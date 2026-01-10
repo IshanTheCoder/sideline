@@ -3,7 +3,7 @@ import { View, StyleSheet, TouchableOpacity, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { AnchorLogo } from '@/components/AnchorLogo';
+import { AnchorLogoHorizontal } from '@/components/AnchorLogoHorizontal';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Colors } from '@/constants/theme';
 
@@ -17,7 +17,7 @@ export default function WelcomeScreen() {
       <View style={styles.content}>
         {/* Logo Section */}
         <View style={styles.logoContainer}>
-          <AnchorLogo width={300} height={150} />
+          <AnchorLogoHorizontal width={450} height={135} />
         </View>
 
         {/* Welcome Text */}
@@ -33,7 +33,7 @@ export default function WelcomeScreen() {
         {/* Action Buttons */}
         <View style={styles.buttonContainer}>
           <TouchableOpacity
-            style={[styles.primaryButton, { backgroundColor: '#1B3B5F' }]}
+            style={[styles.primaryButton, { backgroundColor: '#3B6FA8' }]}
             onPress={() => router.push('/(auth)/signup')}
             activeOpacity={0.8}
           >
@@ -78,7 +78,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   title: {
-    fontSize: 32,
+    fontSize: 42,
     fontWeight: '700',
     marginBottom: 16,
     textAlign: 'center',
@@ -102,7 +102,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     ...Platform.select({
       ios: {
-        shadowColor: '#1B3B5F',
+        shadowColor: '#3B6FA8',
         shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.3,
         shadowRadius: 8,
@@ -128,7 +128,7 @@ const styles = StyleSheet.create({
     opacity: 0.7,
   },
   loginLink: {
-    color: '#1B3B5F',
+    color: '#3B6FA8',
     fontWeight: '600',
     opacity: 1,
   },

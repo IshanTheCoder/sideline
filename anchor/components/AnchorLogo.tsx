@@ -71,7 +71,7 @@ export function AnchorLogo({ width = 400, height = 200, style }: AnchorLogoProps
           fontFamily="Arial, sans-serif"
           fontSize="54"
           fontWeight="700"
-          fill="#1B3B5F"
+          fill="#3B6FA8"
           letterSpacing="3"
         >
           ANCHOR
