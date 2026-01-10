@@ -1,109 +1,84 @@
-# Anchor - Coaching Assistant App
+# Anchor
 
 Anchor is a mobile coaching assistant designed to reduce cognitive overload for volleyball coaches during games. The app allows coaches to quickly capture voice memos during matches without breaking their focus, then review and organize these observations after the game with AI-generated labels and insights.
 
-## Prerequisites
+## The Problem
 
-- Node.js (v18 or later)
-- npm or yarn
-- Expo CLI (`npm install -g expo-cli`)
-- Supabase account (free tier works)
+Coaches experience cognitive overload during games while trying to:
+- Observe player performance in real-time
+- Make tactical decisions
+- Remember specific moments for post-game feedback
+- Track multiple players simultaneously
+- Maintain focus on the game flow
 
-## Setup Instructions
+Traditional note-taking methods (pen and paper, phone notes) require coaches to break their focus, look away from the game, and manually organize observations later. This creates gaps in attention and makes it difficult to capture all important moments.
 
-### 1. Install Dependencies
+## The Solution
 
-```bash
-npm install
-```
+Anchor provides a simple, distraction-free way to capture observations during games:
 
-### 2. Set Up Supabase
+1. **Quick Voice Capture**: One-tap recording with a large, easy-to-hit button that works even when the screen is locked
+2. **AI-Powered Organization**: After the game, AI automatically transcribes recordings and generates helpful labels (skill categories, feedback types, key phrases)
+3. **Organized Review**: Coaches can view all matches, click into any game session, and review all recordings with AI-generated insights
 
-1. Create a new project at [supabase.com](https://supabase.com)
-2. Go to Project Settings > API
-3. Copy your Project URL and anon (public) key
-4. Create a `.env` file in the `anchor` directory:
+The entire capture process takes less than 5 seconds, allowing coaches to stay focused on the game while preserving important observations for later review.
 
-```env
-EXPO_PUBLIC_SUPABASE_URL=your_supabase_project_url
-EXPO_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
-```
+## Key Features
 
-### 3. Set Up Database
+### Quick Voice Recording
+- Large, easy-to-tap record button designed for quick glances
+- Works in the background even when screen is locked
+- Visual feedback with timer and pulsing indicator
+- Auto-saves recordings to the current game session
 
-1. Open your Supabase project dashboard
-2. Go to SQL Editor
-3. Run the SQL script from `database-setup.md` to create the necessary tables and policies
+### Game Session Management
+- Create game sessions with opponent name, date, and location
+- All recordings automatically associated with the active session
+- View all past matches in a list, each titled by opponent name
+- Click into any match to see all recordings and post-game summary
 
-See `database-setup.md` for detailed database setup instructions.
+### AI-Generated Insights
+- Automatic transcription of all voice memos
+- AI extracts key information:
+  - Skill categories (serving, passing, setting, hitting, blocking, defense)
+  - Feedback types (positive reinforcement, correction needed, tactical adjustment)
+  - Mentioned players
+  - Urgency levels
+  - Key phrases and summaries
+- Searchable transcriptions for easy finding of specific observations
 
-### 4. Configure Authentication
+### Post-Game Review
+- View all matches with opponent names as titles
+- Click into any match to see all recordings from that game
+- See AI-generated labels at a glance
+- Filter recordings by skill or feedback type
+- Search transcriptions for specific keywords
+- Play audio recordings and review transcriptions
+- Edit AI labels and add manual notes
+- Post-game summary with key observations
 
-1. In Supabase dashboard, go to Authentication > Providers
-2. Enable Email provider
-3. Configure email settings as needed
+## Technical Stack
 
-### 5. Start the App
+- **Frontend**: React Native with Expo
+- **Backend**: Supabase (Authentication, Database, Storage)
+- **AI Services**: OpenAI Whisper (transcription), GPT-4 (analysis)
 
-```bash
-npx expo start
-```
+## Getting Started
 
-In the output, you'll find options to open the app in:
+1. Install dependencies:
+   ```bash
+   npm install
+   ```
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go) (limited functionality)
+2. Set up Supabase (see `tasks.md` for detailed instructions)
 
-## Project Structure
+3. Start the app:
+   ```bash
+   npx expo start
+   ```
 
-```
-anchor/
-├── app/                    # Expo Router app directory
-│   ├── (auth)/             # Authentication screens
-│   │   ├── welcome.tsx     # Welcome/landing screen
-│   │   ├── signup.tsx      # Signup screen
-│   │   └── login.tsx       # Login screen
-│   └── (tabs)/             # Main app screens (protected)
-├── components/             # Reusable UI components
-├── contexts/               # React contexts (AuthContext, etc.)
-├── lib/                    # Utility functions and services
-│   ├── supabase.ts         # Supabase client configuration
-│   └── auth.ts             # Authentication utilities
-└── constants/              # App constants (themes, etc.)
-```
+For detailed development instructions and setup, see `tasks.md` in the project root.
 
-## Development
+## Project Status
 
-This project uses:
-- **Expo Router** for file-based routing
-- **Supabase** for backend (auth, database, storage)
-- **TypeScript** for type safety
-- **React Native** for cross-platform mobile development
-
-You can start developing by editing the files inside the **app** directory.
-
-## Get a fresh project
-
-When you're ready, run:
-
-```bash
-npm run reset-project
-```
-
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
-
-## Learn more
-
-To learn more about developing your project with Expo, look at the following resources:
-
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
-
-## Join the community
-
-Join our community of developers creating universal apps.
-
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+This project is in active development. The MVP focuses on core recording and review functionality for volleyball coaches.

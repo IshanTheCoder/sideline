@@ -1,57 +1,57 @@
-import { useEffect } from 'react';
-import { StyleSheet, TouchableOpacity, Platform } from 'react-native';
-import { router } from 'expo-router';
+import React from 'react';
+import { View, StyleSheet, TouchableOpacity, Platform } from 'react-native';
+import { useRouter } from 'expo-router';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { useAuth } from '@/contexts/AuthContext';
+import { AnchorLogo } from '@/components/AnchorLogo';
+import { useColorScheme } from '@/hooks/use-color-scheme';
+import { Colors } from '@/constants/theme';
 
 export default function WelcomeScreen() {
-  const { user, loading } = useAuth();
-
-  useEffect(() => {
-    // If user is already logged in, redirect to main app
-    if (!loading && user) {
-      router.replace('/(tabs)');
-    }
-  }, [user, loading]);
-
-  if (loading) {
-    return (
-      <ThemedView style={styles.container}>
-        <ThemedText type="title">Loading...</ThemedText>
-      </ThemedView>
-    );
-  }
+  const router = useRouter();
+  const colorScheme = useColorScheme();
+  const colors = Colors[colorScheme ?? 'light'];
 
   return (
     <ThemedView style={styles.container}>
-      <ThemedView style={styles.content}>
-        <ThemedText type="title" style={styles.title}>
-          Anchor
-        </ThemedText>
-        <ThemedText style={styles.subtitle}>
-          Your coaching assistant for capturing game observations
-        </ThemedText>
-        <ThemedText style={styles.description}>
-          Quickly capture voice memos during games and organize them with AI-powered insights.
-        </ThemedText>
-      </ThemedView>
+      <View style={styles.content}>
+        {/* Logo Section */}
+        <View style={styles.logoContainer}>
+          <AnchorLogo width={300} height={150} />
+        </View>
 
-      <ThemedView style={styles.buttonContainer}>
-        <TouchableOpacity
-          style={styles.primaryButton}
-          onPress={() => router.push('/(auth)/signup')}
-          activeOpacity={0.8}>
-          <ThemedText style={styles.primaryButtonText}>Get Started</ThemedText>
-        </TouchableOpacity>
+        {/* Welcome Text */}
+        <View style={styles.textContainer}>
+          <ThemedText type="title" style={styles.title}>
+            Welcome to Anchor
+          </ThemedText>
+          <ThemedText style={styles.description}>
+            Your coaching assistant for capturing and organizing game observations
+          </ThemedText>
+        </View>
 
-        <TouchableOpacity
-          style={styles.secondaryButton}
-          onPress={() => router.push('/(auth)/login')}
-          activeOpacity={0.8}>
-          <ThemedText style={styles.secondaryButtonText}>Already have an account? Login</ThemedText>
-        </TouchableOpacity>
-      </ThemedView>
+        {/* Action Buttons */}
+        <View style={styles.buttonContainer}>
+          <TouchableOpacity
+            style={[styles.primaryButton, { backgroundColor: '#1B3B5F' }]}
+            onPress={() => router.push('/(auth)/signup')}
+            activeOpacity={0.8}
+          >
+            <ThemedText style={styles.primaryButtonText}>Get Started</ThemedText>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.secondaryButton}
+            onPress={() => router.push('/(auth)/login')}
+            activeOpacity={0.8}
+          >
+            <ThemedText style={styles.secondaryButtonText}>
+              Already have an account?{' '}
+              <ThemedText style={styles.loginLink}>Login</ThemedText>
+            </ThemedText>
+          </TouchableOpacity>
+        </View>
+      </View>
     </ThemedView>
   );
 }
@@ -59,55 +59,77 @@ export default function WelcomeScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 20,
-    justifyContent: 'space-between',
-  },
-  content: {
-    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    gap: 16,
+    paddingHorizontal: 24,
+  },
+  content: {
+    width: '100%',
+    maxWidth: 400,
+    alignItems: 'center',
+  },
+  logoContainer: {
+    marginBottom: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  textContainer: {
+    marginBottom: 48,
+    alignItems: 'center',
   },
   title: {
-    fontSize: 48,
-    fontWeight: 'bold',
-    marginBottom: 8,
+    fontSize: 32,
+    fontWeight: '700',
+    marginBottom: 16,
     textAlign: 'center',
-  },
-  subtitle: {
-    fontSize: 20,
-    textAlign: 'center',
-    marginTop: 8,
-    fontWeight: '600',
   },
   description: {
     fontSize: 16,
-    textAlign: 'center',
-    marginTop: 16,
-    paddingHorizontal: 20,
     lineHeight: 24,
+    textAlign: 'center',
+    opacity: 0.8,
+    paddingHorizontal: 16,
   },
   buttonContainer: {
-    gap: 12,
-    paddingBottom: Platform.OS === 'ios' ? 40 : 20,
+    width: '100%',
+    gap: 16,
   },
   primaryButton: {
-    backgroundColor: '#0a7ea4',
-    padding: 16,
+    width: '100%',
+    paddingVertical: 16,
     borderRadius: 12,
     alignItems: 'center',
+    justifyContent: 'center',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#1B3B5F',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
+      },
+      android: {
+        elevation: 4,
+      },
+    }),
   },
   primaryButtonText: {
-    color: '#fff',
+    color: '#FFFFFF',
     fontSize: 18,
     fontWeight: '600',
   },
   secondaryButton: {
-    padding: 16,
+    width: '100%',
+    paddingVertical: 12,
     alignItems: 'center',
+    justifyContent: 'center',
   },
   secondaryButtonText: {
     fontSize: 16,
-    color: '#0a7ea4',
+    opacity: 0.7,
+  },
+  loginLink: {
+    color: '#1B3B5F',
+    fontWeight: '600',
+    opacity: 1,
   },
 });

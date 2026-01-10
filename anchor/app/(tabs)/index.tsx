@@ -1,13 +1,21 @@
 import { Image } from 'expo-image';
 import { Platform, StyleSheet } from 'react-native';
+import { useEffect, useState } from 'react';
 
 import { HelloWave } from '@/components/hello-wave';
 import ParallaxScrollView from '@/components/parallax-scroll-view';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Link } from 'expo-router';
+import { testSupabaseConnection } from '@/lib/testSupabase';
 
 export default function HomeScreen() {
+  const [testResult, setTestResult] = useState<{ success: boolean; message?: string; error?: string } | null>(null);
+
+  useEffect(() => {
+    // Run Supabase connection test on component mount
+    testSupabaseConnection().then(setTestResult);
+  }, []);
   return (
     <ParallaxScrollView
       headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
@@ -20,6 +28,21 @@ export default function HomeScreen() {
       <ThemedView style={styles.titleContainer}>
         <ThemedText type="title">Welcome!</ThemedText>
         <HelloWave />
+      </ThemedView>
+      <ThemedView style={styles.stepContainer}>
+        <ThemedText type="subtitle">Supabase Connection Test</ThemedText>
+        {testResult ? (
+          <ThemedText>
+            {testResult.success ? (
+              <ThemedText style={{ color: 'green' }}>✅ {testResult.message}</ThemedText>
+            ) : (
+              <ThemedText style={{ color: 'red' }}>❌ Error: {testResult.error}</ThemedText>
+            )}
+            {'\n'}Check console for detailed logs.
+          </ThemedText>
+        ) : (
+          <ThemedText>Testing connection...</ThemedText>
+        )}
       </ThemedView>
       <ThemedView style={styles.stepContainer}>
         <ThemedText type="subtitle">Step 1: Try it</ThemedText>
