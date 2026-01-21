@@ -10,7 +10,12 @@
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.anchor.app"
+      "bundleIdentifier": "com.anchor.app",
+      "infoPlist": {
+        "NSPhotoLibraryUsageDescription": "This app needs access to your photo library to upload profile pictures.",
+        "NSPhotoLibraryAddUsageDescription": "This app needs access to save photos to your library.",
+        "NSMicrophoneUsageDescription": "Anchor needs access to your microphone to record voice memos during games."
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -40,7 +45,21 @@
             "backgroundColor": "#000000"
           }
         }
-      ]
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "The app accesses your photos to let you share them.",
+          "cameraPermission": "The app accesses your camera to let you take photos."
+        }
+      ],
+      [
+        "expo-av",
+        {
+          "microphonePermission": "Anchor needs access to your microphone to record voice memos during games."
+        }
+      ],
+      "@react-native-community/datetimepicker"
     ],
     "experiments": {
       "typedRoutes": true,
