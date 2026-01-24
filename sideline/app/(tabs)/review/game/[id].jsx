@@ -1,0 +1,350 @@
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import {
+  ActivityIndicator,
+  Alert,
+  FlatList,
+  StyleSheet,
+  TouchableOpacity,
+  View,
+} from 'react-native';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { ThemedText } from '@/components/themed-text';
+import { ThemedView } from '@/components/themed-view';
+import { IconSymbol } from '@/components/ui/icon-symbol';
+import { Colors } from '@/constants/theme';
+import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useAuth } from '@/contexts/AuthContext';
+import {
+  deleteRecordingForUser,
+  fetchRecordingsForGame,
+  formatDuration,
+  parseRecordingNotes,
+} from '@/lib/recording';
+
+export default function GameRecordingsScreen() {
+  const { id } = useLocalSearchParams();
+  const router = useRouter();
+  const colorScheme = useColorScheme();
+  const { user } = useAuth();
+  const [recordings, setRecordings] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  const gameId = useMemo(() => {
+    if (Array.isArray(id)) return id[0];
+    return id;
+  }, [id]);
+
+  const loadRecordings = useCallback(async () => {
+    if (!user?.id || !gameId) {
+      setLoading(false);
+      setRecordings([]);
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+
+    const { data, error: fetchError } = await fetchRecordingsForGame(
+      user.id,
+      gameId
+    );
+
+    if (fetchError) {
+      setError(fetchError.message);
+    } else {
+      setRecordings(data ?? []);
+    }
+
+    setLoading(false);
+  }, [user?.id, gameId]);
+
+  useEffect(() => {
+    loadRecordings();
+  }, [loadRecordings]);
+
+  const formatDate = (dateString) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+    });
+  };
+
+  const formatMarkerTime = (seconds) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  const handleDelete = (recording) => {
+    if (!user?.id) return;
+
+    Alert.alert(
+      'Delete recording?',
+      'This will permanently remove the audio file and its notes.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            const { error: deleteError } = await deleteRecordingForUser(
+              user.id,
+              recording.id,
+              recording.audio_url
+            );
+
+            if (deleteError) {
+              Alert.alert('Delete failed', deleteError.message);
+              return;
+            }
+
+            setRecordings((prev) => prev.filter((item) => item.id !== recording.id));
+          },
+        },
+      ]
+    );
+  };
+
+  const renderRecordingItem = ({ item }) => {
+    const { setMarkers } = parseRecordingNotes(item.manual_notes ?? null);
+    return (
+      <TouchableOpacity
+      style={[
+        styles.recordingItem,
+        {
+          backgroundColor: colorScheme === 'dark' ? '#2A2A2A' : '#F5F5F5',
+          borderColor: colorScheme === 'dark' ? '#3A3A3A' : '#E5E5E5',
+        },
+      ]}
+      onPress={() => router.push(`/(tabs)/review/${item.id}`)}
+      activeOpacity={0.7}
+    >
+      <View style={styles.iconContainer}>
+        <IconSymbol
+          name="waveform"
+          size={24}
+          color={Colors[colorScheme ?? 'light'].tint}
+        />
+      </View>
+      <View style={styles.recordingInfo}>
+        <ThemedText style={styles.recordingTitle}>
+          {formatDate(item.created_at)}
+        </ThemedText>
+        <View style={styles.recordingMeta}>
+          <ThemedText style={styles.metaText}>
+            {formatDuration(item.duration)}
+          </ThemedText>
+        </View>
+        {setMarkers.length > 0 && (
+          <View style={styles.markerRow}>
+            <ThemedText style={styles.markerText}>
+              {setMarkers
+                .map((marker) => `${marker.label} ${formatMarkerTime(marker.offsetSeconds)}`)
+                .join(' • ')}
+            </ThemedText>
+          </View>
+        )}
+      </View>
+      <TouchableOpacity
+        style={styles.deleteButton}
+        onPress={() => handleDelete(item)}
+        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+      >
+        <IconSymbol
+          name="trash"
+          size={20}
+          color={colorScheme === 'dark' ? '#FF6B6B' : '#D32F2F'}
+        />
+      </TouchableOpacity>
+    </TouchableOpacity>
+    );
+  };
+
+  const headerTitle =
+    recordings[0]?.game_sessions?.opponent_name
+      ? `vs. ${recordings[0]?.game_sessions?.opponent_name}`
+      : 'Game Recordings';
+
+  return (
+    <ThemedView style={styles.container}>
+      <View style={styles.header}>
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={() => router.back()}
+          activeOpacity={0.7}
+        >
+          <IconSymbol
+            name="chevron.left"
+            size={28}
+            color={Colors[colorScheme ?? 'light'].text}
+          />
+          <ThemedText style={styles.backText}>Back</ThemedText>
+        </TouchableOpacity>
+        <ThemedText type="title" style={styles.title}>
+          {headerTitle}
+        </ThemedText>
+      </View>
+
+      {loading && (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={Colors[colorScheme ?? 'light'].tint} />
+          <ThemedText style={styles.loadingText}>Loading recordings...</ThemedText>
+        </View>
+      )}
+
+      {!loading && error && (
+        <View style={styles.errorContainer}>
+          <ThemedText style={styles.errorText}>{error}</ThemedText>
+          <TouchableOpacity style={styles.retryButton} onPress={loadRecordings}>
+            <ThemedText style={[styles.retryButtonText, { color: Colors[colorScheme ?? 'light'].tint }]}>
+              Retry
+            </ThemedText>
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {!loading && !error && recordings.length === 0 && (
+        <View style={styles.emptyContainer}>
+          <ThemedText style={styles.emptyTitle}>No recordings for this game</ThemedText>
+          <ThemedText style={styles.emptySubtitle}>
+            Recordings will appear here after you finish a session.
+          </ThemedText>
+        </View>
+      )}
+
+      {!loading && !error && recordings.length > 0 && (
+        <FlatList
+          data={recordings}
+          renderItem={renderRecordingItem}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={styles.listContent}
+          ItemSeparatorComponent={() => <View style={styles.separator} />}
+        />
+      )}
+    </ThemedView>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    paddingHorizontal: 20,
+    paddingTop: 50,
+  },
+  header: {
+    paddingBottom: 16,
+  },
+  backButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  backText: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  title: {
+    fontSize: 24,
+    marginTop: 12,
+  },
+  listContent: {
+    paddingBottom: 40,
+  },
+  recordingItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  iconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(30, 144, 255, 0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  recordingInfo: {
+    flex: 1,
+  },
+  recordingTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  recordingMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  metaText: {
+    fontSize: 13,
+    opacity: 0.6,
+  },
+  markerRow: {
+    marginTop: 6,
+  },
+  markerText: {
+    fontSize: 12,
+    opacity: 0.6,
+  },
+  deleteButton: {
+    paddingLeft: 12,
+  },
+  separator: {
+    height: 12,
+  },
+  loadingContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 40,
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 14,
+    opacity: 0.6,
+  },
+  errorContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 32,
+    paddingHorizontal: 20,
+  },
+  errorText: {
+    fontSize: 14,
+    opacity: 0.7,
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+  retryButton: {
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+    backgroundColor: 'rgba(30, 144, 255, 0.1)',
+  },
+  retryButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  emptyContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 48,
+    paddingHorizontal: 20,
+  },
+  emptyTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    marginBottom: 8,
+  },
+  emptySubtitle: {
+    fontSize: 15,
+    opacity: 0.6,
+    textAlign: 'center',
+    lineHeight: 22,
+  },
+});
