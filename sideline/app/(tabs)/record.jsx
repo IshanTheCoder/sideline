@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
-import { StyleSheet, View, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
+import { StyleSheet, View, TouchableOpacity, ActivityIndicator, Alert, Platform } from 'react-native';
 import { Audio } from 'expo-av';
 import { useRouter } from 'expo-router';
+import * as Crypto from 'expo-crypto';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -12,6 +13,7 @@ import { useThemeColor } from '@/hooks/use-theme-color';
 import { useAuth } from '@/contexts/AuthContext';
 import { useActiveSession } from '@/contexts/ActiveSessionContext';
 import { uploadRecording, createRecordingRecord, serializeRecordingNotes } from '@/lib/recording';
+import { processRecording, generateLabelsForGameSession } from '@/lib/recordingProcessing';
 
 export default function RecordScreen() {
   const router = useRouter();
@@ -28,6 +30,7 @@ export default function RecordScreen() {
   const [error, setError] = useState(null);
   const [selectedSet, setSelectedSet] = useState(null);
   const [selectedSetOffsetSeconds, setSelectedSetOffsetSeconds] = useState(null);
+  const [isProcessing, setIsProcessing] = useState(false);
 
   // Audio recording reference
   const recordingRef = useRef(null);
@@ -216,7 +219,7 @@ export default function RecordScreen() {
       // Generate unique recording ID (UUID)
       let recordingId;
       try {
-        recordingId = await Crypto.randomUUID();
+        recordingId = Crypto.randomUUID();
       } catch (uuidError) {
         console.error('Failed to generate UUID:', uuidError);
         const errorMsg = 'Failed to generate recording ID. Please try again.';
@@ -292,6 +295,30 @@ export default function RecordScreen() {
         );
       } else {
         console.log('Recording record created successfully:', recordingRecord);
+        
+        // Start transcribing the recording in the background
+        // Labels will be generated when the game ends
+        setIsProcessing(true);
+        processRecording(recordingId, user.id)
+          .then((result) => {
+            setIsProcessing(false);
+            if (result.success) {
+              console.log('✅ Recording transcribed successfully!');
+              console.log('Transcription:', result.transcription?.substring(0, 100));
+              
+              // Silent success - labels will be generated when game ends
+              // No alert needed to avoid interrupting the user
+            } else {
+              console.error('⚠️ Recording transcription failed:', result.error);
+              // Don't show error alert - processing is a background task
+              // The recording is still saved and usable
+            }
+          })
+          .catch((error) => {
+            setIsProcessing(false);
+            console.error('❌ Unexpected error during transcription:', error);
+            // Don't show error alert - processing is a background task
+          });
       }
 
       // Create recording object for local state
@@ -374,6 +401,41 @@ export default function RecordScreen() {
             if (isRecording) {
               await stopRecording();
             }
+            
+            // Generate labels for all recordings in this game session
+            if (activeSession?.id && user?.id) {
+              console.log('🏷️  Starting batch label generation for game session...');
+              Alert.alert(
+                'Processing Recordings',
+                'Waiting for transcriptions to complete, then generating AI labels...',
+                [{ text: 'OK' }]
+              );
+              
+              // Wait 10 seconds for any in-progress transcriptions to complete
+              // before starting label generation
+              setTimeout(() => {
+                console.log('🏷️  Starting label generation after delay...');
+                generateLabelsForGameSession(activeSession.id, user.id)
+                  .then((result) => {
+                    if (result.success) {
+                      console.log(`✅ Label generation complete! Processed: ${result.processedCount}, Failed: ${result.failedCount}`);
+                      if (result.processedCount > 0) {
+                        Alert.alert(
+                          'Labels Generated',
+                          `Successfully generated labels for ${result.processedCount} recording${result.processedCount !== 1 ? 's' : ''}!`,
+                          [{ text: 'OK' }]
+                        );
+                      }
+                    } else {
+                      console.error('❌ Batch label generation failed:', result.error);
+                    }
+                  })
+                  .catch((error) => {
+                    console.error('❌ Unexpected error during batch label generation:', error);
+                  });
+              }, 10000); // Wait 10 seconds
+            }
+            
             resetSessionDetails();
             router.push('/(tabs)/review');
           },

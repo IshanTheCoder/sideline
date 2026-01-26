@@ -49,28 +49,9 @@ async function downloadAudioFile(audioUrl) {
       throw new Error(`Failed to download audio file: ${downloadResult.status}`);
     }
     
-    // Read file as base64 and convert to blob
-    const base64 = await FileSystem.readAsStringAsync(fileUri, {
-      encoding: 'base64',
-    });
-    
-    // Convert base64 to blob
-    const byteCharacters = atob(base64);
-    const byteNumbers = new Array(byteCharacters.length);
-    for (let i = 0; i < byteCharacters.length; i++) {
-      byteNumbers[i] = byteCharacters.charCodeAt(i);
-    }
-    const byteArray = new Uint8Array(byteNumbers);
-    const blob = new Blob([byteArray], { type: 'audio/m4a' });
-    
-    // Clean up temporary file
-    try {
-      await FileSystem.deleteAsync(fileUri);
-    } catch (err) {
-      console.warn('Failed to delete temporary file:', err);
-    }
-    
-    return blob;
+    // For React Native, return the file URI
+    // We'll handle the upload manually in transcribeAudio
+    return { uri: fileUri, name: 'recording.m4a', type: 'audio/m4a' };
   }
 }
 
@@ -92,23 +73,61 @@ export async function transcribeAudio(audioUrl) {
 
     // Download the audio file
     const audioFile = await downloadAudioFile(audioUrl);
-    console.log('Audio file downloaded, size:', audioFile.size, 'bytes');
+    console.log('Audio file downloaded');
 
-    // Send to OpenAI Whisper API
-    console.log('Sending to OpenAI Whisper API...');
-    const response = await openai.audio.transcriptions.create({
-      file: audioFile,
-      model: 'whisper-1',
-      language: 'en', // Optimize for English
-      response_format: 'text', // Get plain text response
-    });
-
-    console.log('✅ Transcription completed successfully');
-    
-    // Response is already a string when response_format is 'text'
-    const transcription = typeof response === 'string' ? response : response.text;
-    
-    return { transcription, error: null };
+    // For React Native, we need to manually create FormData and use fetch
+    if (Platform.OS !== 'web' && audioFile.uri) {
+      console.log('Sending to OpenAI Whisper API (React Native)...');
+      
+      const formData = new FormData();
+      formData.append('file', {
+        uri: audioFile.uri,
+        name: audioFile.name,
+        type: audioFile.type,
+      });
+      formData.append('model', 'whisper-1');
+      formData.append('language', 'en');
+      formData.append('response_format', 'text');
+      
+      const response = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${openaiApiKey}`,
+        },
+        body: formData,
+      });
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`OpenAI API error: ${response.status} ${errorText}`);
+      }
+      
+      const transcription = await response.text();
+      
+      // Clean up temporary file
+      try {
+        await FileSystem.deleteAsync(audioFile.uri);
+        console.log('🗑️ Temporary file cleaned up');
+      } catch (err) {
+        console.warn('Failed to delete temporary file:', err);
+      }
+      
+      console.log('✅ Transcription completed successfully');
+      return { transcription, error: null };
+    } else {
+      // Web platform - use OpenAI SDK
+      console.log('Sending to OpenAI Whisper API (Web)...');
+      const response = await openai.audio.transcriptions.create({
+        file: audioFile,
+        model: 'whisper-1',
+        language: 'en',
+        response_format: 'text',
+      });
+      
+      console.log('✅ Transcription completed successfully');
+      const transcription = typeof response === 'string' ? response : response.text;
+      return { transcription, error: null };
+    }
   } catch (error) {
     console.error('Error transcribing audio:', error);
     

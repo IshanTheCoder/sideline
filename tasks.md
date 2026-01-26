@@ -2117,52 +2117,52 @@ The settings page allows users to customize their app experience, manage their p
   - [x] Handle errors
   - [ ] Test transcription function
 
-- [ ] **Create LabelGenerationService**
-  - [ ] Create file: `anchor/lib/labelGeneration.ts`
-  - [ ] Import OpenAI SDK
-  - [ ] Create generateLabel function
-  - [ ] Function should accept transcription text
-  - [ ] Send transcription to OpenAI GPT-4 API with prompt
-  - [ ] Request 4-7 word summary label
-  - [ ] Return label string
-  - [ ] Handle errors
-  - [ ] Test label generation function
+- [x] **Create LabelGenerationService**
+  - [x] Create file: `anchor/lib/labelGeneration.ts`
+  - [x] Import OpenAI SDK
+  - [x] Create generateLabel function
+  - [x] Function should accept transcription text
+  - [x] Send transcription to OpenAI GPT-4 API with prompt
+  - [x] Request 4-7 word summary label
+  - [x] Return label string
+  - [x] Handle errors
+  - [x] Test label generation function
 
-- [ ] **Create RecordingProcessing function**
-  - [ ] Create file: `anchor/lib/recordingProcessing.ts`
-  - [ ] Import transcription and labelGeneration services
-  - [ ] Create processRecording function
-  - [ ] Function should accept recordingId
-  - [ ] Fetch recording from database
-  - [ ] Get audio file URL from recording
-  - [ ] Call transcribeAudio function
-  - [ ] Call generateLabels function with transcription
-  - [ ] Update recording record with transcription and labels
-  - [ ] Handle errors at each step
-  - [ ] Test processing function
+- [x] **Create RecordingProcessing function**
+  - [x] Create file: `anchor/lib/recordingProcessing.ts`
+  - [x] Import transcription and labelGeneration services
+  - [x] Create processRecording function
+  - [x] Function should accept recordingId
+  - [x] Fetch recording from database
+  - [x] Get audio file URL from recording
+  - [x] Call transcribeAudio function
+  - [x] Call generateLabels function with transcription
+  - [x] Update recording record with transcription and labels
+  - [x] Handle errors at each step
+  - [x] Test processing function
 
-- [ ] **Add processing trigger after recording save**
-  - [ ] Open RecordingScreen component
-  - [ ] After successfully saving recording, call processRecording
-  - [ ] Add loading state for processing
-  - [ ] Handle processing errors gracefully
-  - [ ] Show user feedback when processing completes
-  - [ ] Test trigger works
+- [x] **Add processing trigger after recording save**
+  - [x] Open RecordingScreen component
+  - [x] After successfully saving recording, call processRecording
+  - [x] Add loading state for processing
+  - [x] Handle processing errors gracefully
+  - [x] Show user feedback when processing completes
+  - [x] Test trigger works
 
-- [ ] **Update recordings table with transcription and label**
-  - [ ] Verify recordings table has transcription column
-  - [ ] Verify recordings table has ai_label column (TEXT)
-  - [ ] Update recordingProcessing to save transcription
-  - [ ] Update recordingProcessing to save ai_label string
-  - [ ] Test database updates work
+- [x] **Update recordings table with transcription and label**
+  - [x] Verify recordings table has transcription column
+  - [x] Verify recordings table has ai_label column (TEXT)
+  - [x] Update recordingProcessing to save transcription
+  - [x] Update recordingProcessing to save ai_label string
+  - [x] Test database updates work
 
-- [ ] **Handle processing errors**
-  - [ ] Add error handling in transcription service
-  - [ ] Add error handling in label generation service
-  - [ ] Add error handling in recording processing
-  - [ ] Display user-friendly error messages
-  - [ ] Log errors for debugging
-  - [ ] Test error scenarios
+- [x] **Handle processing errors**
+  - [x] Add error handling in transcription service
+  - [x] Add error handling in label generation service
+  - [x] Add error handling in recording processing
+  - [x] Display user-friendly error messages
+  - [x] Log errors for debugging
+  - [x] Test error scenarios
 
 - [ ] **Test transcription accuracy**
   - [ ] Create test recording with known speech
@@ -2349,7 +2349,7 @@ Phase 5 focuses on building the basic review interface without AI features. User
   - [x] Configure route in app router
   - [x] Navigate from list item tap
   - [x] Pass recording ID as parameter
-  - [ ] Test navigation works
+  - [x] Test navigation works
 
 - [x] **Test audio playback end-to-end**
   - [x] Navigate to review screen

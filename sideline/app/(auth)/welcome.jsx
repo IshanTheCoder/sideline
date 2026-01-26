@@ -1,9 +1,8 @@
 import React from 'react';
-import { View, StyleSheet, TouchableOpacity, Platform } from 'react-native';
+import { View, StyleSheet, TouchableOpacity, Platform, Image, Text } from 'react-native';
 import { useRouter } from 'expo-router';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { SidelineLogoHorizontal } from '@/components/SidelineLogoHorizontal';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Colors } from '@/constants/theme';
 
@@ -17,7 +16,12 @@ export default function WelcomeScreen() {
       <View style={styles.content}>
         {/* Logo Section */}
         <View style={styles.logoContainer}>
-          <SidelineLogoHorizontal width={450} height={176} />
+          <Image
+            source={require('@/assets/images/whistle-logo.png')}
+            style={styles.whistleLogo}
+            resizeMode="contain"
+          />
+          <Text style={styles.logoText}>SIDELINE</Text>
         </View>
 
         {/* Welcome Text */}
@@ -61,7 +65,8 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 24,
+    paddingHorizontal: 12,
+    overflow: 'visible',
   },
   content: {
     width: '100%',
@@ -69,20 +74,39 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   logoContainer: {
-    marginBottom: 48,
+    marginBottom: 36,
     alignItems: 'center',
     justifyContent: 'center',
+    width: '100%',
+    overflow: 'visible',
+  },
+  whistleLogo: {
+    width: 360,
+    height: 360,
+    marginBottom: 32,
+  },
+  logoText: {
+    fontSize: 68,
+    fontWeight: '900',
+    color: '#5A8A6D',
+    letterSpacing: -1.5,
+    textAlign: 'center',
+    width: '100%',
+    lineHeight: 80,
+    includeFontPadding: false,
+    textAlignVertical: 'center',
   },
   textContainer: {
-    marginBottom: 48,
+    marginTop: 24,
+    marginBottom: 32,
     alignItems: 'center',
   },
   title: {
-    fontSize: 42,
+    fontSize: 36,
     fontWeight: '700',
-    lineHeight: 48,
+    lineHeight: 42,
     paddingVertical: 2,
-    marginBottom: 16,
+    marginBottom: 12,
     textAlign: 'center',
   },
   description: {

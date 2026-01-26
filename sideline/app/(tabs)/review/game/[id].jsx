@@ -131,12 +131,20 @@ export default function GameRecordingsScreen() {
       </View>
       <View style={styles.recordingInfo}>
         <ThemedText style={styles.recordingTitle}>
-          {formatDate(item.created_at)}
+          {item.ai_labels || formatDate(item.created_at)}
         </ThemedText>
         <View style={styles.recordingMeta}>
           <ThemedText style={styles.metaText}>
             {formatDuration(item.duration)}
           </ThemedText>
+          {item.ai_labels && (
+            <>
+              <ThemedText style={styles.metaText}> • </ThemedText>
+              <ThemedText style={[styles.metaText, { opacity: 0.6 }]}>
+                {formatDate(item.created_at)}
+              </ThemedText>
+            </>
+          )}
         </View>
         {setMarkers.length > 0 && (
           <View style={styles.markerRow}>

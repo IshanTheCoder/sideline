@@ -242,6 +242,16 @@ export default function RecordingDetailScreen() {
             🎙️ Recording
           </ThemedText>
 
+          {/* Processing indicator */}
+          {recording.status === 'new' && !recording.transcription && (
+            <View style={[styles.processingCard, { backgroundColor: colorScheme === 'dark' ? '#1A2A1F' : '#F0FFF4' }]}>
+              <ActivityIndicator size="small" color={Colors[colorScheme ?? 'light'].tint} />
+              <ThemedText style={styles.processingText}>
+                🔄 Processing recording... Transcription and labeling in progress.
+              </ThemedText>
+            </View>
+          )}
+
           <View style={styles.metaCard}>
             <ThemedText style={styles.metaLabel}>Date</ThemedText>
             <ThemedText style={styles.metaValue}>{formatDate(recording.created_at)}</ThemedText>
@@ -294,6 +304,39 @@ export default function RecordingDetailScreen() {
               <ThemedText style={styles.mutedText}>No set markers added.</ThemedText>
             )}
           </View>
+
+          {/* AI-Generated Label */}
+          {recording.ai_labels && (
+            <View style={styles.section}>
+              <ThemedText style={styles.sectionTitle}>🏷️ AI Label</ThemedText>
+              <View style={[styles.aiLabelCard, { backgroundColor: colorScheme === 'dark' ? '#1A2332' : '#F0F7FF' }]}>
+                <ThemedText style={styles.aiLabelText}>{recording.ai_labels}</ThemedText>
+              </View>
+            </View>
+          )}
+
+          {/* Transcription */}
+          {recording.transcription && (
+            <View style={styles.section}>
+              <ThemedText style={styles.sectionTitle}>📝 Transcription</ThemedText>
+              <View style={[styles.transcriptionCard, { backgroundColor: colorScheme === 'dark' ? '#1F1F1F' : '#FFFFFF' }]}>
+                <ThemedText style={styles.transcriptionText}>{recording.transcription}</ThemedText>
+              </View>
+            </View>
+          )}
+
+          {/* Processing Status */}
+          {recording.status && recording.status !== 'processed' && recording.status !== 'new' && (
+            <View style={styles.section}>
+              <View style={[styles.statusCard, { backgroundColor: colorScheme === 'dark' ? '#2A1F1F' : '#FFF5F5' }]}>
+                <ThemedText style={[styles.statusText, { color: colorScheme === 'dark' ? '#FF9999' : '#D32F2F' }]}>
+                  {recording.status === 'transcription_failed' && '⚠️ Transcription failed'}
+                  {recording.status === 'label_failed' && '⚠️ Label generation failed (transcription available)'}
+                  {!['transcription_failed', 'label_failed'].includes(recording.status) && `Status: ${recording.status}`}
+                </ThemedText>
+              </View>
+            </View>
+          )}
 
           <View style={styles.section}>
             <ThemedText style={styles.sectionTitle}>Manual notes</ThemedText>
@@ -462,5 +505,50 @@ const styles = StyleSheet.create({
   retryButtonText: {
     fontSize: 14,
     fontWeight: '600',
+  },
+  processingCard: {
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(52, 199, 89, 0.3)',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  processingText: {
+    fontSize: 14,
+    flex: 1,
+    lineHeight: 20,
+  },
+  aiLabelCard: {
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(30, 144, 255, 0.3)',
+  },
+  aiLabelText: {
+    fontSize: 16,
+    fontWeight: '600',
+    lineHeight: 24,
+  },
+  transcriptionCard: {
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(128, 128, 128, 0.2)',
+  },
+  transcriptionText: {
+    fontSize: 15,
+    lineHeight: 22,
+  },
+  statusCard: {
+    padding: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 59, 48, 0.3)',
+  },
+  statusText: {
+    fontSize: 13,
+    fontWeight: '500',
   },
 });

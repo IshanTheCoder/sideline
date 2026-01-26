@@ -472,6 +472,9 @@ export async function fetchRecordingById(userId, recordingId) {
         user_id,
         game_session_id,
         manual_notes,
+        transcription,
+        ai_labels,
+        status,
         game_sessions (
           opponent_name,
           date
@@ -493,6 +496,9 @@ export async function fetchRecordingById(userId, recordingId) {
           audio_url,
           game_session_id,
           manual_notes,
+          transcription,
+          ai_labels,
+          status,
           game_sessions!inner (
             opponent_name,
             date,
