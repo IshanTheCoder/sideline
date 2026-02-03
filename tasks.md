@@ -2407,7 +2407,7 @@ Phase 5 focuses on building the basic review interface without AI features. User
 
 ### Overview
 
-Phase 8 builds on the basic review interface from Phase 5 by adding AI-powered features like transcription search, intelligent filtering, post-game summaries, and analytics. This phase requires Phase 7 (AI Integration) to be complete so recordings have transcriptions and labels.
+Phase 8 builds on the basic review interface from Phase 5 by adding AI-powered features like transcription search, intelligent filtering, post-game summaries. This phase requires Phase 7 (AI Integration) to be complete so recordings have transcriptions and labels.
 
 ### Component Breakdown
 

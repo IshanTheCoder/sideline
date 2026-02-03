@@ -405,6 +405,9 @@ export async function fetchRecordingsForGame(userId, gameSessionId) {
         user_id,
         game_session_id,
         manual_notes,
+        transcription,
+        ai_labels,
+        status,
         game_sessions (
           opponent_name,
           date
@@ -430,6 +433,9 @@ export async function fetchRecordingsForGame(userId, gameSessionId) {
           audio_url,
           game_session_id,
           manual_notes,
+          transcription,
+          ai_labels,
+          status,
           game_sessions!inner (
             opponent_name,
             date,
@@ -569,25 +575,44 @@ function getStoragePathFromPublicUrl(publicUrl) {
 // Create a signed URL for private audio playback
 export async function createSignedRecordingUrl(audioUrl, expiresInSeconds = 3600) {
   try {
+    // Try to parse as a public URL first
     const parsed = getStoragePathFromPublicUrl(audioUrl);
-    if (!parsed) {
-      // If it's not a storage public URL, just return as-is
+    
+    let bucket = 'recordings'; // Default bucket
+    let path = audioUrl; // Assume it's already a path
+    
+    if (parsed) {
+      // If we successfully parsed a public URL, extract bucket and path
+      const [parsedBucket, ...rest] = parsed.split('/');
+      if (parsedBucket && rest.length > 0) {
+        bucket = parsedBucket;
+        path = rest.join('/');
+      }
+    } else if (audioUrl.startsWith('http://') || audioUrl.startsWith('https://')) {
+      // It's a URL but couldn't be parsed - return as-is
       return { url: audioUrl, error: null };
     }
-
-    const [bucket, ...rest] = parsed.split('/');
-    if (!bucket || rest.length === 0) {
-      return { url: audioUrl, error: null };
-    }
-
-    const path = rest.join('/');
+    // else: it's already a storage path, use it directly with default bucket
+    
+    console.log('Creating signed URL - bucket:', bucket, 'path:', path);
     const { data, error } = await supabase.storage
       .from(bucket)
       .createSignedUrl(path, expiresInSeconds);
 
-    if (error) return { url: null, error };
+    if (error) {
+      console.error('Supabase createSignedUrl error:', error);
+      return { url: null, error };
+    }
+    
+    if (!data || !data.signedUrl) {
+      console.error('No signed URL returned from Supabase');
+      return { url: null, error: new Error('No signed URL returned') };
+    }
+    
+    console.log('Signed URL created successfully');
     return { url: data.signedUrl, error: null };
   } catch (e) {
+    console.error('Exception in createSignedRecordingUrl:', e);
     return { url: null, error: e };
   }
 }

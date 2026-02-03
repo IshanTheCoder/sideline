@@ -340,19 +340,6 @@ export default function HomeScreen() {
               ))}
             </View>
           )}
-
-          {games.length > 0 && !loading && !error && (
-            <TouchableOpacity 
-              style={styles.viewAllButton}
-              onPress={handleViewAllRecordings}
-            >
-              <ThemedText style={[styles.viewAllButtonText, {
-                color: Colors[colorScheme ?? 'light'].tint,
-              }]}>
-                View All Games →
-              </ThemedText>
-            </TouchableOpacity>
-          )}
         </View>
       </ScrollView>
     </ThemedView>
@@ -529,15 +516,6 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   viewAllText: {
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  viewAllButton: {
-    alignItems: 'center',
-    paddingVertical: 16,
-    marginTop: 12,
-  },
-  viewAllButtonText: {
     fontSize: 16,
     fontWeight: '600',
   },

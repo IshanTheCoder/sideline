@@ -17,12 +17,9 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useAuth } from '@/contexts/AuthContext';
-import AudioPlayer from '@/components/AudioPlayer';
 import {
   deleteRecordingForUser,
-  createSignedRecordingUrl,
   fetchRecordingById,
-  formatDuration,
   saveRecordingNotes,
   parseRecordingNotes,
   serializeRecordingNotes,
@@ -34,14 +31,12 @@ export default function RecordingDetailScreen() {
   const colorScheme = useColorScheme();
   const { user } = useAuth();
   const [recording, setRecording] = useState(null);
-  const [audioUrl, setAudioUrl] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [notes, setNotes] = useState('');
   const [setMarkers, setSetMarkers] = useState([]);
   const [error, setError] = useState(null);
-  const [playbackError, setPlaybackError] = useState(null);
   const lastSavedNotesRef = useRef('');
   const saveTimeoutRef = useRef | null>(null);
 
@@ -75,18 +70,6 @@ export default function RecordingDetailScreen() {
         setNotes(parsedNotes.notes);
         setSetMarkers(parsedNotes.setMarkers);
         lastSavedNotesRef.current = parsedNotes.notes;
-        if (data.audio_url) {
-          const { url, error: signedError } = await createSignedRecordingUrl(
-            data.audio_url
-          );
-          if (signedError) {
-            setPlaybackError(signedError.message);
-            setAudioUrl(null);
-          } else {
-            setAudioUrl(url);
-            setPlaybackError(null);
-          }
-        }
       }
 
       setLoading(false);
@@ -162,19 +145,15 @@ export default function RecordingDetailScreen() {
     );
   };
 
-  const formatDate = (dateString) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-    });
-  };
-
-  const formatMarkerTime = (seconds) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  const removeEmojis = (text) => {
+    if (!text) return '';
+    // Remove emojis and other pictographs
+    let cleaned = text.replace(/[\u{1F300}-\u{1F9FF}]|[\u{2600}-\u{26FF}]|[\u{2700}-\u{27BF}]/gu, '').trim();
+    // Remove quotation marks
+    cleaned = cleaned.replace(/^["']|["']$/g, '').trim();
+    // Remove sport-related suffixes (e.g., "in Volleyball", "in volleyball")
+    cleaned = cleaned.replace(/\s+in\s+(volleyball|basketball|soccer|football|baseball|tennis|hockey)$/gi, '').trim();
+    return cleaned;
   };
 
   return (
@@ -238,8 +217,9 @@ export default function RecordingDetailScreen() {
           contentContainerStyle={styles.content}
           keyboardShouldPersistTaps="handled"
         >
+          {/* Title - AI Label without emojis */}
           <ThemedText type="title" style={styles.title}>
-            🎙️ Recording
+            {recording.ai_labels ? removeEmojis(recording.ai_labels) : 'Recording'}
           </ThemedText>
 
           {/* Processing indicator */}
@@ -247,78 +227,15 @@ export default function RecordingDetailScreen() {
             <View style={[styles.processingCard, { backgroundColor: colorScheme === 'dark' ? '#1A2A1F' : '#F0FFF4' }]}>
               <ActivityIndicator size="small" color={Colors[colorScheme ?? 'light'].tint} />
               <ThemedText style={styles.processingText}>
-                🔄 Processing recording... Transcription and labeling in progress.
+                Processing recording... Transcription and labeling in progress.
               </ThemedText>
-            </View>
-          )}
-
-          <View style={styles.metaCard}>
-            <ThemedText style={styles.metaLabel}>Date</ThemedText>
-            <ThemedText style={styles.metaValue}>{formatDate(recording.created_at)}</ThemedText>
-            <View style={styles.metaRow}>
-              <View style={styles.metaItem}>
-                <ThemedText style={styles.metaLabel}>Duration</ThemedText>
-                <ThemedText style={styles.metaValue}>{formatDuration(recording.duration)}</ThemedText>
-              </View>
-              <View style={styles.metaItem}>
-                <ThemedText style={styles.metaLabel}>Game</ThemedText>
-                <ThemedText style={styles.metaValue}>
-                  {recording.game_sessions?.opponent_name
-                    ? `vs. ${recording.game_sessions.opponent_name}`
-                    : 'Unassigned'}
-                </ThemedText>
-              </View>
-            </View>
-            <View style={styles.metaRow}>
-              <View style={styles.metaItem}>
-                <ThemedText style={styles.metaLabel}>Game Type</ThemedText>
-                <ThemedText style={styles.metaValue}>Default</ThemedText>
-              </View>
-            </View>
-          </View>
-
-          <View style={styles.section}>
-            <ThemedText style={styles.sectionTitle}>Playback</ThemedText>
-            {audioUrl ? (
-              <AudioPlayer audioUrl={audioUrl} />
-            ) : (
-              <ThemedText style={styles.mutedText}>
-                {playbackError ?? 'Audio unavailable.'}
-              </ThemedText>
-            )}
-          </View>
-
-          <View style={styles.section}>
-            <ThemedText style={styles.sectionTitle}>Set markers</ThemedText>
-            {setMarkers.length > 0 ? (
-              <View style={styles.markerList}>
-                {setMarkers.map((marker, index) => (
-                  <View key={`${marker.label}-${index}`} style={styles.markerChip}>
-                    <ThemedText style={styles.markerChipText}>
-                      {marker.label} {formatMarkerTime(marker.offsetSeconds)}
-                    </ThemedText>
-                  </View>
-                ))}
-              </View>
-            ) : (
-              <ThemedText style={styles.mutedText}>No set markers added.</ThemedText>
-            )}
-          </View>
-
-          {/* AI-Generated Label */}
-          {recording.ai_labels && (
-            <View style={styles.section}>
-              <ThemedText style={styles.sectionTitle}>🏷️ AI Label</ThemedText>
-              <View style={[styles.aiLabelCard, { backgroundColor: colorScheme === 'dark' ? '#1A2332' : '#F0F7FF' }]}>
-                <ThemedText style={styles.aiLabelText}>{recording.ai_labels}</ThemedText>
-              </View>
             </View>
           )}
 
           {/* Transcription */}
           {recording.transcription && (
             <View style={styles.section}>
-              <ThemedText style={styles.sectionTitle}>📝 Transcription</ThemedText>
+              <ThemedText style={styles.sectionTitle}>Transcription</ThemedText>
               <View style={[styles.transcriptionCard, { backgroundColor: colorScheme === 'dark' ? '#1F1F1F' : '#FFFFFF' }]}>
                 <ThemedText style={styles.transcriptionText}>{recording.transcription}</ThemedText>
               </View>
@@ -330,14 +247,15 @@ export default function RecordingDetailScreen() {
             <View style={styles.section}>
               <View style={[styles.statusCard, { backgroundColor: colorScheme === 'dark' ? '#2A1F1F' : '#FFF5F5' }]}>
                 <ThemedText style={[styles.statusText, { color: colorScheme === 'dark' ? '#FF9999' : '#D32F2F' }]}>
-                  {recording.status === 'transcription_failed' && '⚠️ Transcription failed'}
-                  {recording.status === 'label_failed' && '⚠️ Label generation failed (transcription available)'}
+                  {recording.status === 'transcription_failed' && 'Transcription failed'}
+                  {recording.status === 'label_failed' && 'Label generation failed (transcription available)'}
                   {!['transcription_failed', 'label_failed'].includes(recording.status) && `Status: ${recording.status}`}
                 </ThemedText>
               </View>
             </View>
           )}
 
+          {/* Manual notes */}
           <View style={styles.section}>
             <ThemedText style={styles.sectionTitle}>Manual notes</ThemedText>
             <TextInput
@@ -405,31 +323,6 @@ const styles = StyleSheet.create({
     marginBottom: 4,
     paddingTop: 4,
   },
-  metaCard: {
-    padding: 16,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(128, 128, 128, 0.2)',
-    gap: 12,
-  },
-  metaLabel: {
-    fontSize: 12,
-    opacity: 0.6,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  metaValue: {
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  metaRow: {
-    flexDirection: 'row',
-    gap: 16,
-  },
-  metaItem: {
-    flex: 1,
-    gap: 6,
-  },
   section: {
     gap: 12,
   },
@@ -453,26 +346,6 @@ const styles = StyleSheet.create({
   savingText: {
     fontSize: 13,
     opacity: 0.7,
-  },
-  mutedText: {
-    fontSize: 14,
-    opacity: 0.6,
-  },
-  markerList: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  markerChip: {
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: 'rgba(128, 128, 128, 0.3)',
-  },
-  markerChipText: {
-    fontSize: 12,
-    fontWeight: '600',
   },
   loadingContainer: {
     alignItems: 'center',
@@ -519,17 +392,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     flex: 1,
     lineHeight: 20,
-  },
-  aiLabelCard: {
-    padding: 16,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(30, 144, 255, 0.3)',
-  },
-  aiLabelText: {
-    fontSize: 16,
-    fontWeight: '600',
-    lineHeight: 24,
   },
   transcriptionCard: {
     padding: 16,
