@@ -21,5 +21,3 @@ Week 7-8 (Early April):
 Goal: Add game/player organization features
 Test with volleyball coach at actual game
 Success metric: Coach uses it for one full game
-
-Would having a week-by-we
