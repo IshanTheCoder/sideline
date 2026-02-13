@@ -70,9 +70,7 @@ The entire capture process takes less than 5 seconds, allowing coaches to stay f
    npm install
    ```
 
-2. Set up Supabase (see `tasks.md` for detailed instructions)
-
-3. Start the app:
+2. Start the app:
    ```bash
    npx expo start
    ```
