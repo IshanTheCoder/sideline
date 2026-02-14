@@ -1,22 +1,12 @@
-import OpenAI from 'openai';
+// Get Groq API key from environment
+const groqApiKey = process.env.EXPO_PUBLIC_GROQ_API_KEY;
 
-// Get OpenAI API key from environment
-const openaiApiKey = process.env.EXPO_PUBLIC_OPENAI_API_KEY;
-
-if (!openaiApiKey) {
+if (!groqApiKey) {
   console.warn(
-    'Missing OpenAI API key. Label generation will not work.\n' +
-    'Please add EXPO_PUBLIC_OPENAI_API_KEY to your .env file.'
+    'Missing Groq API key. Label generation will not work.\n' +
+    'Please add EXPO_PUBLIC_GROQ_API_KEY to your .env file.'
   );
 }
-
-// Create OpenAI client
-const openai = openaiApiKey ? new OpenAI({
-  apiKey: openaiApiKey,
-  // For React Native, we need to use dangerouslyAllowBrowser
-  // since we're making API calls from the client
-  dangerouslyAllowBrowser: true,
-}) : null;
 
 /**
  * Generate a concise label for a recording based on its transcription
@@ -25,10 +15,10 @@ const openai = openaiApiKey ? new OpenAI({
  */
 export async function generateLabel(transcriptionText) {
   try {
-    if (!openai) {
+    if (!groqApiKey) {
       return {
         label: null,
-        error: new Error('OpenAI API key not configured'),
+        error: new Error('Groq API key not configured'),
       };
     }
 
@@ -41,29 +31,42 @@ export async function generateLabel(transcriptionText) {
 
     console.log('Generating label for transcription:', transcriptionText.substring(0, 100) + '...');
 
-    // Send to OpenAI GPT-4 API to generate a concise label
-    const response = await openai.chat.completions.create({
-      model: 'gpt-4',
-      messages: [
-        {
-          role: 'system',
-          content: 'You are a volleyball coach assistant that creates specific, actionable labels for coaching moment recordings. Create labels that identify the SPECIFIC coaching topic or feedback being given. Examples: "Halftime adjustments: Passing and blocking corrections", "First set review - Individual player feedback", "Team instruction: Reduce errors, improve serve receive", "Tactical adjustments for second set". Focus on the specific coaching content, not generic descriptions.'
-        },
-        {
-          role: 'user',
-          content: `Create a specific 4-8 word coaching label for this volleyball coaching recording:\n\n${transcriptionText}`
-        }
-      ],
-      max_tokens: 30,
-      temperature: 0.7,
+    // Send to Groq API to generate a concise label (using their fast inference)
+    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${groqApiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'mixtral-8x7b-32768', // Groq's fastest/best free model
+        messages: [
+          {
+            role: 'system',
+            content: 'You are a volleyball coach assistant that creates specific, actionable labels for coaching moment recordings. Create labels that identify the SPECIFIC coaching topic or feedback being given. Examples: "Halftime adjustments: Passing and blocking corrections", "First set review - Individual player feedback", "Team instruction: Reduce errors, improve serve receive", "Tactical adjustments for second set". Focus on the specific coaching content, not generic descriptions.'
+          },
+          {
+            role: 'user',
+            content: `Create a specific 4-8 word coaching label for this volleyball coaching recording:\n\n${transcriptionText}`
+          }
+        ],
+        max_tokens: 30,
+        temperature: 0.7,
+      }),
     });
 
-    const label = response.choices[0]?.message?.content?.trim();
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Groq API error: ${response.status} ${errorText}`);
+    }
+
+    const result = await response.json();
+    const label = result.choices?.[0]?.message?.content?.trim();
 
     if (!label) {
       return {
         label: null,
-        error: new Error('Failed to generate label from OpenAI response'),
+        error: new Error('Failed to generate label from Groq response'),
       };
     }
 
@@ -77,13 +80,13 @@ export async function generateLabel(transcriptionText) {
     let errorMessage = 'Failed to generate label';
     if (error instanceof Error) {
       if (error.message.includes('API key')) {
-        errorMessage = 'Invalid OpenAI API key';
+        errorMessage = 'Invalid Groq API key';
       } else if (error.message.includes('quota')) {
-        errorMessage = 'OpenAI API quota exceeded';
+        errorMessage = 'Groq API quota exceeded';
       } else if (error.message.includes('network')) {
         errorMessage = 'Network error - please check your connection';
       } else if (error.message.includes('model')) {
-        errorMessage = 'Model not available - check your OpenAI subscription';
+        errorMessage = 'Model not available - check your Groq account';
       } else {
         errorMessage = error.message;
       }

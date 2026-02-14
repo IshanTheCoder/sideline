@@ -1,0 +1,1 @@
+When creating a new feature or implementing new code, always include a short summary of what it does.

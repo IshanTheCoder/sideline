@@ -1,24 +1,15 @@
-import OpenAI from 'openai';
-import { Platform } from 'react-native';
 import * as FileSystem from 'expo-file-system/legacy';
+import { Platform } from 'react-native';
 
-// Get OpenAI API key from environment
-const openaiApiKey = process.env.EXPO_PUBLIC_OPENAI_API_KEY;
+// Get Groq API key from environment
+const groqApiKey = process.env.EXPO_PUBLIC_GROQ_API_KEY;
 
-if (!openaiApiKey) {
+if (!groqApiKey) {
   console.warn(
-    'Missing OpenAI API key. Transcription will not work.\n' +
-    'Please add EXPO_PUBLIC_OPENAI_API_KEY to your .env file.'
+    'Missing Groq API key. Transcription will not work.\n' +
+    'Please add EXPO_PUBLIC_GROQ_API_KEY to your .env file.'
   );
 }
-
-// Create OpenAI client
-const openai = openaiApiKey ? new OpenAI({
-  apiKey: openaiApiKey,
-  // For React Native, we need to use dangerouslyAllowBrowser
-  // since we're making API calls from the client
-  dangerouslyAllowBrowser: true,
-}) : null;
 
 /**
  * Download audio file from URL and convert to format suitable for OpenAI
@@ -56,16 +47,16 @@ async function downloadAudioFile(audioUrl) {
 }
 
 /**
- * Transcribe an audio recording using OpenAI Whisper API
+ * Transcribe an audio recording using Groq Whisper API
  * @param audioUrl - URL of the audio file to transcribe
  * @returns Transcription text or error
  */
 export async function transcribeAudio(audioUrl) {
   try {
-    if (!openai) {
+    if (!groqApiKey) {
       return {
         transcription: null,
-        error: new Error('OpenAI API key not configured'),
+        error: new Error('Groq API key not configured'),
       };
     }
 
@@ -77,33 +68,33 @@ export async function transcribeAudio(audioUrl) {
 
     // For React Native, we need to manually create FormData and use fetch
     if (Platform.OS !== 'web' && audioFile.uri) {
-      console.log('Sending to OpenAI Whisper API (React Native)...');
-      
+      console.log('Sending to Groq Whisper API (React Native)...');
+
       const formData = new FormData();
       formData.append('file', {
         uri: audioFile.uri,
         name: audioFile.name,
         type: audioFile.type,
       });
-      formData.append('model', 'whisper-1');
+      formData.append('model', 'whisper-large-v3-turbo');
       formData.append('language', 'en');
-      formData.append('response_format', 'text');
-      
-      const response = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+
+      const response = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${openaiApiKey}`,
+          'Authorization': `Bearer ${groqApiKey}`,
         },
         body: formData,
       });
-      
+
       if (!response.ok) {
         const errorText = await response.text();
-        throw new Error(`OpenAI API error: ${response.status} ${errorText}`);
+        throw new Error(`Groq API error: ${response.status} ${errorText}`);
       }
-      
-      const transcription = await response.text();
-      
+
+      const result = await response.json();
+      const transcription = result.text || result;
+
       // Clean up temporary file
       try {
         await FileSystem.deleteAsync(audioFile.uri);
@@ -111,40 +102,54 @@ export async function transcribeAudio(audioUrl) {
       } catch (err) {
         console.warn('Failed to delete temporary file:', err);
       }
-      
+
       console.log('✅ Transcription completed successfully');
       return { transcription, error: null };
     } else {
-      // Web platform - use OpenAI SDK
-      console.log('Sending to OpenAI Whisper API (Web)...');
-      const response = await openai.audio.transcriptions.create({
-        file: audioFile,
-        model: 'whisper-1',
-        language: 'en',
-        response_format: 'text',
+      // Web platform - use Groq API with fetch
+      console.log('Sending to Groq Whisper API (Web)...');
+
+      const formData = new FormData();
+      formData.append('file', audioFile);
+      formData.append('model', 'whisper-large-v3-turbo');
+      formData.append('language', 'en');
+
+      const response = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${groqApiKey}`,
+        },
+        body: formData,
       });
-      
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Groq API error: ${response.status} ${errorText}`);
+      }
+
+      const result = await response.json();
+      const transcription = result.text || result;
+
       console.log('✅ Transcription completed successfully');
-      const transcription = typeof response === 'string' ? response : response.text;
       return { transcription, error: null };
     }
   } catch (error) {
     console.error('Error transcribing audio:', error);
-    
+
     // Provide more helpful error messages
     let errorMessage = 'Failed to transcribe audio';
     if (error instanceof Error) {
       if (error.message.includes('API key')) {
-        errorMessage = 'Invalid OpenAI API key';
+        errorMessage = 'Invalid Groq API key';
       } else if (error.message.includes('quota')) {
-        errorMessage = 'OpenAI API quota exceeded';
+        errorMessage = 'Groq API quota exceeded';
       } else if (error.message.includes('network')) {
         errorMessage = 'Network error - please check your connection';
       } else {
         errorMessage = error.message;
       }
     }
-    
+
     return {
       transcription: null,
       error: new Error(errorMessage),
