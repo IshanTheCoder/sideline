@@ -1,0 +1,23 @@
+Week 1-2 (Now - End of Feb):
+
+Goal: Get audio recording working in the app
+Specific tasks: Research recording libraries, implement basic record/stop/save
+Success metric: Can record a 30-second clip and save it
+
+Week 3-4 (Early March):
+
+Goal: Connect to OpenAI Whisper API for transcription
+Specific tasks: Set up API keys, test transcription, handle errors
+Success metric: Can transcribe a recording and display text
+
+Week 5-6 (Mid-Late March):
+
+Goal: Add Claude API for summarization
+Specific tasks: Design prompt, integrate API, test with real coach notes
+Success metric: Takes transcription → produces organized summary
+
+Week 7-8 (Early April):
+
+Goal: Add game/player organization features
+Test with volleyball coach at actual game
+Success metric: Coach uses it for one full game
