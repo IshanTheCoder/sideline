@@ -28,7 +28,6 @@ export function AuthProvider({ children }) {
       }
 
       console.log('✅ Profile loaded:', data);
-      console.log('Profile picture URL:', data?.profile_picture_url);
       setProfile(data);
     } catch (error) {
       console.log('❌ Unexpected error loading profile:', error);

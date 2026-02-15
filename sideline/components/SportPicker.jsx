@@ -1,12 +1,12 @@
-import React from 'react';
-import { View, StyleSheet } from 'react-native';
-import { Picker } from '@react-native-picker/picker';
-import { ThemedText } from './themed-text';
-import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Colors } from '@/constants/theme';
+import { useColorScheme } from '@/hooks/use-color-scheme';
+import { Picker } from '@react-native-picker/picker';
+import React from 'react';
+import { StyleSheet, View } from 'react-native';
+import { ThemedText } from './themed-text';
 
 // Volleyball icon using emoji
-const VolleyballIcon = ({ size = 24 }) => (
+const VolleyballIcon = ({ size = 20 }) => (
   <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
     <ThemedText style={{ fontSize: size, lineHeight: size }}>
       🏐

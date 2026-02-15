@@ -53,6 +53,11 @@
     "react-native-worklets": "0.5.1"
   },
   "devDependencies": {
+    "@types/estree": "^1.0.8",
+    "@types/hammerjs": "^2.0.46",
+    "@types/json-schema": "^7.0.15",
+    "@types/node": "^25.2.3",
+    "@types/phoenix": "^1.6.7",
     "@types/react": "~19.1.0",
     "eslint": "^9.25.0",
     "eslint-config-expo": "~10.0.0",
