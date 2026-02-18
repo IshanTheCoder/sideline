@@ -23,7 +23,7 @@ export function SportPicker({ selectedSport, onSportChange }) {
       <ThemedText style={styles.label}>Sport</ThemedText>
       <View style={[styles.pickerContainer, { backgroundColor: colors.background, borderColor: colors.icon + '40' }]}>
         <View style={styles.iconContainer}>
-          <VolleyballIcon size={24} />
+          <VolleyballIcon size={20} />
         </View>
         <Picker
           selectedValue={selectedSport}

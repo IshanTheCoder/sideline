@@ -1,18 +1,17 @@
-import { StyleSheet, View, ScrollView, TouchableOpacity, Alert, Platform } from 'react-native';
-import { useState, useEffect } from 'react';
-import { Image } from 'expo-image';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { IconSymbol } from '@/components/ui/icon-symbol';
-import { useAuth } from '@/contexts/AuthContext';
-import { useTheme } from '@/contexts/ThemeContext';
-import { Colors } from '@/constants/theme';
-import { useRouter } from 'expo-router';
-import { supabase } from '@/lib/supabase';
-import ProfileEditModal from '@/components/ProfileEditModal';
 import ChangeEmailModal from '@/components/ChangeEmailModal';
 import ChangePasswordModal from '@/components/ChangePasswordModal';
 import { SportSelectionModal } from '@/components/SportSelectionModal';
+import { ThemedText } from '@/components/themed-text';
+import { ThemedView } from '@/components/themed-view';
+import { IconSymbol } from '@/components/ui/icon-symbol';
+import { Colors } from '@/constants/theme';
+import { useAuth } from '@/contexts/AuthContext';
+import { useTheme } from '@/contexts/ThemeContext';
+import { supabase } from '@/lib/supabase';
+import { Image } from 'expo-image';
+import { useRouter } from 'expo-router';
+import { useEffect, useState } from 'react';
+import { Alert, Platform, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 
 export default function SettingsScreen() {
   const { user, profile, signOut, refreshProfile } = useAuth();
