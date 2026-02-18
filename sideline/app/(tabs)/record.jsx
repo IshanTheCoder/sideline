@@ -61,7 +61,7 @@ export default function RecordScreen() {
 
   // Timer effect - increments every second while recording
   useEffect(() => {
-    let interval: NodeJS.Timeout | null = null;
+    let interval = null;
     
     if (isRecording) {
       interval = setInterval(() => {
@@ -322,7 +322,7 @@ export default function RecordScreen() {
       }
 
       // Create recording object for local state
-      const newRecording: Recording = {
+      const newRecording = {
         id: recordingId,
         created_at: timestamp,
         duration: recordingDuration,

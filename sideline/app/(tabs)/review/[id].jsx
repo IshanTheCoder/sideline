@@ -38,7 +38,7 @@ export default function RecordingDetailScreen() {
   const [setMarkers, setSetMarkers] = useState([]);
   const [error, setError] = useState(null);
   const lastSavedNotesRef = useRef('');
-  const saveTimeoutRef = useRef | null>(null);
+  const saveTimeoutRef = useRef(null);
 
   const recordingId = useMemo(() => {
     if (Array.isArray(id)) return id[0];
