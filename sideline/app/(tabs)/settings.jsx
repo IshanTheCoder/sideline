@@ -30,33 +30,17 @@ export default function SettingsScreen() {
 
   // Sync profile picture URI when profile changes
   useEffect(() => {
-    console.log('🔄 Profile changed, checking profile picture URL...');
-    console.log('📍 Current profile?.profile_picture_url:', profile?.profile_picture_url);
-    console.log('📍 Current profileImageUri state:', profileImageUri);
-    
     if (profile?.profile_picture_url) {
-      // Only update if the URL actually changed to avoid unnecessary re-renders
       const currentUrlWithoutCache = profileImageUri?.split('?')[0];
       const newUrlWithoutCache = profile.profile_picture_url.split('?')[0];
-      
       if (currentUrlWithoutCache !== newUrlWithoutCache) {
-        // Add cache busting parameter to force reload with expo-image
-        // Check if URL already has query parameters
         const separator = profile.profile_picture_url.includes('?') ? '&' : '?';
-        const cacheBuster = `${separator}t=${Date.now()}`;
-        const newUri = profile.profile_picture_url + cacheBuster;
-        console.log('✅ Setting NEW profile image URI:', newUri);
-        setProfileImageUri(newUri);
-        setImageError(false);
-      } else {
-        console.log('⚠️ URL unchanged, skipping update');
-      }
-    } else {
-      console.log('⚠️ No profile picture URL, clearing image');
-      if (profileImageUri) {
-        setProfileImageUri(null);
+        setProfileImageUri(profile.profile_picture_url + `${separator}t=${Date.now()}`);
         setImageError(false);
       }
+    } else if (profileImageUri) {
+      setProfileImageUri(null);
+      setImageError(false);
     }
   }, [profile?.profile_picture_url]);
 
@@ -95,26 +79,7 @@ export default function SettingsScreen() {
   };
 
   const handleModalSave = async () => {
-    console.log('Modal save triggered, refreshing profile...');
-    // Refresh profile data after save
     await refreshProfile();
-    console.log('Profile refresh completed');
-    
-    // Force re-check after a short delay to ensure state has propagated
-    setTimeout(async () => {
-      console.log('Checking profile after delay...');
-      console.log('Current profile:', profile);
-      console.log('Current profileImageUri:', profileImageUri);
-      
-      // Force another refresh if the image URI is not set
-      if (profile?.profile_picture_url && !profileImageUri) {
-        console.log('Image URI not set, forcing update...');
-        const separator = profile.profile_picture_url.includes('?') ? '&' : '?';
-        const cacheBuster = `${separator}t=${Date.now()}`;
-        setProfileImageUri(profile.profile_picture_url + cacheBuster);
-        setImageError(false);
-      }
-    }, 500);
   };
 
   const handleSignOut = async () => {
@@ -224,37 +189,8 @@ export default function SettingsScreen() {
                   key={profileImageUri}
                   source={{ uri: profileImageUri }}
                   style={styles.profilePicture}
-                  onLoadStart={() => {
-                    console.log('🔄 Starting to load profile picture (React Native Image)...');
-                    console.log('📍 URI:', profileImageUri);
-                  }}
-                  onLoad={() => {
-                    console.log('✅ Profile picture loaded successfully!');
-                    console.log('📍 Loaded URI:', profileImageUri);
-                    setImageError(false);
-                  }}
-                  onError={(event) => {
-                    console.log('❌ React Native Image failed, error:', event.nativeEvent.error);
-                    console.log('📍 Image URI:', profileImageUri);
-                    console.log('🧪 Testing URL accessibility...');
-                    
-                    // Test if URL is accessible
-                    fetch(profileImageUri.split('?')[0], { method: 'HEAD' })
-                      .then(response => {
-                        console.log('📡 URL test response status:', response.status);
-                        console.log('📡 Response headers:', JSON.stringify(Object.fromEntries(response.headers.entries())));
-                        if (response.ok) {
-                          console.log('✅ URL is accessible via fetch');
-                        } else {
-                          console.log('❌ URL returned error status:', response.status);
-                        }
-                      })
-                      .catch(err => {
-                        console.log('❌ Failed to test URL:', err);
-                      });
-                    
-                    setImageError(true);
-                  }}
+                  onLoad={() => setImageError(false)}
+                  onError={() => setImageError(true)}
                 />
               ) : (
                   <View style={[styles.profilePicturePlaceholder, {
@@ -283,6 +219,12 @@ export default function SettingsScreen() {
               <ThemedText style={styles.profileName}>
                 {profile?.name || 'User'}
               </ThemedText>
+              {profile?.role ? (
+                <ThemedText style={styles.profileRole}>{profile.role}</ThemedText>
+              ) : null}
+              {profile?.school ? (
+                <ThemedText style={styles.profileSchool}>{profile.school}</ThemedText>
+              ) : null}
               <ThemedText style={styles.profileEmail}>
                 {user?.email}
               </ThemedText>
@@ -416,16 +358,9 @@ export default function SettingsScreen() {
           onClose={() => setShowEditModal(false)}
           userId={user.id}
           currentName={profile?.name || ''}
-          currentProfilePicture={profileImageUri}
+          currentSchool={profile?.school || ''}
+          currentRole={profile?.role || ''}
           onSave={handleModalSave}
-          onImageUploaded={(imageUrl) => {
-            // Immediately update the image URI when uploaded
-            console.log('📥 Received new image URL from modal:', imageUrl);
-            const separator = imageUrl.includes('?') ? '&' : '?';
-            const cacheBuster = `${separator}t=${Date.now()}`;
-            setProfileImageUri(imageUrl + cacheBuster);
-            setImageError(false);
-          }}
         />
       )}
 
@@ -576,9 +511,21 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     marginBottom: 4,
   },
-  profileEmail: {
-    fontSize: 14,
+  profileRole: {
+    fontSize: 13,
+    fontWeight: '600',
+    opacity: 0.8,
+    marginBottom: 2,
+  },
+  profileSchool: {
+    fontSize: 13,
     opacity: 0.6,
+    marginBottom: 2,
+  },
+  profileEmail: {
+    fontSize: 13,
+    opacity: 0.5,
+    marginTop: 2,
   },
   settingItem: {
     flexDirection: 'row',
