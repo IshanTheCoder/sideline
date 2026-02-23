@@ -4,6 +4,7 @@ import {
   Alert,
   FlatList,
   StyleSheet,
+  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
@@ -20,6 +21,9 @@ import {
   fetchRecordingsForUser,
   formatDuration,
 } from '@/lib/recording';
+import { parseAiLabels } from '@/lib/volleyballVocabulary';
+import { SKILL_CATEGORY_LABELS, FEEDBACK_TYPE_LABELS } from '@/lib/volleyballVocabulary';
+import { fetchRosterForUser } from '@/lib/roster';
 
 export default function ReviewScreen() {
   const router = useRouter();
@@ -29,8 +33,19 @@ export default function ReviewScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filterSkill, setFilterSkill] = useState('');
+  const [filterFeedback, setFilterFeedback] = useState('');
+  const [filterPlayer, setFilterPlayer] = useState('');
+  const [roster, setRoster] = useState([]);
+  const [showFilters, setShowFilters] = useState(false);
 
   const titleText = useMemo(() => '🏟️ Games', []);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    fetchRosterForUser(user.id).then(({ data }) => setRoster(data ?? []));
+  }, [user?.id]);
 
   const loadRecordings = useCallback(async (opts) => {
     if (!user?.id) {
@@ -93,6 +108,17 @@ export default function ReviewScreen() {
     });
   };
 
+  const matchesRecording = useCallback((rec) => {
+    const q = searchQuery.trim().toLowerCase();
+    const labelInfo = parseAiLabels(rec.ai_labels ?? null);
+    const searchText = [rec.transcription, labelInfo.displayLabel].filter(Boolean).join(' ').toLowerCase();
+    if (q && !searchText.includes(q)) return false;
+    if (filterSkill && labelInfo.skillCategory !== filterSkill) return false;
+    if (filterFeedback && labelInfo.feedbackType !== filterFeedback) return false;
+    if (filterPlayer && !searchText.includes(filterPlayer.toLowerCase())) return false;
+    return true;
+  }, [searchQuery, filterSkill, filterFeedback, filterPlayer]);
+
   const groupedGames = useMemo(() => {
     const map = new Map();
 
@@ -116,8 +142,20 @@ export default function ReviewScreen() {
       map.get(gameId)?.recordings.push(rec);
     });
 
-    return Array.from(map.values());
-  }, [recordings]);
+    let list = Array.from(map.values());
+
+    const hasActiveFilter = searchQuery.trim() || filterSkill || filterFeedback || filterPlayer;
+    if (hasActiveFilter) {
+      list = list
+        .map((game) => ({
+          ...game,
+          recordings: game.recordings.filter(matchesRecording),
+        }))
+        .filter((game) => game.recordings.length > 0);
+    }
+
+    return list;
+  }, [recordings, searchQuery, filterSkill, filterFeedback, filterPlayer, matchesRecording]);
 
   const handleDeleteGame = (gameId) => {
     if (!user?.id) return;
@@ -273,16 +311,113 @@ export default function ReviewScreen() {
         </View>
       )}
 
-      {!loading && !error && groupedGames.length > 0 && (
-        <FlatList
-          data={groupedGames}
-          renderItem={renderGameItem}
-          keyExtractor={(item) => item.id}
-          contentContainerStyle={styles.listContent}
-          ItemSeparatorComponent={() => <View style={styles.separator} />}
-          refreshing={refreshing}
-          onRefresh={() => loadRecordings({ isRefresh: true })}
-        />
+      {!loading && !error && recordings.length > 0 && (
+        <>
+          <View style={[styles.searchRow, { backgroundColor: colorScheme === 'dark' ? '#2A2A2A' : '#F0F0F0' }]}>
+            <IconSymbol name="magnifyingglass" size={20} color={colorScheme === 'dark' ? '#999' : '#666'} />
+            <TextInput
+              style={[styles.searchInput, { color: Colors[colorScheme ?? 'light'].text }]}
+              placeholder="Search transcriptions and labels..."
+              placeholderTextColor="#999"
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+            />
+            {searchQuery ? (
+              <TouchableOpacity onPress={() => setSearchQuery('')} hitSlop={8}>
+                <IconSymbol name="xmark.circle.fill" size={20} color="#999" />
+              </TouchableOpacity>
+            ) : null}
+          </View>
+          <TouchableOpacity
+            style={[styles.filterToggle, { borderColor: colorScheme === 'dark' ? '#444' : '#DDD' }]}
+            onPress={() => setShowFilters(!showFilters)}
+          >
+            <IconSymbol name="line.3.horizontal.decrease.circle" size={20} color={Colors[colorScheme ?? 'light'].tint} />
+            <ThemedText style={styles.filterToggleText}>Filters</ThemedText>
+            {(filterSkill || filterFeedback || filterPlayer) && (
+              <View style={[styles.filterBadge, { backgroundColor: Colors[colorScheme ?? 'light'].tint }]}>
+                <ThemedText style={styles.filterBadgeText}>
+                  {[filterSkill, filterFeedback, filterPlayer].filter(Boolean).length}
+                </ThemedText>
+              </View>
+            )}
+          </TouchableOpacity>
+          {showFilters && (
+            <View style={[styles.filterPanel, { backgroundColor: colorScheme === 'dark' ? '#2A2A2A' : '#F5F5F5', borderColor: colorScheme === 'dark' ? '#333' : '#E5E5E5' }]}>
+              <ThemedText style={styles.filterLabel}>Skill</ThemedText>
+              <View style={styles.filterChips}>
+                {['', 'serving', 'passing', 'setting', 'attacking', 'blocking', 'defense'].map((s) => (
+                  <TouchableOpacity
+                    key={s || '_'}
+                    style={[styles.chip, filterSkill === s && { backgroundColor: Colors[colorScheme ?? 'light'].tint }]}
+                    onPress={() => setFilterSkill(s)}
+                  >
+                    <ThemedText style={[styles.chipText, filterSkill === s && { color: '#FFF' }]}>
+                      {s ? (SKILL_CATEGORY_LABELS[s] ?? s) : 'Any'}
+                    </ThemedText>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              <ThemedText style={styles.filterLabel}>Feedback</ThemedText>
+              <View style={styles.filterChips}>
+                {['', 'technique', 'positioning', 'communication'].map((f) => (
+                  <TouchableOpacity
+                    key={f || '_'}
+                    style={[styles.chip, filterFeedback === f && { backgroundColor: Colors[colorScheme ?? 'light'].tint }]}
+                    onPress={() => setFilterFeedback(f)}
+                  >
+                    <ThemedText style={[styles.chipText, filterFeedback === f && { color: '#FFF' }]}>
+                      {f ? (FEEDBACK_TYPE_LABELS[f] ?? f) : 'Any'}
+                    </ThemedText>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              <ThemedText style={styles.filterLabel}>Player</ThemedText>
+              <View style={styles.filterChips}>
+                <TouchableOpacity
+                  style={[styles.chip, !filterPlayer && { backgroundColor: Colors[colorScheme ?? 'light'].tint }]}
+                  onPress={() => setFilterPlayer('')}
+                >
+                  <ThemedText style={[styles.chipText, !filterPlayer && { color: '#FFF' }]}>Any</ThemedText>
+                </TouchableOpacity>
+                {roster.map((p) => (
+                  <TouchableOpacity
+                    key={p.id}
+                    style={[styles.chip, filterPlayer === p.name && { backgroundColor: Colors[colorScheme ?? 'light'].tint }]}
+                    onPress={() => setFilterPlayer(filterPlayer === p.name ? '' : p.name)}
+                  >
+                    <ThemedText style={[styles.chipText, filterPlayer === p.name && { color: '#FFF' }]}>{p.name}</ThemedText>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              {(searchQuery || filterSkill || filterFeedback || filterPlayer) && (
+                <TouchableOpacity
+                  style={[styles.clearFiltersBtn, { borderColor: Colors[colorScheme ?? 'light'].tint }]}
+                  onPress={() => { setSearchQuery(''); setFilterSkill(''); setFilterFeedback(''); setFilterPlayer(''); }}
+                >
+                  <ThemedText style={[styles.clearFiltersText, { color: Colors[colorScheme ?? 'light'].tint }]}>Clear all</ThemedText>
+                </TouchableOpacity>
+              )}
+            </View>
+          )}
+
+          {groupedGames.length === 0 ? (
+            <View style={styles.emptyContainer}>
+              <ThemedText style={styles.emptyTitle}>No matches</ThemedText>
+              <ThemedText style={styles.emptySubtitle}>Try changing search or filters.</ThemedText>
+            </View>
+          ) : (
+            <FlatList
+              data={groupedGames}
+              renderItem={renderGameItem}
+              keyExtractor={(item) => item.id}
+              contentContainerStyle={styles.listContent}
+              ItemSeparatorComponent={() => <View style={styles.separator} />}
+              refreshing={refreshing}
+              onRefresh={() => loadRecordings({ isRefresh: true })}
+            />
+          )}
+        </>
       )}
     </ThemedView>
   );
@@ -309,6 +444,87 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 28,
     marginTop: 12,
+  },
+  searchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginBottom: 10,
+    gap: 8,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 16,
+    paddingVertical: 4,
+  },
+  filterToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    gap: 6,
+    marginBottom: 10,
+  },
+  filterToggleText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  filterBadge: {
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  filterBadgeText: {
+    color: '#FFF',
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  filterPanel: {
+    padding: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginBottom: 14,
+  },
+  filterLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    marginBottom: 6,
+    opacity: 0.8,
+  },
+  filterChips: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 12,
+  },
+  chip: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    backgroundColor: 'rgba(128,128,128,0.2)',
+  },
+  chipText: {
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  clearFiltersBtn: {
+    alignSelf: 'flex-start',
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderRadius: 10,
+    borderWidth: 1,
+    marginTop: 4,
+  },
+  clearFiltersText: {
+    fontSize: 14,
+    fontWeight: '600',
   },
   listContent: {
     paddingBottom: 40,

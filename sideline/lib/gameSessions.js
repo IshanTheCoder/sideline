@@ -1,7 +1,7 @@
 import { supabase } from './supabase';
 
-// Helper to get or create default team
-const getOrCreateDefaultTeam = async (userId) => {
+// Helper to get or create default team (exported for roster, etc.)
+export const getOrCreateDefaultTeam = async (userId) => {
   try {
     const { data: existingTeam } = await supabase
       .from('teams')

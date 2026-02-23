@@ -20,10 +20,11 @@ import { useAuth } from '@/contexts/AuthContext';
 import {
   deleteRecordingForUser,
   fetchRecordingById,
-  saveRecordingNotes,
-  parseRecordingNotes,
-  serializeRecordingNotes,
+  updateRecording,
 } from '@/lib/recording';
+import { parseAiLabels, serializeAiLabels, SKILL_CATEGORY_LABELS, POSITION_LABELS, FEEDBACK_TYPE_LABELS } from '@/lib/volleyballVocabulary';
+import { fetchRosterForUser, getPlayerNamesForGameSession } from '@/lib/roster';
+import { generateLabel } from '@/lib/labelGeneration';
 
 export default function RecordingDetailScreen() {
   const { id } = useLocalSearchParams();
@@ -32,13 +33,16 @@ export default function RecordingDetailScreen() {
   const { user } = useAuth();
   const [recording, setRecording] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
-  const [notes, setNotes] = useState('');
-  const [setMarkers, setSetMarkers] = useState([]);
   const [error, setError] = useState(null);
-  const lastSavedNotesRef = useRef('');
-  const saveTimeoutRef = useRef(null);
+  const [editLabel, setEditLabel] = useState('');
+  const [editSkill, setEditSkill] = useState('');
+  const [editPosition, setEditPosition] = useState('');
+  const [editFeedback, setEditFeedback] = useState('');
+  const [taggedPlayerNames, setTaggedPlayerNames] = useState([]);
+  const [roster, setRoster] = useState([]);
+  const [savingField, setSavingField] = useState(null);
+  const [fillingMetadata, setFillingMetadata] = useState(false);
 
   const recordingId = useMemo(() => {
     if (Array.isArray(id)) return id[0];
@@ -66,10 +70,12 @@ export default function RecordingDetailScreen() {
         setError('Recording not found.');
       } else {
         setRecording(data);
-        const parsedNotes = parseRecordingNotes(data.manual_notes ?? null);
-        setNotes(parsedNotes.notes);
-        setSetMarkers(parsedNotes.setMarkers);
-        lastSavedNotesRef.current = parsedNotes.notes;
+        const parsed = parseAiLabels(data.ai_labels ?? null);
+        setEditLabel(parsed.displayLabel ?? '');
+        setEditSkill(parsed.skillCategory ?? '');
+        setEditPosition(parsed.position ?? '');
+        setEditFeedback(parsed.feedbackType ?? '');
+        setTaggedPlayerNames(parsed.taggedPlayers ?? []);
       }
 
       setLoading(false);
@@ -79,46 +85,50 @@ export default function RecordingDetailScreen() {
   }, [user?.id, recordingId]);
 
   useEffect(() => {
-    if (!user?.id || !recordingId) return;
-    if (notes === lastSavedNotesRef.current) return;
+    if (!user?.id) return;
+    fetchRosterForUser(user.id).then(({ data }) => setRoster(data ?? []));
+  }, [user?.id]);
 
-    if (saveTimeoutRef.current) {
-      clearTimeout(saveTimeoutRef.current);
-    }
+  // When user opens Edit: if there's transcription but no/empty labels, run AI to pre-fill metadata
+  useEffect(() => {
+    if (!recording?.transcription?.trim() || !user?.id || !recordingId) return;
+    const parsed = parseAiLabels(recording.ai_labels ?? null);
+    if (parsed.displayLabel?.trim()) return; // already have labels
 
-    saveTimeoutRef.current = setTimeout(async () => {
-      setSaving(true);
-      const { error: saveError } = await saveRecordingNotes(
-        user.id,
-        recordingId,
-        serializeRecordingNotes(notes, setMarkers)
-      );
-      setSaving(false);
-
-      if (saveError) {
-        Alert.alert('Save failed', saveError.message);
+    let cancelled = false;
+    setFillingMetadata(true);
+    (async () => {
+      const { names: playerNames } = recording.game_session_id
+        ? await getPlayerNamesForGameSession(recording.game_session_id)
+        : { names: [] };
+      if (cancelled) return;
+      const result = await generateLabel(recording.transcription, { playerNames });
+      if (cancelled || result.error || !result.label) {
+        setFillingMetadata(false);
         return;
       }
-
-      lastSavedNotesRef.current = notes;
-      setRecording((prev) =>
-        prev ? { ...prev, manual_notes: serializeRecordingNotes(notes, setMarkers) } : prev
-      );
-    }, 700);
-
-    return () => {
-      if (saveTimeoutRef.current) {
-        clearTimeout(saveTimeoutRef.current);
-      }
-    };
-  }, [notes, setMarkers, user?.id, recordingId]);
+      setEditLabel(result.label);
+      if (result.skillCategory) setEditSkill(result.skillCategory);
+      if (result.position) setEditPosition(result.position);
+      if (result.feedbackType) setEditFeedback(result.feedbackType);
+      const aiLabels = serializeAiLabels(result.label, {
+        skillCategory: result.skillCategory ?? undefined,
+        position: result.position ?? undefined,
+        feedbackType: result.feedbackType ?? undefined,
+      });
+      await updateRecording(user.id, recordingId, { ai_labels: aiLabels });
+      if (!cancelled) setRecording((p) => (p ? { ...p, ai_labels: aiLabels } : p));
+      setFillingMetadata(false);
+    })();
+    return () => { cancelled = true; };
+  }, [recording?.id, recording?.transcription, recording?.ai_labels, recording?.game_session_id, user?.id, recordingId]);
 
   const handleDelete = () => {
     if (!user?.id || !recordingId || !recording) return;
 
     Alert.alert(
       'Delete recording?',
-      'This will permanently remove the audio file and its notes.',
+      'This will permanently remove this recording.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -147,13 +157,35 @@ export default function RecordingDetailScreen() {
 
   const removeEmojis = (text) => {
     if (!text) return '';
-    // Remove emojis and other pictographs
     let cleaned = text.replace(/[\u{1F300}-\u{1F9FF}]|[\u{2600}-\u{26FF}]|[\u{2700}-\u{27BF}]/gu, '').trim();
-    // Remove quotation marks
     cleaned = cleaned.replace(/^["']|["']$/g, '').trim();
-    // Remove sport-related suffixes (e.g., "in Volleyball", "in volleyball")
     cleaned = cleaned.replace(/\s+in\s+(volleyball|basketball|soccer|football|baseball|tennis|hockey)$/gi, '').trim();
     return cleaned;
+  };
+
+  const handleSaveLabels = async () => {
+    if (!user?.id || !recordingId || !recording) return;
+    setSavingField('labels');
+    const parsed = parseAiLabels(recording.ai_labels ?? null);
+    const aiLabels = serializeAiLabels(editLabel || parsed.displayLabel || 'Untitled', {
+      skillCategory: editSkill || parsed.skillCategory || undefined,
+      position: editPosition || parsed.position || undefined,
+      playPattern: parsed.playPattern || undefined,
+      feedbackType: editFeedback || parsed.feedbackType || undefined,
+      ruleNote: parsed.ruleNote || undefined,
+      taggedPlayers: taggedPlayerNames.length ? taggedPlayerNames : (parsed.taggedPlayers?.length ? parsed.taggedPlayers : undefined),
+    });
+    const { error: err } = await updateRecording(user.id, recordingId, { ai_labels: aiLabels });
+    setSavingField(null);
+    if (err) Alert.alert('Save failed', err.message);
+    else setRecording((p) => (p ? { ...p, ai_labels: aiLabels } : p));
+  };
+
+  const toggleTaggedPlayer = (name) => {
+    const next = taggedPlayerNames.includes(name)
+      ? taggedPlayerNames.filter((n) => n !== name)
+      : [...taggedPlayerNames, name];
+    setTaggedPlayerNames(next);
   };
 
   return (
@@ -217,9 +249,9 @@ export default function RecordingDetailScreen() {
           contentContainerStyle={styles.content}
           keyboardShouldPersistTaps="handled"
         >
-          {/* Title - AI Label without emojis */}
+          {/* Title - AI Label */}
           <ThemedText type="title" style={styles.title}>
-            {recording.ai_labels ? removeEmojis(recording.ai_labels) : 'Recording'}
+            {recording.ai_labels ? removeEmojis(parseAiLabels(recording.ai_labels).displayLabel) || 'Recording' : 'Recording'}
           </ThemedText>
 
           {/* Processing indicator */}
@@ -232,53 +264,94 @@ export default function RecordingDetailScreen() {
             </View>
           )}
 
-          {/* Transcription */}
-          {recording.transcription && (
-            <View style={styles.section}>
-              <ThemedText style={styles.sectionTitle}>Transcription</ThemedText>
-              <View style={[styles.transcriptionCard, { backgroundColor: colorScheme === 'dark' ? '#1F1F1F' : '#FFFFFF' }]}>
-                <ThemedText style={styles.transcriptionText}>{recording.transcription}</ThemedText>
-              </View>
-            </View>
-          )}
-
-          {/* Processing Status */}
-          {recording.status && recording.status !== 'processed' && recording.status !== 'new' && (
-            <View style={styles.section}>
-              <View style={[styles.statusCard, { backgroundColor: colorScheme === 'dark' ? '#2A1F1F' : '#FFF5F5' }]}>
-                <ThemedText style={[styles.statusText, { color: colorScheme === 'dark' ? '#FF9999' : '#D32F2F' }]}>
-                  {recording.status === 'transcription_failed' && 'Transcription failed'}
-                  {recording.status === 'label_failed' && 'Label generation failed (transcription available)'}
-                  {!['transcription_failed', 'label_failed'].includes(recording.status) && `Status: ${recording.status}`}
-                </ThemedText>
-              </View>
-            </View>
-          )}
-
-          {/* Manual notes */}
+          {/* Summary & categories (from transcription analysis) */}
           <View style={styles.section}>
-            <ThemedText style={styles.sectionTitle}>Manual notes</ThemedText>
-            <TextInput
-              style={[
-                styles.notesInput,
-                {
-                  color: Colors[colorScheme ?? 'light'].text,
-                  backgroundColor: colorScheme === 'dark' ? '#1F1F1F' : '#FFFFFF',
-                },
-              ]}
-              placeholder="Add notes about this recording..."
-              placeholderTextColor={colorScheme === 'dark' ? '#999' : '#999'}
-              value={notes}
-              onChangeText={setNotes}
-              multiline
-            />
-            {saving && (
-              <View style={styles.savingRow}>
+            <ThemedText style={styles.sectionTitle}>Edit Recording Name</ThemedText>
+            <ThemedText style={styles.sectionSubtitle}>
+              Title and categories are filled from the recording. You can change them below.
+            </ThemedText>
+            {fillingMetadata && (
+              <View style={styles.fillingMetaRow}>
                 <ActivityIndicator size="small" color={Colors[colorScheme ?? 'light'].tint} />
-                <ThemedText style={styles.savingText}>Saving...</ThemedText>
+                <ThemedText style={styles.fillingMetaText}>Filling from transcription…</ThemedText>
               </View>
             )}
+            <TextInput
+              style={[styles.labelInput, { color: Colors[colorScheme ?? 'light'].text, backgroundColor: colorScheme === 'dark' ? '#1F1F1F' : '#FFFFFF', borderColor: colorScheme === 'dark' ? '#444' : '#DDD' }]}
+              placeholder="Label"
+              placeholderTextColor="#999"
+              value={editLabel}
+              onChangeText={setEditLabel}
+            />
+            <View style={styles.labelMetaRow}>
+              <ThemedText style={styles.labelMetaLabel}>Skill</ThemedText>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipScroll}>
+                {['', 'serving', 'passing', 'setting', 'attacking', 'blocking', 'defense'].map((s) => (
+                  <TouchableOpacity key={s || '_'} style={[styles.metaChip, editSkill === s && { backgroundColor: Colors[colorScheme ?? 'light'].tint }]} onPress={() => setEditSkill(s)}>
+                    <ThemedText style={[styles.metaChipText, editSkill === s && { color: '#FFF' }]}>{s ? (SKILL_CATEGORY_LABELS[s] ?? s) : 'Any'}</ThemedText>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+            <View style={styles.labelMetaRow}>
+              <ThemedText style={styles.labelMetaLabel}>Position</ThemedText>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipScroll}>
+                {['', 'setter', 'outside_hitter', 'middle_blocker', 'opposite', 'libero'].map((p) => (
+                  <TouchableOpacity key={p || '_'} style={[styles.metaChip, editPosition === p && { backgroundColor: Colors[colorScheme ?? 'light'].tint }]} onPress={() => setEditPosition(p)}>
+                    <ThemedText style={[styles.metaChipText, editPosition === p && { color: '#FFF' }]}>{p ? (POSITION_LABELS[p] ?? p) : 'Any'}</ThemedText>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+            <View style={styles.labelMetaRow}>
+              <ThemedText style={styles.labelMetaLabel}>Feedback</ThemedText>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipScroll}>
+                {['', 'technique', 'positioning', 'communication'].map((f) => (
+                  <TouchableOpacity key={f || '_'} style={[styles.metaChip, editFeedback === f && { backgroundColor: Colors[colorScheme ?? 'light'].tint }]} onPress={() => setEditFeedback(f)}>
+                    <ThemedText style={[styles.metaChipText, editFeedback === f && { color: '#FFF' }]}>{f ? (FEEDBACK_TYPE_LABELS[f] ?? f) : 'Any'}</ThemedText>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+            <TouchableOpacity
+              style={[styles.saveFieldButton, { backgroundColor: Colors[colorScheme ?? 'light'].tint }]}
+              onPress={handleSaveLabels}
+              disabled={savingField === 'labels'}
+            >
+              {savingField === 'labels' ? <ActivityIndicator size="small" color="#FFF" /> : <ThemedText style={styles.saveFieldButtonText}>Save changes</ThemedText>}
+            </TouchableOpacity>
           </View>
+
+          {/* Tagged players */}
+          {roster.length > 0 && (
+            <View style={styles.section}>
+              <ThemedText style={styles.sectionTitle}>Tagged players</ThemedText>
+              <View style={styles.tagRow}>
+                {roster.map((p) => (
+                  <TouchableOpacity
+                    key={p.id}
+                    style={[styles.metaChip, taggedPlayerNames.includes(p.name) && { backgroundColor: Colors[colorScheme ?? 'light'].tint }]}
+                    onPress={() => toggleTaggedPlayer(p.name)}
+                  >
+                    <ThemedText style={[styles.metaChipText, taggedPlayerNames.includes(p.name) && { color: '#FFF' }]}>{p.name}</ThemedText>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              <TouchableOpacity style={[styles.saveFieldButton, { backgroundColor: Colors[colorScheme ?? 'light'].tint }]} onPress={handleSaveLabels} disabled={savingField === 'labels'}>
+                {savingField === 'labels' ? <ActivityIndicator size="small" color="#FFF" /> : <ThemedText style={styles.saveFieldButtonText}>Save tags</ThemedText>}
+              </TouchableOpacity>
+            </View>
+          )}
+
+          {/* Processing Status (errors) */}
+          {recording.status && ['transcription_failed', 'label_failed'].includes(recording.status) && (
+            <View style={[styles.statusCard, { backgroundColor: colorScheme === 'dark' ? '#2A1F1F' : '#FFF5F5' }]}>
+              <ThemedText style={[styles.statusText, { color: colorScheme === 'dark' ? '#FF9999' : '#D32F2F' }]}>
+                {recording.status === 'transcription_failed' && 'Transcription failed'}
+                {recording.status === 'label_failed' && 'Label generation failed (transcription available)'}
+              </ThemedText>
+            </View>
+          )}
         </ScrollView>
         </KeyboardAvoidingView>
       )}
@@ -330,22 +403,21 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '700',
   },
-  notesInput: {
-    minHeight: 160,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(128, 128, 128, 0.2)',
-    padding: 12,
-    textAlignVertical: 'top',
+  sectionSubtitle: {
+    fontSize: 14,
+    opacity: 0.8,
+    marginTop: 4,
+    marginBottom: 12,
   },
-  savingRow: {
+  fillingMetaRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
+    marginBottom: 8,
   },
-  savingText: {
+  fillingMetaText: {
     fontSize: 13,
-    opacity: 0.7,
+    opacity: 0.8,
   },
   loadingContainer: {
     alignItems: 'center',
@@ -392,6 +464,54 @@ const styles = StyleSheet.create({
     fontSize: 14,
     flex: 1,
     lineHeight: 20,
+  },
+  saveFieldButton: {
+    alignSelf: 'flex-start',
+    paddingVertical: 10,
+    paddingHorizontal: 18,
+    borderRadius: 10,
+    marginTop: 8,
+  },
+  saveFieldButtonText: {
+    color: '#FFF',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  labelInput: {
+    borderRadius: 12,
+    borderWidth: 1,
+    padding: 12,
+    fontSize: 16,
+    marginBottom: 10,
+  },
+  labelMetaRow: {
+    marginBottom: 10,
+  },
+  labelMetaLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    marginBottom: 6,
+    opacity: 0.8,
+  },
+  chipScroll: {
+    flexGrow: 0,
+  },
+  metaChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    backgroundColor: 'rgba(128,128,128,0.2)',
+    marginRight: 8,
+    marginBottom: 4,
+  },
+  metaChipText: {
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  tagRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
   },
   transcriptionCard: {
     padding: 16,

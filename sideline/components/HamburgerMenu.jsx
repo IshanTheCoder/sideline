@@ -81,6 +81,13 @@ export default function HamburgerMenu({ visible, onClose, onSignOut }) {
       color: Colors[colorScheme ?? 'light'].tint,
     },
     {
+      id: 'roster',
+      label: 'Roster',
+      icon: 'person.2.fill',
+      onPress: () => handleNavigation('/(tabs)/roster'),
+      color: Colors[colorScheme ?? 'light'].tint,
+    },
+    {
       id: 'settings',
       label: 'Settings',
       icon: 'gearshape.fill',

@@ -27,6 +27,7 @@ const MAPPING = {
   'lock': 'lock',
   'sportscourt': 'sports-volleyball',
   'camera': 'camera-alt',
+  'doc.text': 'description',
 };
 
 /**

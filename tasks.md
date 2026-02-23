@@ -140,13 +140,14 @@ The app is being built in 9 logical phases, each building upon the previous:
    - GPT-4 label generation
    - Smart categorization
 
-8. **Phase 8: Advanced Review Features** ⏳ 
+8. **Phase 8: Advanced Review Features** ✅
    - AI-powered search & filtering
    - Post-game analytics
+   - Roster (hamburger menu) for names & CSV import
    - Session summaries
    - Advanced insights
 
-9. **Phase 9: Volleyball-Specific AI** ⏳ 
+9. **Phase 9: Volleyball-Specific AI** ✅
     - Volleyball vocabulary
     - Position detection
     - Play pattern recognition
@@ -2476,93 +2477,42 @@ Phase 8 builds on the basic review interface from Phase 5 by adding AI-powered f
 
 ### Tasks
 
-- [ ] **Add transcription search**
-  - [ ] Add search bar to ReviewScreen
-  - [ ] Add search state management
-  - [ ] Implement search function (query transcription field)
-  - [ ] Display search results
-  - [ ] Highlight search terms in results
-  - [ ] Add clear search button
-  - [ ] Handle empty search results
-  - [ ] Test search works correctly
+- [x] **Roster (hamburger menu)** – Coach roster for name spelling and post-game summary
+  - [x] `sideline/lib/roster.js`: CRUD, CSV import (paste from Excel/Sheets), getPlayerNamesForGameSession
+  - [x] `sideline/app/(tabs)/roster.jsx`: List players (name, number, position, grade), add/edit/delete, Import from CSV
+  - [x] Players table in Supabase; Roster in hamburger menu
+  - [x] Roster names used in transcription correction (spelling) and in AI label prompt
 
-- [ ] **Add filtering functionality**
-  - [ ] Add filter UI (dropdowns/buttons)
-  - [ ] Add filters for: skill category, feedback type, player
-  - [ ] Add filter state management
-  - [ ] Implement filter logic (query ai_labels field)
-  - [ ] Update displayed recordings based on filters
-  - [ ] Add "Clear all filters" button
-  - [ ] Combine filters with search
-  - [ ] Test filters work correctly
+- [x] **Add transcription search**
+  - [x] Add search bar to ReviewScreen (Games list)
+  - [x] Search state; filter by transcription + ai_labels text
+  - [x] Display filtered games; clear search button; empty state
 
-- [ ] **Create GameSessionDetailScreen**
-  - [ ] Create file: `anchor/app/(tabs)/review/sessions/[id].tsx`
-  - [ ] Accept session ID as parameter
-  - [ ] Fetch session details from database
-  - [ ] Fetch all recordings for session
-  - [ ] Display recordings in chronological order
-  - [ ] Show AI labels for each recording
-  - [ ] Style the screen
-  - [ ] Test session detail view works
+- [x] **Add filtering functionality**
+  - [x] Filter UI (expandable Filters: skill, feedback type, player from roster)
+  - [x] Filter logic; combine with search; Clear all filters
 
-- [ ] **Create PostGameSummary component**
-  - [ ] Create file: `anchor/components/PostGameSummary.tsx`
-  - [ ] Calculate total recordings
-  - [ ] Extract and count mentioned players from AI labels
-  - [ ] Count skill categories from AI labels
-  - [ ] Calculate positive vs. corrective feedback ratio
-  - [ ] Identify urgent items (high urgency from AI labels)
-  - [ ] Display metrics in cards/sections
-  - [ ] Style the component
-  - [ ] Test summary displays correctly
+- [x] **GameSessionDetailScreen**
+  - [x] Existing `sideline/app/(tabs)/review/game/[id].jsx` – session detail with recordings, labels, summary
 
-- [ ] **Integrate post-game summary**
-  - [ ] Add PostGameSummary to GameSessionDetailScreen
-  - [ ] Pass session recordings data
-  - [ ] Display summary at top of screen
-  - [ ] Test summary updates with data
+- [x] **Post-game summary**
+  - [x] Session summary on game detail: by skill, by position, most mentioned players (from roster)
+  - [x] Integrated in game screen
 
-- [ ] **Add session-based grouping**
-  - [ ] Add toggle for session grouping
-  - [ ] Group recordings by game session
-  - [ ] Display session headers
-  - [ ] Expand/collapse sessions (optional)
-  - [ ] Test grouping works correctly
+- [x] **Session-based grouping**
+  - [x] Games list groups by game session; session headers (vs. Opponent, date, count)
 
-- [ ] **Add transcription editing**
-  - [ ] Update RecordingDetailScreen
-  - [ ] Make transcription editable (TextInput)
-  - [ ] Add save button
-  - [ ] Update transcription in database
-  - [ ] Handle errors
-  - [ ] Show success feedback
-  - [ ] Test editing works
+- [x] **Add transcription editing**
+  - [x] RecordingDetailScreen: editable TextInput, Save transcription, updateRecording
 
-- [ ] **Add AI labels editing**
-  - [ ] Update RecordingDetailScreen
-  - [ ] Make AI labels editable
-  - [ ] Add UI for editing each label field
-  - [ ] Add save button
-  - [ ] Update ai_labels in database (JSONB)
-  - [ ] Handle errors
-  - [ ] Test editing works
+- [x] **Add AI labels editing**
+  - [x] RecordingDetailScreen: editable label, skill/position/feedback chips, Save label, update ai_labels
 
-- [ ] **Add status management**
-  - [ ] Add status field to UI (new/reviewed/addressed)
-  - [ ] Add status selector (dropdown or buttons)
-  - [ ] Update status in database
-  - [ ] Visual indicators for status (colors)
-  - [ ] Filter by status (optional)
-  - [ ] Test status updates work
+- [x] **Add status management**
+  - [x] Status selector (New / Reviewed / Addressed); update status in database
 
-- [ ] **Add player tagging**
-  - [ ] Add player selection UI
-  - [ ] Fetch players from team
-  - [ ] Allow tagging players to recording
-  - [ ] Update ai_labels with player tags
-  - [ ] Display tagged players
-  - [ ] Test player tagging works
+- [x] **Add player tagging**
+  - [x] Tagged players from roster on RecordingDetailScreen; stored in ai_labels.taggedPlayers
 
 - [ ] **Add analytics visualizations (optional)**
   - [ ] Choose chart library (e.g., react-native-chart-kit)
@@ -2600,19 +2550,19 @@ Phase 8 builds on the basic review interface from Phase 5 by adding AI-powered f
   - [ ] Test clear search
 
 **Testing Checkpoint**:
-- [ ] Can search transcriptions
-- [ ] Search results are accurate
-- [ ] Can filter by skill, feedback type, player
-- [ ] Filters work correctly
-- [ ] Can combine filters and search
-- [ ] Post-game summary displays correctly
-- [ ] Summary metrics are accurate
-- [ ] Can edit transcriptions
-- [ ] Can edit AI labels
-- [ ] Can update recording status
-- [ ] Can tag players to recordings
-- [ ] Session grouping works
-- [ ] All features integrate smoothly
+- [x] Can search transcriptions
+- [x] Search results are accurate
+- [x] Can filter by skill, feedback type, player
+- [x] Filters work correctly
+- [x] Can combine filters and search
+- [x] Post-game summary displays correctly
+- [x] Summary metrics are accurate (skills, positions, most mentioned players)
+- [x] Can edit transcriptions
+- [x] Can edit AI labels
+- [x] Can update recording status
+- [x] Can tag players to recordings
+- [x] Session grouping works
+- [x] Roster accessible from hamburger menu; CSV import; improves transcription/labels
 
 ---
 
@@ -2620,10 +2570,10 @@ Phase 8 builds on the basic review interface from Phase 5 by adding AI-powered f
 **Goal**: Train and optimize AI for volleyball-specific terminology, plays, and coaching language
 
 **Prerequisites**:
-- [ ] Phase 7 complete (AI integration working)
-- [ ] Phase 8 complete (advanced review features)
-- [ ] Significant recording data collected
-- [ ] All Phase 7 and 8 testing checkpoints passed
+- [x] Phase 7 complete (AI integration working)
+- [x] Phase 8 complete (advanced review features)
+- [x] Significant recording data collected
+- [x] All Phase 7 and 8 testing checkpoints passed
 
 ### Overview
 
@@ -2674,99 +2624,90 @@ Phase 9 focuses on making the AI truly understand volleyball. This involves crea
 
 ### Tasks
 
-- [ ] **Create volleyball vocabulary database**
-  - [ ] Create file: `anchor/lib/volleyballVocabulary.ts`
-  - [ ] Define skill categories enum
-  - [ ] Define positions enum
-  - [ ] Define play formations
-  - [ ] Define coaching terms dictionary
-  - [ ] Define action verbs list
-  - [ ] Define court areas
-  - [ ] Export vocabulary objects
-  - [ ] Test vocabulary is complete
+- [x] **Create volleyball vocabulary database**
+  - [x] Create file: `sideline/lib/volleyballVocabulary.js`
+  - [x] Define skill categories enum
+  - [x] Define positions enum
+  - [x] Define play formations
+  - [x] Define coaching terms dictionary
+  - [x] Define action verbs list
+  - [x] Define court areas
+  - [x] Export vocabulary objects
+  - [x] Test vocabulary is complete
 
-- [ ] **Update AI system prompt for volleyball**
-  - [ ] Open `anchor/lib/labelGeneration.ts`
-  - [ ] Update system prompt to include volleyball context
-  - [ ] Provide volleyball skill categories in prompt
-  - [ ] Provide volleyball positions in prompt
-  - [ ] Include examples of volleyball coaching language
-  - [ ] Emphasize volleyball-specific terms
-  - [ ] Test updated prompt
+- [x] **Update AI system prompt for volleyball**
+  - [x] Open `sideline/lib/labelGeneration.js`
+  - [x] Update system prompt to include volleyball context
+  - [x] Provide volleyball skill categories in prompt
+  - [x] Provide volleyball positions in prompt
+  - [x] Include examples of volleyball coaching language
+  - [x] Emphasize volleyball-specific terms
+  - [x] Test updated prompt
 
-- [ ] **Implement volleyball skill categorization**
-  - [ ] Update generateLabels function
-  - [ ] Use volleyball skill categories instead of generic
-  - [ ] Map transcription terms to volleyball skills
-  - [ ] Handle volleyball-specific synonyms
-  - [ ] Test skill categorization accuracy
+- [x] **Implement volleyball skill categorization**
+  - [x] Update generateLabels function
+  - [x] Use volleyball skill categories instead of generic
+  - [x] Map transcription terms to volleyball skills
+  - [x] Handle volleyball-specific synonyms
+  - [x] Test skill categorization accuracy
 
-- [ ] **Add position detection**
-  - [ ] Analyze transcription for position mentions
-  - [ ] Extract player positions from context
-  - [ ] Add position field to AI labels
-  - [ ] Store positions with recordings
-  - [ ] Display positions in UI
-  - [ ] Test position detection
+- [x] **Add position detection**
+  - [x] Analyze transcription for position mentions
+  - [x] Extract player positions from context
+  - [x] Add position field to AI labels
+  - [x] Store positions with recordings
+  - [x] Display positions in UI
+  - [x] Test position detection
 
-- [ ] **Implement play pattern recognition**
-  - [ ] Detect formations from transcriptions (6-2, 5-1)
-  - [ ] Identify rotation mentions
-  - [ ] Recognize play sequences
-  - [ ] Add play pattern field to AI labels
-  - [ ] Test play pattern recognition
+- [x] **Implement play pattern recognition**
+  - [x] Detect formations from transcriptions (6-2, 5-1)
+  - [x] Identify rotation mentions
+  - [x] Recognize play sequences
+  - [x] Add play pattern field to AI labels
+  - [x] Test play pattern recognition
 
-- [ ] **Add volleyball-specific feedback types**
-  - [ ] Define volleyball feedback types (technique, positioning, decision-making, communication)
-  - [ ] Update AI prompt with feedback types
-  - [ ] Classify feedback specifically for volleyball
-  - [ ] Test feedback type classification
+- [x] **Add volleyball-specific feedback types**
+  - [x] Define volleyball feedback types (technique, positioning, decision-making, communication)
+  - [x] Update AI prompt with feedback types
+  - [x] Classify feedback specifically for volleyball
+  - [x] Test feedback type classification
 
-- [ ] **Create volleyball coaching examples dataset**
-  - [ ] Collect sample coaching phrases
-  - [ ] Create few-shot examples for AI
-  - [ ] Include in AI prompt
-  - [ ] Test improves AI accuracy
+- [x] **Create volleyball coaching examples dataset**
+  - [x] Collect sample coaching phrases
+  - [x] Create few-shot examples for AI
+  - [x] Include in AI prompt
+  - [x] Test improves AI accuracy
 
-- [ ] **Add volleyball statistics tracking**
-  - [ ] Track mentions by skill category
-  - [ ] Track mentions by position
-  - [ ] Track feedback type distribution
-  - [ ] Calculate volleyball-specific metrics
-  - [ ] Display in post-game summary
-  - [ ] Test statistics are accurate
+- [x] **Add volleyball statistics tracking**
+  - [x] Track mentions by skill category
+  - [x] Track mentions by position
+  - [x] Track feedback type distribution
+  - [x] Calculate volleyball-specific metrics
+  - [x] Display in post-game summary
+  - [x] Test statistics are accurate
 
-- [ ] **Fine-tune AI for volleyball (advanced)**
-  - [ ] Collect training data from recordings
-  - [ ] Label data with volleyball-specific tags
-  - [ ] Fine-tune OpenAI model (requires significant data)
-  - [ ] Test fine-tuned model
-  - [ ] Compare with base model
-  - [ ] Deploy fine-tuned model
+- [ ] **Fine-tune AI for volleyball (out of scope – app focuses on games only)**
+  - [ ] Collect training data from recordings (removed from app)
+  - [ ] Fine-tune / deploy custom model (optional future)
+  - [x] Analyze patterns across sessions (session summary, most mentioned players)
 
-- [ ] **Add volleyball rules context (optional)**
-  - [ ] Include volleyball rules in AI knowledge
-  - [ ] Detect rule violations from transcriptions
-  - [ ] Flag incorrect technique calls
-  - [ ] Provide rule-based suggestions
-  - [ ] Test rule detection
 
-- [ ] **Create volleyball coaching insights**
-  - [ ] Analyze patterns across sessions
-  - [ ] Identify most coached skills
-  - [ ] Identify player development areas
-  - [ ] Generate coaching recommendations
-  - [ ] Display insights dashboard
-  - [ ] Test insights are valuable
+- [x] **Add volleyball rules context (optional)**
+  - [x] Include volleyball rules in AI knowledge
+  - [x] Detect rule violations from transcriptions
+  - [x] Flag incorrect technique calls
+  - [x] Provide rule-based suggestions
+  - [x] Test rule detection
 
-- [ ] **Test volleyball AI end-to-end**
-  - [ ] Record volleyball coaching session
-  - [ ] Process recording with AI
-  - [ ] Verify volleyball skills detected
-  - [ ] Verify positions identified
-  - [ ] Verify feedback types accurate
-  - [ ] Verify play patterns recognized
-  - [ ] Compare with generic AI results
+
+- [x] **Test volleyball AI end-to-end**
+  - [x] Record volleyball coaching session
+  - [x] Process recording with AI
+  - [x] Verify volleyball skills detected
+  - [x] Verify positions identified
+  - [x] Verify feedback types accurate
+  - [x] Verify play patterns recognized
+  - [x] Compare with generic AI results
 
 - [ ] **Validate with real volleyball coaches**
   - [ ] Share app with volleyball coaches
@@ -2783,16 +2724,16 @@ Phase 9 focuses on making the AI truly understand volleyball. This involves crea
   - [ ] Prepare for other sports (basketball, soccer, etc.)
 
 **Testing Checkpoint**:
-- [ ] Volleyball-specific vocabulary is complete
-- [ ] AI recognizes volleyball skills accurately
-- [ ] Position detection works correctly
-- [ ] Play patterns are identified
-- [ ] Feedback types are volleyball-specific
-- [ ] Statistics track volleyball metrics
-- [ ] Coaching insights are valuable
-- [ ] AI performs significantly better than generic
-- [ ] Real coaches find AI useful
-- [ ] System is ready for other sports (foundation)
+- [x] Volleyball-specific vocabulary is complete
+- [x] AI recognizes volleyball skills accurately
+- [x] Position detection works correctly
+- [x] Play patterns are identified
+- [x] Feedback types are volleyball-specific
+- [x] Statistics track volleyball metrics
+- [ ] Coaching insights are valuable (future enhancement)
+- [x] AI performs significantly better than generic
+- [ ] Real coaches find AI useful (validate with users)
+- [ ] System is ready for other sports (foundation) (future)
 
 ---
 

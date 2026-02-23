@@ -346,6 +346,9 @@ export async function fetchRecordingsForUser(userId) {
         user_id,
         game_session_id,
         manual_notes,
+        transcription,
+        ai_labels,
+        status,
         game_sessions (
           opponent_name,
           date
@@ -367,6 +370,9 @@ export async function fetchRecordingsForUser(userId) {
           audio_url,
           game_session_id,
           manual_notes,
+          transcription,
+          ai_labels,
+          status,
           game_sessions!inner (
             opponent_name,
             date,
@@ -542,6 +548,40 @@ export async function saveRecordingNotes(userId, recordingId, manualNotes) {
       const retry = await supabase
         .from('recordings')
         .update({ manual_notes: manualNotes })
+        .eq('id', recordingId);
+      error = retry.error;
+    }
+
+    return { error: error ?? null };
+  } catch (e) {
+    return { error: e };
+  }
+}
+
+/**
+ * Update recording fields (transcription, ai_labels, status).
+ * @param {string} userId
+ * @param {string} recordingId
+ * @param {{ transcription?: string, ai_labels?: string, status?: string }} updates
+ */
+export async function updateRecording(userId, recordingId, updates) {
+  try {
+    const payload = {};
+    if (updates.transcription !== undefined) payload.transcription = updates.transcription;
+    if (updates.ai_labels !== undefined) payload.ai_labels = updates.ai_labels;
+    if (updates.status !== undefined) payload.status = updates.status;
+    if (Object.keys(payload).length === 0) return { error: null };
+
+    let { error } = await supabase
+      .from('recordings')
+      .update(payload)
+      .eq('id', recordingId)
+      .eq('user_id', userId);
+
+    if (error && isMissingColumnError(error, 'user_id')) {
+      const retry = await supabase
+        .from('recordings')
+        .update(payload)
         .eq('id', recordingId);
       error = retry.error;
     }

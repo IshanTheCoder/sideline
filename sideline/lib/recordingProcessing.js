@@ -1,6 +1,8 @@
 import { supabase } from './supabase';
 import { transcribeAudio } from './transcription';
 import { generateLabel } from './labelGeneration';
+import { serializeAiLabels, applyVolleyballTranscriptionCorrections } from './volleyballVocabulary';
+import { getPlayerNamesForGameSession, buildRosterNameCorrections } from './roster';
 
 // Helper function to check if error is missing column error
 const isMissingColumnError = (error, column) => {
@@ -87,28 +89,61 @@ export async function processRecording(recordingId, userId) {
 
     console.log('✅ Transcription completed:', transcription.substring(0, 100) + '...');
 
-    // Step 4: Update recording with transcription only
-    // Labels will be generated in batch when the game ends
-    // Keep status as 'new' since we haven't generated labels yet
-    console.log('💾 Updating recording with transcription...');
+    // Step 3.5: Apply volleyball corrections + roster name spelling (e.g. "Malikal" → "Maliekal")
+    let nameCorrections = [];
+    if (recording.game_session_id) {
+      const { names: rosterNames } = await getPlayerNamesForGameSession(recording.game_session_id);
+      nameCorrections = buildRosterNameCorrections(transcription, rosterNames);
+    }
+    const correctedTranscription = applyVolleyballTranscriptionCorrections(transcription, nameCorrections);
+    if (correctedTranscription !== transcription || nameCorrections.length > 0) {
+      console.log('🏐 Applied volleyball transcription corrections', nameCorrections.length ? `(${nameCorrections.length} name fixes)` : '');
+    }
+
+    // Step 4: Generate AI label with roster context for correct player name spelling
+    const { names: playerNames } = recording.game_session_id
+      ? await getPlayerNamesForGameSession(recording.game_session_id)
+      : { names: [] };
+    console.log('🏷️  Generating AI label (volleyball)...');
+    const labelResult = await generateLabel(correctedTranscription, { playerNames });
+
+    let aiLabel = null;
+    if (labelResult.error || !labelResult.label) {
+      console.error('⚠️ Label generation failed:', labelResult.error);
+      // Continue anyway - we still have transcription
+    } else {
+      console.log('✅ Label generated:', labelResult.label);
+      aiLabel = serializeAiLabels(labelResult.label, {
+        skillCategory: labelResult.skillCategory ?? undefined,
+        position: labelResult.position ?? undefined,
+        playPattern: labelResult.playPattern ?? undefined,
+        feedbackType: labelResult.feedbackType ?? undefined,
+        ruleNote: labelResult.ruleNote ?? undefined,
+      });
+    }
+
+    // Step 5: Update recording with corrected transcription and label
+    console.log('💾 Updating recording with transcription and label...');
     const { error: updateError } = await updateRecordingData(recordingId, userId, {
-      transcription,
-      // Status stays 'new' - will become 'processed' after label generation
+      transcription: correctedTranscription,
+      ai_labels: aiLabel,
     });
 
     if (updateError) {
       console.error('❌ Failed to update recording:', updateError);
       return {
         success: false,
-        transcription,
+        transcription: correctedTranscription,
+        label: aiLabel,
         error: updateError,
       };
     }
 
-    console.log('✅ Transcription completed successfully! Labels will be generated when game ends.');
+    console.log('✅ Recording processed successfully with transcription and label!');
     return {
       success: true,
-      transcription,
+      transcription: correctedTranscription,
+      label: aiLabel,
       error: null,
     };
   } catch (error) {
@@ -247,6 +282,8 @@ export async function generateLabelsForGameSession(gameSessionId, userId) {
 
     console.log(`📋 Found ${recordings.length} recordings to process`);
 
+    const { names: playerNames } = await getPlayerNamesForGameSession(gameSessionId);
+
     let processedCount = 0;
     let failedCount = 0;
 
@@ -260,21 +297,26 @@ export async function generateLabelsForGameSession(gameSessionId, userId) {
 
       console.log(`🏷️  Generating label for recording ${recording.id}...`);
 
-      // Generate label from transcription
-      const { label, error: labelError } = await generateLabel(recording.transcription);
+      const labelResult = await generateLabel(recording.transcription, { playerNames });
 
-      if (labelError || !label) {
-        console.error(`❌ Label generation failed for ${recording.id}:`, labelError);
+      if (labelResult.error || !labelResult.label) {
+        console.error(`❌ Label generation failed for ${recording.id}:`, labelResult.error);
         failedCount++;
-        // Don't update status - keep as 'new'
         continue;
       }
 
-      console.log(`✅ Label generated for ${recording.id}: "${label}"`);
+      console.log(`✅ Label generated for ${recording.id}: "${labelResult.label}"`);
 
-      // Update recording with label (keep status as 'new')
+      const aiLabel = serializeAiLabels(labelResult.label, {
+        skillCategory: labelResult.skillCategory ?? undefined,
+        position: labelResult.position ?? undefined,
+        playPattern: labelResult.playPattern ?? undefined,
+        feedbackType: labelResult.feedbackType ?? undefined,
+        ruleNote: labelResult.ruleNote ?? undefined,
+      });
+
       const { error: updateError } = await updateRecordingData(recording.id, userId, {
-        ai_labels: label,
+        ai_labels: aiLabel,
       });
 
       if (updateError) {
@@ -297,6 +339,111 @@ export async function generateLabelsForGameSession(gameSessionId, userId) {
     console.error('❌ Unexpected error during batch label generation:', error);
     return {
       success: false,
+      processedCount: 0,
+      failedCount: 0,
+      error: error instanceof Error ? error : new Error(String(error)),
+    };
+  }
+}
+
+/**
+ * Generate labels for ALL recordings in a specific game that have transcriptions
+ * @param {string} userId - The user ID
+ * @param {string} gameSessionId - The game session ID to filter recordings
+ * @returns {Promise<{processedCount: number, failedCount: number, error: Error|null}>}
+ */
+export async function generateMissingLabels(userId, gameSessionId) {
+  try {
+    console.log('🏷️  Finding recordings with transcriptions for game session:', gameSessionId);
+
+    // Fetch ALL recordings for this game session that have transcriptions
+    let { data: recordings, error: fetchError } = await supabase
+      .from('recordings')
+      .select('id, transcription, ai_labels')
+      .eq('user_id', userId)
+      .eq('game_session_id', gameSessionId)
+      .not('transcription', 'is', null);
+
+    // Backward-compat: if recordings.user_id doesn't exist, retry without it
+    if (fetchError && isMissingColumnError(fetchError, 'user_id')) {
+      const retry = await supabase
+        .from('recordings')
+        .select('id, transcription, ai_labels')
+        .eq('game_session_id', gameSessionId)
+        .not('transcription', 'is', null);
+      recordings = retry.data;
+      fetchError = retry.error;
+    }
+
+    if (fetchError) {
+      console.error('❌ Failed to fetch recordings:', fetchError);
+      return {
+        processedCount: 0,
+        failedCount: 0,
+        error: fetchError,
+      };
+    }
+
+    if (!recordings || recordings.length === 0) {
+      console.log('ℹ️  No recordings with transcriptions found');
+      return {
+        processedCount: 0,
+        failedCount: 0,
+        error: null,
+      };
+    }
+
+    console.log(`📋 Found ${recordings.length} recordings to generate labels for`);
+
+    const { names: playerNames } = await getPlayerNamesForGameSession(gameSessionId);
+
+    let processedCount = 0;
+    let failedCount = 0;
+
+    // Process each recording
+    for (const recording of recordings) {
+      console.log(`🏷️  Generating label for recording ${recording.id}...`);
+
+      const labelResult = await generateLabel(recording.transcription, { playerNames });
+
+      if (labelResult.error || !labelResult.label) {
+        console.error(`❌ Label generation failed for ${recording.id}:`, labelResult.error);
+        failedCount++;
+        continue;
+      }
+
+      console.log(`✅ Label generated for ${recording.id}: "${labelResult.label}"`);
+
+      const aiLabel = serializeAiLabels(labelResult.label, {
+        skillCategory: labelResult.skillCategory ?? undefined,
+        position: labelResult.position ?? undefined,
+        playPattern: labelResult.playPattern ?? undefined,
+        feedbackType: labelResult.feedbackType ?? undefined,
+        ruleNote: labelResult.ruleNote ?? undefined,
+      });
+
+      const { error: updateError } = await updateRecordingData(recording.id, userId, {
+        ai_labels: aiLabel,
+      });
+
+      if (updateError) {
+        console.error(`❌ Failed to update recording ${recording.id}:`, updateError);
+        failedCount++;
+      } else {
+        processedCount++;
+      }
+    }
+
+    console.log(`✅ Label generation complete! Processed: ${processedCount}, Failed: ${failedCount}`);
+
+    return {
+      processedCount,
+      failedCount,
+      error: null,
+    };
+  } catch (error) {
+    console.error('❌ Unexpected error generating missing labels:', error);
+    return {
       processedCount: 0,
       failedCount: 0,
       error: error instanceof Error ? error : new Error(String(error)),

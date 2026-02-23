@@ -117,7 +117,61 @@ CREATE POLICY "Users can delete own game sessions"
   );
 
 
--- 4. CREATE RECORDINGS TABLE
+-- 4. CREATE PLAYERS (ROSTER) TABLE
+-- =====================================================
+CREATE TABLE IF NOT EXISTS public.players (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  team_id UUID REFERENCES public.teams(id) ON DELETE CASCADE NOT NULL,
+  name TEXT NOT NULL,
+  number TEXT,
+  position TEXT,
+  grade TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_players_team_id ON public.players(team_id);
+
+ALTER TABLE public.players ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can view players of own teams"
+  ON public.players FOR SELECT
+  USING (
+    EXISTS (
+      SELECT 1 FROM public.teams
+      WHERE teams.id = players.team_id AND teams.coach_id = auth.uid()
+    )
+  );
+
+CREATE POLICY "Users can insert players to own teams"
+  ON public.players FOR INSERT
+  WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM public.teams
+      WHERE teams.id = players.team_id AND teams.coach_id = auth.uid()
+    )
+  );
+
+CREATE POLICY "Users can update players of own teams"
+  ON public.players FOR UPDATE
+  USING (
+    EXISTS (
+      SELECT 1 FROM public.teams
+      WHERE teams.id = players.team_id AND teams.coach_id = auth.uid()
+    )
+  );
+
+CREATE POLICY "Users can delete players of own teams"
+  ON public.players FOR DELETE
+  USING (
+    EXISTS (
+      SELECT 1 FROM public.teams
+      WHERE teams.id = players.team_id AND teams.coach_id = auth.uid()
+    )
+  );
+
+
+-- 5. CREATE RECORDINGS TABLE
 -- =====================================================
 CREATE TABLE IF NOT EXISTS public.recordings (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
@@ -187,7 +241,7 @@ SELECT
   (SELECT COUNT(*) FROM information_schema.columns WHERE columns.table_name = tables.table_name) as column_count
 FROM information_schema.tables
 WHERE table_schema = 'public'
-AND table_name IN ('profiles', 'teams', 'game_sessions', 'recordings')
+AND table_name IN ('profiles', 'teams', 'game_sessions', 'players', 'recordings')
 ORDER BY table_name;
 
--- Expected output: 4 rows showing all tables with their column counts
+-- Expected output: 5 rows showing all tables with their column counts

@@ -30,6 +30,15 @@ import {
   saveRecordingNotes,
   serializeRecordingNotes,
 } from '@/lib/recording';
+import { generateMissingLabels } from '@/lib/recordingProcessing';
+import {
+  parseAiLabels,
+  aggregateVolleyballStats,
+  SKILL_CATEGORY_LABELS,
+  POSITION_LABELS,
+  FEEDBACK_TYPE_LABELS,
+} from '@/lib/volleyballVocabulary';
+import { getPlayerNamesForGameSession } from '@/lib/roster';
 
 export default function GameRecordingsScreen() {
   const { id } = useLocalSearchParams();
@@ -57,6 +66,7 @@ export default function GameRecordingsScreen() {
   const currentRecordingIdRef = useRef(null);
   const isLoadingAudioRef = useRef(false);
   const [editingNotes, setEditingNotes] = useState('');
+  const [originalNotes, setOriginalNotes] = useState('');
   const [savingNotes, setSavingNotes] = useState(false);
   const [playerExpanded, setPlayerExpanded] = useState(true);
   const [transcriptionScrollIndicator, setTranscriptionScrollIndicator] = useState({
@@ -69,11 +79,32 @@ export default function GameRecordingsScreen() {
   const transcriptionLayoutHeight = useRef(0);
   const [isScrollingTranscription, setIsScrollingTranscription] = useState(false);
   const modalScrollRef = useRef(null);
+  const [generatingLabels, setGeneratingLabels] = useState(false);
 
   const gameId = useMemo(() => {
     if (Array.isArray(id)) return id[0];
     return id;
   }, [id]);
+
+  const volleyballStats = useMemo(() => aggregateVolleyballStats(recordings), [recordings]);
+
+  const [rosterNames, setRosterNames] = useState([]);
+  useEffect(() => {
+    if (!gameId) return;
+    getPlayerNamesForGameSession(gameId).then(({ names }) => setRosterNames(names ?? []));
+  }, [gameId]);
+
+  const mentionedPlayers = useMemo(() => {
+    const count = {};
+    rosterNames.forEach((name) => { count[name] = 0; });
+    recordings.forEach((rec) => {
+      const text = [rec.transcription, parseAiLabels(rec.ai_labels).displayLabel].filter(Boolean).join(' ').toLowerCase();
+      rosterNames.forEach((name) => {
+        if (name && text.includes(name.toLowerCase())) count[name]++;
+      });
+    });
+    return Object.entries(count).filter(([, n]) => n > 0).sort((a, b) => b[1] - a[1]).slice(0, 8);
+  }, [recordings, rosterNames]);
 
   const loadRecordings = useCallback(async () => {
     if (!user?.id || !gameId) {
@@ -114,6 +145,7 @@ export default function GameRecordingsScreen() {
     if (modalVisible && selectedRecording) {
       const { notes } = parseRecordingNotes(selectedRecording.manual_notes ?? null);
       setEditingNotes(notes);
+      setOriginalNotes(notes); // Track original to detect changes
     }
   }, [modalVisible, selectedRecording]);
 
@@ -422,13 +454,27 @@ export default function GameRecordingsScreen() {
 
   const cleanLabel = (text) => {
     if (!text) return '';
-    // Remove emojis and other pictographs
     let cleaned = text.replace(/[\u{1F300}-\u{1F9FF}]|[\u{2600}-\u{26FF}]|[\u{2700}-\u{27BF}]/gu, '').trim();
-    // Remove quotation marks
     cleaned = cleaned.replace(/^["']|["']$/g, '').trim();
-    // Remove sport-related suffixes (e.g., "in Volleyball", "in volleyball")
     cleaned = cleaned.replace(/\s+in\s+(volleyball|basketball|soccer|football|baseball|tennis|hockey)$/gi, '').trim();
     return cleaned;
+  };
+
+  /** Parse ai_labels (plain or JSON) and return display label + volleyball metadata for UI */
+  const getRecordingLabelInfo = (recording) => {
+    const parsed = parseAiLabels(recording?.ai_labels ?? null);
+    const displayLabel = cleanLabel(parsed.displayLabel) || 'Untitled Recording';
+    const skillLabel = parsed.skillCategory ? (SKILL_CATEGORY_LABELS[parsed.skillCategory] ?? parsed.skillCategory) : null;
+    const positionLabel = parsed.position ? (POSITION_LABELS[parsed.position] ?? parsed.position) : null;
+    const feedbackLabel = parsed.feedbackType ? (FEEDBACK_TYPE_LABELS[parsed.feedbackType] ?? parsed.feedbackType) : null;
+    return {
+      displayLabel,
+      skillLabel,
+      positionLabel,
+      feedbackLabel,
+      playPattern: parsed.playPattern,
+      ruleNote: parsed.ruleNote ?? null,
+    };
   };
 
   const handleBackPress = async () => {
@@ -443,6 +489,12 @@ export default function GameRecordingsScreen() {
 
   const handleSaveNotes = async () => {
     if (!user?.id || !selectedRecording) return;
+
+    // Only save if notes have actually changed
+    if (editingNotes === originalNotes) {
+      setSavingNotes(false);
+      return;
+    }
 
     try {
       setSavingNotes(true);
@@ -469,7 +521,8 @@ export default function GameRecordingsScreen() {
         )
       );
 
-      // Update selected recording
+      // Update selected recording and original notes after successful save
+      setOriginalNotes(editingNotes);
       setSelectedRecording((prev) =>
         prev ? { ...prev, manual_notes: serializedNotes } : prev
       );
@@ -582,6 +635,33 @@ export default function GameRecordingsScreen() {
     []
   );
 
+  const handleGenerateLabels = async () => {
+    if (!user || !gameId) return;
+    
+    setGeneratingLabels(true);
+    try {
+      const result = await generateMissingLabels(user.id, gameId);
+      
+      if (result.error) {
+        Alert.alert('Error', 'Failed to generate recording names. Please try again.');
+      } else if (result.processedCount === 0 && result.failedCount === 0) {
+        Alert.alert('No Recordings', 'No recordings with transcriptions found in this game.');
+      } else {
+        Alert.alert(
+          'Names Generated',
+          `Successfully generated ${result.processedCount} recording name${result.processedCount !== 1 ? 's' : ''} for this game.${result.failedCount > 0 ? ` ${result.failedCount} failed.` : ''}`
+        );
+        // Reload recordings to show new labels
+        await loadRecordings();
+      }
+    } catch (error) {
+      console.error('Error generating labels:', error);
+      Alert.alert('Error', 'An unexpected error occurred while generating labels.');
+    } finally {
+        setGeneratingLabels(false);
+      }
+  };
+
   const renderRecordingItem = ({ item }) => {
     const { setMarkers } = parseRecordingNotes(item.manual_notes ?? null);
     const isCurrentlyPlaying = playingRecordingId === item.id;
@@ -626,9 +706,30 @@ export default function GameRecordingsScreen() {
           
           {/* Recording info */}
           <View style={styles.recordingInfo}>
-            <ThemedText style={styles.recordingTitle} numberOfLines={2}>
-              {item.ai_labels ? cleanLabel(item.ai_labels) : 'Untitled Recording'}
-            </ThemedText>
+            {(() => {
+              const labelInfo = getRecordingLabelInfo(item);
+              return (
+                <>
+                  <ThemedText style={styles.recordingTitle} numberOfLines={2}>
+                    {labelInfo.displayLabel}
+                  </ThemedText>
+                  {(labelInfo.skillLabel || labelInfo.positionLabel) ? (
+                    <View style={styles.volleyballChipsRow}>
+                      {labelInfo.skillLabel && (
+                        <View style={[styles.volleyballChip, { backgroundColor: colorScheme === 'dark' ? '#333' : '#E8E8E8' }]}>
+                          <ThemedText style={styles.volleyballChipText}>{labelInfo.skillLabel}</ThemedText>
+                        </View>
+                      )}
+                      {labelInfo.positionLabel && (
+                        <View style={[styles.volleyballChip, { backgroundColor: colorScheme === 'dark' ? '#333' : '#E8E8E8' }]}>
+                          <ThemedText style={styles.volleyballChipText}>{labelInfo.positionLabel}</ThemedText>
+                        </View>
+                      )}
+                    </View>
+                  ) : null}
+                </>
+              );
+            })()}
             {setMarkers.length > 0 && (
               <View style={styles.markerRow}>
                 <ThemedText style={styles.markerText}>
@@ -732,6 +833,10 @@ export default function GameRecordingsScreen() {
       ? `vs. ${recordings[0]?.game_sessions?.opponent_name}`
       : 'Game Recordings';
 
+  const openMatchReflection = () => {
+    router.push({ pathname: '/(tabs)/review/game/summary/[id]', params: { id: gameId } });
+  };
+
   return (
     <ThemedView style={styles.container}>
       <View style={styles.header}>
@@ -747,9 +852,21 @@ export default function GameRecordingsScreen() {
           />
           <ThemedText style={styles.backText}>Back</ThemedText>
         </TouchableOpacity>
-        <ThemedText type="title" style={styles.title}>
+        <ThemedText type="title" style={styles.title} numberOfLines={1}>
           {headerTitle}
         </ThemedText>
+        <TouchableOpacity
+          style={styles.headerRightButton}
+          onPress={openMatchReflection}
+          activeOpacity={0.7}
+          accessibilityLabel="Match Reflection"
+        >
+          <IconSymbol
+            name="doc.text"
+            size={24}
+            color={Colors[colorScheme ?? 'light'].tint}
+          />
+        </TouchableOpacity>
       </View>
 
       {loading && (
@@ -780,13 +897,84 @@ export default function GameRecordingsScreen() {
       )}
 
       {!loading && !error && recordings.length > 0 && (
-        <FlatList
-          data={recordings}
+        <>
+          {/* Button: generate labels */}
+          <View style={styles.generateLabelsContainer}>
+            <TouchableOpacity
+              style={[
+                styles.generateLabelsButton,
+                { backgroundColor: Colors[colorScheme ?? 'light'].tint }
+              ]}
+              onPress={handleGenerateLabels}
+              disabled={generatingLabels}
+              activeOpacity={0.7}
+            >
+              {generatingLabels ? (
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              ) : (
+                <>
+                  <IconSymbol name="sparkles" size={18} color="#FFFFFF" />
+                  <ThemedText style={styles.generateLabelsButtonText}>
+                    Generate Recording Names
+                  </ThemedText>
+                </>
+              )}
+            </TouchableOpacity>
+          </View>
+
+          {/* Volleyball session summary (skills, positions, most mentioned players) */}
+          {(volleyballStats.totalWithMeta > 0 || mentionedPlayers.length > 0) && (
+            <View style={[styles.statsSummaryBox, { backgroundColor: colorScheme === 'dark' ? '#2A2A2A' : '#F5F5F5' }]}>
+              <ThemedText style={styles.statsSummaryTitle}>Session summary</ThemedText>
+              <View style={styles.statsSummaryRow}>
+                {mentionedPlayers.length > 0 && (
+                  <View style={styles.statsSummaryCol}>
+                    <ThemedText style={styles.statsSummaryLabel}>Most mentioned players</ThemedText>
+                    {mentionedPlayers.map(([name, count]) => (
+                      <ThemedText key={name} style={styles.statsSummaryItem}>
+                        {name}: {count}
+                      </ThemedText>
+                    ))}
+                  </View>
+                )}
+                {Object.keys(volleyballStats.bySkill).length > 0 && (
+                  <View style={styles.statsSummaryCol}>
+                    <ThemedText style={styles.statsSummaryLabel}>By skill</ThemedText>
+                    {Object.entries(volleyballStats.bySkill)
+                      .sort((a, b) => b[1] - a[1])
+                      .slice(0, 5)
+                      .map(([key, count]) => (
+                        <ThemedText key={key} style={styles.statsSummaryItem}>
+                          {SKILL_CATEGORY_LABELS[key] ?? key}: {count}
+                        </ThemedText>
+                      ))}
+                  </View>
+                )}
+                {Object.keys(volleyballStats.byPosition).length > 0 && (
+                  <View style={styles.statsSummaryCol}>
+                    <ThemedText style={styles.statsSummaryLabel}>By position</ThemedText>
+                    {Object.entries(volleyballStats.byPosition)
+                      .sort((a, b) => b[1] - a[1])
+                      .slice(0, 5)
+                      .map(([key, count]) => (
+                        <ThemedText key={key} style={styles.statsSummaryItem}>
+                          {POSITION_LABELS[key] ?? key}: {count}
+                        </ThemedText>
+                      ))}
+                  </View>
+                )}
+              </View>
+            </View>
+          )}
+
+          <FlatList
+            data={recordings}
           renderItem={renderRecordingItem}
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.listContent}
           ItemSeparatorComponent={() => <View style={styles.separator} />}
         />
+        </>
       )}
 
       {/* Recording Details Modal */}
@@ -816,22 +1004,34 @@ export default function GameRecordingsScreen() {
           >
             {/* Modal Header */}
             <View style={styles.modalHeader}>
-              <ThemedText style={styles.modalTitle}>
-                {selectedRecording?.ai_labels ? cleanLabel(selectedRecording.ai_labels) : 'Recording Details'}
+              <ThemedText style={styles.modalTitle} numberOfLines={1}>
+                {selectedRecording ? getRecordingLabelInfo(selectedRecording).displayLabel : 'Recording Details'}
               </ThemedText>
-              <TouchableOpacity
-                onPress={async () => {
-                  await handleSaveNotes();
-                  setModalVisible(false);
-                }}
-                style={styles.closeButton}
-              >
-                <IconSymbol
-                  name="xmark.circle.fill"
-                  size={28}
-                  color={colorScheme === 'dark' ? '#999' : '#666'}
-                />
-              </TouchableOpacity>
+              <View style={styles.modalHeaderActions}>
+                <TouchableOpacity
+                  onPress={async () => {
+                    await handleSaveNotes();
+                    setModalVisible(false);
+                    if (selectedRecording?.id) router.push(`/(tabs)/review/${selectedRecording.id}`);
+                  }}
+                  style={styles.editDetailButton}
+                >
+                  <ThemedText style={[styles.editDetailButtonText, { color: Colors[colorScheme ?? 'light'].tint }]}>Edit</ThemedText>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={async () => {
+                    await handleSaveNotes();
+                    setModalVisible(false);
+                  }}
+                  style={styles.closeButton}
+                >
+                  <IconSymbol
+                    name="xmark.circle.fill"
+                    size={28}
+                    color={colorScheme === 'dark' ? '#999' : '#666'}
+                  />
+                </TouchableOpacity>
+              </View>
             </View>
 
             <KeyboardAvoidingView
@@ -849,6 +1049,23 @@ export default function GameRecordingsScreen() {
                 nestedScrollEnabled={true}
                 directionalLockEnabled={true}
               >
+                {/* Volleyball metadata (skill, position, feedback, play pattern, rule note) */}
+                {selectedRecording && (() => {
+                  const info = getRecordingLabelInfo(selectedRecording);
+                  const hasMeta = info.skillLabel || info.positionLabel || info.feedbackLabel || info.playPattern;
+                  if (!hasMeta) return null;
+                  return (
+                    <View style={styles.modalSection}>
+                      <ThemedText style={styles.modalSectionTitle}>Volleyball</ThemedText>
+                      <View style={[styles.volleyballMetaRow, { backgroundColor: colorScheme === 'dark' ? '#2A2A2A' : '#F5F5F5' }]}>
+                        {info.skillLabel && <ThemedText style={styles.volleyballMetaText}>Skill: {info.skillLabel}</ThemedText>}
+                        {info.positionLabel && <ThemedText style={styles.volleyballMetaText}>Position: {info.positionLabel}</ThemedText>}
+                        {info.feedbackLabel && <ThemedText style={styles.volleyballMetaText}>Feedback: {info.feedbackLabel}</ThemedText>}
+                        {info.playPattern && <ThemedText style={styles.volleyballMetaText}>Play: {info.playPattern}</ThemedText>}
+                      </View>
+                    </View>
+                  );
+                })()}
                 {/* Transcription Section */}
                 {selectedRecording?.transcription && (
                   <View style={styles.modalSection}>
@@ -957,7 +1174,12 @@ export default function GameRecordingsScreen() {
                     multiline
                     scrollEnabled={false}
                     textAlignVertical="top"
-                    onBlur={handleSaveNotes}
+                    onFocus={() => {
+                      // Scroll to bottom when user taps on notes input
+                      setTimeout(() => {
+                        modalScrollRef.current?.scrollToEnd({ animated: true });
+                      }, 100);
+                    }}
                   />
                 </View>
               </ScrollView>
@@ -976,6 +1198,9 @@ const styles = StyleSheet.create({
     paddingTop: 50,
   },
   header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     paddingBottom: 16,
   },
   backButton: {
@@ -988,8 +1213,15 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   title: {
+    flex: 1,
     fontSize: 24,
-    marginTop: 12,
+    marginHorizontal: 8,
+    textAlign: 'center',
+  },
+  headerRightButton: {
+    padding: 8,
+    minWidth: 40,
+    alignItems: 'flex-end',
   },
   listContent: {
     paddingBottom: 40,
@@ -1020,6 +1252,30 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     marginBottom: 4,
+  },
+  volleyballChipsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginTop: 4,
+    marginBottom: 2,
+  },
+  volleyballChip: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 10,
+  },
+  volleyballChipText: {
+    fontSize: 12,
+    opacity: 0.9,
+  },
+  volleyballMetaRow: {
+    padding: 12,
+    borderRadius: 10,
+    gap: 6,
+  },
+  volleyballMetaText: {
+    fontSize: 14,
   },
   markerRow: {
     marginTop: 6,
@@ -1159,6 +1415,19 @@ const styles = StyleSheet.create({
     paddingRight: 16,
     lineHeight: 24,
   },
+  modalHeaderActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  editDetailButton: {
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+  },
+  editDetailButtonText: {
+    fontSize: 15,
+    fontWeight: '600',
+  },
   closeButton: {
     padding: 4,
     marginTop: -4,
@@ -1249,5 +1518,56 @@ const styles = StyleSheet.create({
     maxHeight: 300,
     fontSize: 15,
     lineHeight: 22,
+  },
+  generateLabelsContainer: {
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(128, 128, 128, 0.1)',
+  },
+  generateLabelsButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 12,
+    gap: 8,
+    minHeight: 44,
+  },
+  generateLabelsButtonText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  statsSummaryBox: {
+    marginHorizontal: 20,
+    marginBottom: 12,
+    padding: 14,
+    borderRadius: 12,
+  },
+  statsSummaryTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    marginBottom: 10,
+    opacity: 0.9,
+  },
+  statsSummaryRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 20,
+  },
+  statsSummaryCol: {
+    minWidth: 120,
+  },
+  statsSummaryLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    marginBottom: 4,
+    opacity: 0.8,
+  },
+  statsSummaryItem: {
+    fontSize: 13,
+    marginBottom: 2,
   },
 });

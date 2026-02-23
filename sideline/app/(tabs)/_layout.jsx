@@ -53,6 +53,13 @@ export default function TabLayout() {
           href: null, // Hide from tab bar
         }}
       />
+      <Tabs.Screen
+        name="roster"
+        options={{
+          title: 'Roster',
+          href: null, // Hide from tab bar - access via hamburger menu
+        }}
+      />
       {/* Explore tab - Temporary demo content (will be replaced with app features) */}
       <Tabs.Screen
         name="explore"
