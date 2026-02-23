@@ -1,0 +1,530 @@
+import React, { useState } from 'react';
+import {
+  StyleSheet,
+  View,
+  Modal,
+  TextInput,
+  TouchableOpacity,
+  Image,
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  ActivityIndicator,
+  Linking,
+} from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
+import { ThemedText } from './themed-text';
+import { IconSymbol } from './ui/icon-symbol';
+import { Colors } from '@/constants/theme';
+import { useColorScheme } from '@/hooks/use-color-scheme';
+import { uploadProfilePicture } from '@/lib/profilePicture';
+import { supabase } from '@/lib/supabase';
+
+export default function ProfileEditModal({
+  visible,
+  onClose,
+  userId,
+  currentName,
+  currentProfilePicture,
+  onSave,
+  onImageUploaded,
+}) {
+  const colorScheme = useColorScheme();
+  const [name, setName] = useState(currentName);
+  const [profileImageUri, setProfileImageUri] = useState(
+    currentProfilePicture || null
+  );
+  const [saving, setSaving] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const [imageError, setImageError] = useState(false);
+
+  // Sync with parent's currentProfilePicture when it changes or modal opens
+  React.useEffect(() => {
+    if (visible) {
+      console.log('Modal opened, syncing profile picture:', currentProfilePicture);
+      setName(currentName);
+      setProfileImageUri(currentProfilePicture || null);
+      setImageError(false);
+    }
+  }, [visible, currentName, currentProfilePicture]);
+
+  const getInitials = () => {
+    if (name) {
+      const nameParts = name.trim().split(' ');
+      if (nameParts.length >= 2) {
+        return `${nameParts[0][0]}${nameParts[nameParts.length - 1][0]}`.toUpperCase();
+      }
+      return name.substring(0, 2).toUpperCase();
+    }
+    return 'U';
+  };
+
+  const pickImage = async () => {
+    try {
+      console.log('📸 Starting image picker...');
+      
+      // Check current permission status first
+      const { status: currentStatus } = await ImagePicker.getMediaLibraryPermissionsAsync();
+      console.log('📸 Current permission status:', currentStatus);
+      
+      let finalStatus = currentStatus;
+      
+      // Request permissions if not already granted
+      if (currentStatus !== 'granted') {
+        console.log('📸 Requesting permissions...');
+        const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        finalStatus = status;
+        console.log('📸 Permission request result:', status);
+      }
+      
+      if (finalStatus !== 'granted') {
+        console.log('❌ Permission denied, showing alert');
+        Alert.alert(
+          'Photo Access Needed',
+          'Sideline needs access to your camera roll to set your profile picture.',
+          [
+            { text: 'Cancel', style: 'cancel' },
+            {
+              text: 'Open Settings',
+              onPress: async () => {
+                if (Platform.OS === 'ios') {
+                  try {
+                    await Linking.openURL('app-settings:');
+                  } catch (error) {
+                    console.log('Could not open settings:', error);
+                    Alert.alert(
+                      'Cannot Open Settings',
+                      'Please go to Settings > Sideline > Photos to enable access.'
+                    );
+                  }
+                }
+              },
+            },
+          ]
+        );
+        return;
+      }
+
+      console.log('✅ Permissions granted, launching image picker...');
+      
+      // Launch image picker
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+        ...(Platform.OS === 'ios' && {
+          allowsMultipleSelection: false,
+        }),
+      });
+      
+      console.log('📸 Image picker result:', result.canceled ? 'Canceled' : 'Image selected');
+
+      if (!result.canceled && result.assets[0]) {
+        const asset = result.assets[0];
+        setUploadingImage(true);
+        setImageError(false);
+
+        // Get file extension
+        const uriParts = asset.uri.split('.');
+        let fileExtension = uriParts[uriParts.length - 1].toLowerCase();
+        
+        // Normalize file extension (some devices use .jpeg)
+        if (fileExtension === 'jpeg') {
+          fileExtension = 'jpg';
+        }
+        
+        console.log('📝 File extension detected:', fileExtension);
+        console.log('📝 Original URI:', asset.uri);
+
+        const mimeType =
+          fileExtension === 'jpg' ? 'image/jpeg' : `image/${fileExtension}`;
+
+        // Upload to Supabase
+        const { url, error } = await uploadProfilePicture(
+          userId,
+          {
+            uri: asset.uri,
+            type: mimeType,
+            name: `profile.${fileExtension}`,
+          },
+          fileExtension
+        );
+
+        if (error) {
+          Alert.alert('Upload Failed', 'Failed to upload profile picture. Please try again.');
+          console.log('❌ Upload error:', error);
+          setUploadingImage(false);
+        } else if (url) {
+          console.log('✅ Upload successful!');
+          console.log('📍 URL returned from Supabase:', url);
+          
+          // Update local state immediately for preview
+          const separator = url.includes('?') ? '&' : '?';
+          const cacheBuster = `${separator}t=${Date.now()}`;
+          const newUri = url + cacheBuster;
+          console.log('🖼️  Setting profile image URI with cache buster:', newUri);
+          setProfileImageUri(newUri);
+          setImageError(false);
+          setUploadingImage(false);
+          
+          // Immediately notify parent component of the new image URL
+          if (onImageUploaded) {
+            console.log('📤 Notifying parent component of new image URL:', url);
+            onImageUploaded(url);
+          }
+          
+          // Wait a moment for database to commit, then refresh profile
+          console.log('🔄 Waiting for database commit, then refreshing profile...');
+          await new Promise(resolve => setTimeout(resolve, 500));
+          
+          // Refresh profile so parent component gets the new URL from database
+          await onSave();
+          console.log('✅ Profile refreshed');
+          
+          // Show success message
+          Alert.alert(
+            'Success', 
+            'Profile picture uploaded successfully!\n\nThe image should now be visible.'
+          );
+        } else {
+          console.log('❌ No URL returned from upload');
+          Alert.alert('Error', 'Upload succeeded but no URL was returned. Please try again.');
+          setUploadingImage(false);
+        }
+      }
+    } catch (error) {
+      console.log('Error picking image:', error);
+      Alert.alert('Error', 'Failed to pick image. Please try again.');
+      setUploadingImage(false);
+    }
+  };
+
+  const handleSave = async () => {
+    if (!name.trim()) {
+      Alert.alert('Error', 'Please enter your name');
+      return;
+    }
+
+    // Wait for any ongoing image upload to complete
+    if (uploadingImage) {
+      Alert.alert('Please wait', 'Image is still uploading...');
+      return;
+    }
+
+    setSaving(true);
+
+    try {
+      // Update profile in Supabase
+      const { error } = await supabase
+        .from('profiles')
+        .update({
+          name: name.trim(),
+        })
+        .eq('id', userId);
+
+      if (error) {
+        console.log('Error updating profile:', error);
+        Alert.alert('Error', 'Failed to update profile. Please try again.');
+        setSaving(false);
+        return;
+      }
+
+      // Success - call onSave to refresh profile
+      setSaving(false);
+      console.log('Calling onSave to refresh profile in parent...');
+      await onSave();
+      console.log('onSave completed');
+      
+      Alert.alert('Success', 'Profile updated successfully!', [
+        {
+          text: 'OK',
+          onPress: () => {
+            console.log('Closing modal after profile update');
+            onClose();
+          },
+        },
+      ]);
+    } catch (error) {
+      console.log('Unexpected error updating profile:', error);
+      Alert.alert('Error', 'An unexpected error occurred. Please try again.');
+      setSaving(false);
+    }
+  };
+
+  const handleClose = () => {
+    // Reset to original values
+    setName(currentName);
+    setProfileImageUri(currentProfilePicture || null);
+    setImageError(false);
+    // Refresh profile one more time before closing to ensure parent has latest data
+    onSave().then(() => {
+      onClose();
+    });
+  };
+
+  return (
+    <Modal
+      visible={visible}
+      animationType="slide"
+      transparent={true}
+      onRequestClose={handleClose}
+      statusBarTranslucent={true}
+    >
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={styles.container}
+      >
+        <TouchableOpacity
+          style={styles.backdrop}
+          activeOpacity={1}
+          onPress={handleClose}
+        />
+
+        <View
+          style={[
+            styles.modalContent,
+            {
+              backgroundColor: Colors[colorScheme].background,
+            },
+          ]}
+          onStartShouldSetResponder={() => true}
+        >
+          {/* Header */}
+          <View style={styles.header}>
+            <TouchableOpacity onPress={handleClose} disabled={saving}>
+              <ThemedText style={styles.cancelButton}>Cancel</ThemedText>
+            </TouchableOpacity>
+            <ThemedText style={styles.title}>Edit Profile</ThemedText>
+            <TouchableOpacity onPress={handleSave} disabled={saving || uploadingImage}>
+              {saving ? (
+                <ActivityIndicator size="small" color={Colors[colorScheme ?? 'light'].tint} />
+              ) : (
+                <ThemedText
+                  style={[
+                    styles.saveButton,
+                    { color: Colors[colorScheme ?? 'light'].tint },
+                  ]}
+                >
+                  Save
+                </ThemedText>
+              )}
+            </TouchableOpacity>
+          </View>
+
+          <ScrollView
+            style={styles.scrollView}
+            contentContainerStyle={styles.scrollContent}
+            showsVerticalScrollIndicator={false}
+          >
+            {/* Profile Picture */}
+            <View style={styles.profilePictureSection}>
+              <TouchableOpacity
+                style={styles.profilePictureWrapper}
+                onPress={pickImage}
+                disabled={uploadingImage || saving}
+                activeOpacity={0.8}
+              >
+                {profileImageUri && !imageError ? (
+                  <Image
+                    key={profileImageUri}
+                    source={{ uri: profileImageUri }}
+                    style={styles.profilePicture}
+                    onLoad={() => {
+                      console.log('✅ Profile picture loaded in modal');
+                    }}
+                    onError={(event) => {
+                      console.log('❌ Failed to load profile picture in modal');
+                      console.log('URI:', profileImageUri);
+                      console.log('Error:', event.nativeEvent.error);
+                      setImageError(true);
+                    }}
+                  />
+                ) : (
+                  <View
+                    style={[
+                      styles.profilePicturePlaceholder,
+                      {
+                        backgroundColor: Colors[colorScheme].cardBackground,
+                      },
+                    ]}
+                  >
+                    <ThemedText style={styles.initialsText}>{getInitials()}</ThemedText>
+                  </View>
+                )}
+                {uploadingImage && (
+                  <View style={styles.uploadingOverlay}>
+                    <ActivityIndicator size="large" color="#FFFFFF" />
+                  </View>
+                )}
+              </TouchableOpacity>
+
+              {/* Hint text */}
+              <View style={styles.profilePictureTapArea}>
+                <ThemedText style={styles.profilePictureHint}>
+                  Tap picture to change profile picture
+                </ThemedText>
+              </View>
+            </View>
+
+            {/* Name Input */}
+            <View style={styles.inputSection}>
+              <ThemedText style={styles.label}>Name</ThemedText>
+              <TextInput
+                style={[
+                  styles.input,
+                  {
+                    backgroundColor: Colors[colorScheme].inputBackground,
+                    color: Colors[colorScheme].text,
+                  },
+                ]}
+                value={name}
+                onChangeText={setName}
+                placeholder="Enter your name"
+                placeholderTextColor={Colors[colorScheme].placeholder}
+                editable={!saving}
+                autoCapitalize="words"
+                maxLength={50}
+              />
+              <ThemedText style={styles.hint}>
+                This is how other users will see your name
+              </ThemedText>
+            </View>
+          </ScrollView>
+        </View>
+      </KeyboardAvoidingView>
+    </Modal>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    justifyContent: 'flex-end',
+  },
+  backdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  },
+  modalContent: {
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingTop: 20,
+    paddingBottom: Platform.OS === 'ios' ? 40 : 20,
+    maxHeight: '90%',
+    minHeight: '50%',
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: -2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingBottom: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(128, 128, 128, 0.2)',
+  },
+  title: {
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  cancelButton: {
+    fontSize: 16,
+    opacity: 0.6,
+  },
+  saveButton: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    paddingHorizontal: 20,
+    paddingTop: 30,
+  },
+  profilePictureSection: {
+    alignItems: 'center',
+    marginBottom: 40,
+  },
+  profilePictureWrapper: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    position: 'relative',
+    marginBottom: 12,
+    overflow: 'hidden',
+  },
+  profilePicture: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+  },
+  profilePicturePlaceholder: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  initialsText: {
+    fontSize: 48,
+    fontWeight: '700',
+    opacity: 0.7,
+    textAlign: 'center',
+    lineHeight: 56,
+    ...(Platform.OS === 'android' && { includeFontPadding: false }),
+  },
+  uploadingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    borderRadius: 60,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  profilePictureTapArea: {
+    marginTop: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+  },
+  profilePictureHint: {
+    fontSize: 14,
+    opacity: 0.7,
+    textAlign: 'center',
+    fontWeight: '500',
+  },
+  inputSection: {
+    marginBottom: 24,
+  },
+  label: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 8,
+  },
+  input: {
+    borderRadius: 12,
+    padding: 16,
+    fontSize: 16,
+  },
+  hint: {
+    fontSize: 12,
+    opacity: 0.6,
+    marginTop: 6,
+  },
+});

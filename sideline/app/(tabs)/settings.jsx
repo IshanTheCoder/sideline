@@ -1,5 +1,6 @@
 import ChangeEmailModal from '@/components/ChangeEmailModal';
 import ChangePasswordModal from '@/components/ChangePasswordModal';
+import ProfileEditModal from '@/components/ProfileEditModal';
 import { SportSelectionModal } from '@/components/SportSelectionModal';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -63,6 +64,29 @@ export default function SettingsScreen() {
     setShowEditModal(true);
   };
 
+  const handleModalSave = async () => {
+    console.log('Modal save triggered, refreshing profile...');
+    // Refresh profile data after save
+    await refreshProfile();
+    console.log('Profile refresh completed');
+    
+    // Force re-check after a short delay to ensure state has propagated
+    setTimeout(async () => {
+      console.log('Checking profile after delay...');
+      console.log('Current profile:', profile);
+      console.log('Current profileImageUri:', profileImageUri);
+      
+      // Force another refresh if the image URI is not set
+      if (profile?.profile_picture_url && !profileImageUri) {
+        console.log('Image URI not set, forcing update...');
+        const separator = profile.profile_picture_url.includes('?') ? '&' : '?';
+        const cacheBuster = `${separator}t=${Date.now()}`;
+        setProfileImageUri(profile.profile_picture_url + cacheBuster);
+        setImageError(false);
+      }
+    }, 1000);
+  };
+
   const handleSportSelect = async (sport) => {
     if (!user) return;
 
@@ -91,29 +115,6 @@ export default function SettingsScreen() {
       Alert.alert('Error', 'An unexpected error occurred. Please try again.');
       setSavingSport(false);
     }
-  };
-
-  const handleModalSave = async () => {
-    console.log('Modal save triggered, refreshing profile...');
-    // Refresh profile data after save
-    await refreshProfile();
-    console.log('Profile refresh completed');
-    
-    // Force re-check after a short delay to ensure state has propagated
-    setTimeout(async () => {
-      console.log('Checking profile after delay...');
-      console.log('Current profile:', profile);
-      console.log('Current profileImageUri:', profileImageUri);
-      
-      // Force another refresh if the image URI is not set
-      if (profile?.profile_picture_url && !profileImageUri) {
-        console.log('Image URI not set, forcing update...');
-        const separator = profile.profile_picture_url.includes('?') ? '&' : '?';
-        const cacheBuster = `${separator}t=${Date.now()}`;
-        setProfileImageUri(profile.profile_picture_url + cacheBuster);
-        setImageError(false);
-      }
-    }, 500);
   };
 
   const handleSignOut = async () => {
@@ -266,7 +267,7 @@ export default function SettingsScreen() {
                 )}
               </View>
 
-              {/* Edit Badge - Opens modal */}
+              {/* Edit Badge - Edit profile name */}
               <TouchableOpacity 
                 style={[styles.editBadge, {
                   backgroundColor: Colors[colorScheme ?? 'light'].tint,
@@ -408,6 +409,26 @@ export default function SettingsScreen() {
         </View>
       </ScrollView>
 
+      {/* Profile Edit Modal - Removed as component doesn't exist */}
+
+      {/* Change Email Modal */}
+      {user && (
+        <ChangeEmailModal
+          visible={showChangeEmailModal}
+          onClose={() => setShowChangeEmailModal(false)}
+          currentEmail={user.email || ''}
+        />
+      )}
+
+      {/* Change Password Modal */}
+      {user && (
+        <ChangePasswordModal
+          visible={showChangePasswordModal}
+          onClose={() => setShowChangePasswordModal(false)}
+          userEmail={user.email || ''}
+        />
+      )}
+
       {/* Profile Edit Modal */}
       {user && (
         <ProfileEditModal
@@ -425,24 +446,6 @@ export default function SettingsScreen() {
             setProfileImageUri(imageUrl + cacheBuster);
             setImageError(false);
           }}
-        />
-      )}
-
-      {/* Change Email Modal */}
-      {user && (
-        <ChangeEmailModal
-          visible={showChangeEmailModal}
-          onClose={() => setShowChangeEmailModal(false)}
-          currentEmail={user.email || ''}
-        />
-      )}
-
-      {/* Change Password Modal */}
-      {user && (
-        <ChangePasswordModal
-          visible={showChangePasswordModal}
-          onClose={() => setShowChangePasswordModal(false)}
-          userEmail={user.email || ''}
         />
       )}
 

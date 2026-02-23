@@ -12,8 +12,8 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.sideline.app",
       "infoPlist": {
-        "NSPhotoLibraryUsageDescription": "This app needs access to your photo library to upload profile pictures.",
-        "NSPhotoLibraryAddUsageDescription": "This app needs access to save photos to your library.",
+        "NSPhotoLibraryUsageDescription": "Sideline needs access to your camera roll to set your profile picture.",
+        "NSPhotoLibraryAddUsageDescription": "Sideline needs access to save photos to your library.",
         "NSMicrophoneUsageDescription": "Sideline needs access to your microphone to record voice memos during games."
       }
     },
@@ -49,8 +49,8 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "The app accesses your photos to let you share them.",
-          "cameraPermission": "The app accesses your camera to let you take photos."
+          "photosPermission": "Sideline needs access to your photos to set your profile picture.",
+          "cameraPermission": "Sideline needs access to your camera to take a profile picture."
         }
       ],
       [
