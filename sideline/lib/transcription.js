@@ -78,6 +78,7 @@ export async function transcribeAudio(audioUrl) {
       });
       formData.append('model', 'whisper-large-v3-turbo');
       formData.append('language', 'en');
+      formData.append('prompt', 'volleyball coaching note: serve receive, spike, block, setter, libero, rotation, dig, kill, free ball, down ball, outside hitter, middle blocker, opposite hitter, pancake, pipe, floater');
 
       const response = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
         method: 'POST',
@@ -113,6 +114,7 @@ export async function transcribeAudio(audioUrl) {
       formData.append('file', audioFile);
       formData.append('model', 'whisper-large-v3-turbo');
       formData.append('language', 'en');
+      formData.append('prompt', 'volleyball coaching note: serve receive, spike, block, setter, libero, rotation, dig, kill, outside hitter, middle blocker');
 
       const response = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
         method: 'POST',
