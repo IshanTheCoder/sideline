@@ -5,6 +5,7 @@ import {
   FlatList,
   Modal,
   Platform,
+  Pressable,
   ScrollView,
   StyleSheet,
   TextInput,
@@ -284,14 +285,13 @@ export default function RosterScreen() {
 
       {/* Add/Edit modal */}
       <Modal visible={modalVisible} animationType="slide" transparent>
-        <TouchableOpacity
+        <Pressable
           style={styles.modalOverlay}
-          activeOpacity={1}
           onPress={() => setModalVisible(false)}
         >
-          <View
+          <Pressable
             style={[styles.modalContent, { backgroundColor: colorScheme === 'dark' ? '#1A1A1A' : '#FFF' }]}
-            onStartShouldSetResponder={() => true}
+            onPress={(e) => e.stopPropagation()}
           >
             <ThemedText style={styles.modalTitle}>{editingPlayer ? 'Edit player' : 'Add player'}</ThemedText>
             <TextInput
@@ -336,8 +336,8 @@ export default function RosterScreen() {
                 {saving ? <ActivityIndicator size="small" color="#FFF" /> : <ThemedText style={styles.saveButtonText}>Save</ThemedText>}
               </TouchableOpacity>
             </View>
-          </View>
-        </TouchableOpacity>
+          </Pressable>
+        </Pressable>
       </Modal>
 
       {/* Import CSV modal */}
