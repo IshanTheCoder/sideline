@@ -2522,18 +2522,9 @@ Phase 8 builds on the basic review interface from Phase 5 by adding AI-powered f
   - [ ] Style charts consistently
   - [ ] Test charts display correctly
 
-- [ ] **Test advanced filtering**
-  - [ ] Filter by skill category
-  - [ ] Filter by feedback type
-  - [ ] Filter by player
-  - [ ] Combine multiple filters
-  - [ ] Combine filters with search
-  - [ ] Clear filters
-  - [ ] Verify results are correct
-
 - [ ] **Test post-game summary**
   - [ ] View session detail
-  - [ ] Verify summary displays
+  - [i ] Verify summary displays
   - [ ] Verify player mentions are correct
   - [ ] Verify skill categories are correct
   - [ ] Verify feedback ratio is accurate
@@ -2687,7 +2678,6 @@ Phase 9 focuses on making the AI truly understand volleyball. This involves crea
   - [x] Test statistics are accurate
 
 - [ ] **Fine-tune AI for volleyball (out of scope – app focuses on games only)**
-  - [ ] Collect training data from recordings (removed from app)
   - [ ] Fine-tune / deploy custom model (optional future)
   - [x] Analyze patterns across sessions (session summary, most mentioned players)
 

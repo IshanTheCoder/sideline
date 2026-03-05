@@ -3,12 +3,15 @@ import {
   ActivityIndicator,
   Alert,
   FlatList,
+  Keyboard,
+  KeyboardAvoidingView,
   Modal,
   Platform,
   ScrollView,
   StyleSheet,
   TextInput,
   TouchableOpacity,
+  TouchableWithoutFeedback,
   View,
 } from 'react-native';
 import { useRouter } from 'expo-router';
@@ -23,12 +26,12 @@ import {
   addPlayer,
   updatePlayer,
   deletePlayer,
-  importRosterFromCsv,
   getTeamIdForUser,
-  parseRosterCsv,
+  importRosterFromSheetRows,
 } from '@/lib/roster';
+import { requestGoogleSheetsAccess, listSpreadsheets, getSheetValues } from '@/lib/googleSheets';
 
-const POSITION_OPTIONS = ['Setter', 'Outside Hitter', 'Middle Blocker', 'Opposite', 'Libero', 'Defensive Specialist', ''];
+const POSITION_OPTIONS = ['', 'Setter', 'Outside Hitter', 'Middle Blocker', 'Opposite', 'Libero', 'Defensive Specialist', 'Entire Team'];
 
 export default function RosterScreen() {
   const router = useRouter();
@@ -45,8 +48,10 @@ export default function RosterScreen() {
   const [formPosition, setFormPosition] = useState('');
   const [formGrade, setFormGrade] = useState('');
   const [saving, setSaving] = useState(false);
-  const [csvText, setCsvText] = useState('');
   const [importing, setImporting] = useState(false);
+  const [importStep, setImportStep] = useState('connect'); // 'connect' | 'list' | 'importing'
+  const [googleAccessToken, setGoogleAccessToken] = useState(null);
+  const [sheetsList, setSheetsList] = useState([]);
 
   const loadRoster = useCallback(async () => {
     if (!user?.id) {
@@ -155,23 +160,55 @@ export default function RosterScreen() {
     );
   };
 
-  const handleImportCsv = async () => {
-    const parsed = parseRosterCsv(csvText);
-    if (parsed.length === 0) {
-      Alert.alert('No data', 'Paste CSV with columns: Name, Number, Position, Grade (or use commas/tabs).');
-      return;
-    }
+  const openImportModal = () => {
+    setImportStep('connect');
+    setGoogleAccessToken(null);
+    setSheetsList([]);
+    setImportModalVisible(true);
+  };
+
+  const handleConnectGoogle = async () => {
     setImporting(true);
     try {
-      const { teamId, error: teamError } = await getTeamIdForUser(user.id);
-      if (teamError || !teamId) {
-        Alert.alert('Error', 'Could not load team.');
-        setImporting(false);
+      const { accessToken, error } = await requestGoogleSheetsAccess();
+      if (error) {
+        Alert.alert('Error', error.message || 'Could not connect to Google.');
         return;
       }
-      const { added, errors } = await importRosterFromCsv(teamId, csvText);
+      setGoogleAccessToken(accessToken);
+      const { files, error: listError } = await listSpreadsheets(accessToken);
+      if (listError || !files.length) {
+        Alert.alert('No sheets', listError?.message || 'No spreadsheets found in your Google Drive.');
+        return;
+      }
+      setSheetsList(files);
+      setImportStep('list');
+    } finally {
+      setImporting(false);
+    }
+  };
+
+  const handlePickSheet = async (spreadsheetId) => {
+    if (!user?.id || !googleAccessToken) return;
+    const { teamId, error: teamError } = await getTeamIdForUser(user.id);
+    if (teamError || !teamId) {
+      Alert.alert('Error', 'Could not load team.');
+      return;
+    }
+    setImportStep('importing');
+    setImporting(true);
+    try {
+      const { values, error: sheetError } = await getSheetValues(googleAccessToken, spreadsheetId);
+      if (sheetError || !values.length) {
+        Alert.alert('Error', sheetError?.message || 'Could not read sheet. Ensure it has columns: Name, Number, Position, Grade.');
+        setImportStep('list');
+        return;
+      }
+      const { added, errors } = await importRosterFromSheetRows(teamId, values);
       setImportModalVisible(false);
-      setCsvText('');
+      setImportStep('connect');
+      setGoogleAccessToken(null);
+      setSheetsList([]);
       loadRoster();
       if (errors.length > 0) {
         Alert.alert('Import done', `Added ${added} player(s). Some rows had errors: ${errors.slice(0, 3).join('; ')}${errors.length > 3 ? '...' : ''}`);
@@ -180,6 +217,7 @@ export default function RosterScreen() {
       }
     } finally {
       setImporting(false);
+      setImportStep('list');
     }
   };
 
@@ -212,9 +250,8 @@ export default function RosterScreen() {
   return (
     <ThemedView style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity style={styles.backButton} onPress={() => router.back()} activeOpacity={0.7}>
+        <TouchableOpacity style={styles.backButton} onPress={() => router.back()} activeOpacity={0.7} accessibilityLabel="Back">
           <IconSymbol name="chevron.left" size={28} color={Colors[colorScheme ?? 'light'].text} />
-          <ThemedText style={styles.backText}>Back</ThemedText>
         </TouchableOpacity>
         <ThemedText type="title" style={styles.title}>
           Roster
@@ -236,12 +273,12 @@ export default function RosterScreen() {
         </TouchableOpacity>
         <TouchableOpacity
           style={[styles.secondaryButton, { borderColor: Colors[colorScheme ?? 'light'].tint }]}
-          onPress={() => { setCsvText(''); setImportModalVisible(true); }}
+          onPress={openImportModal}
           activeOpacity={0.7}
         >
           <IconSymbol name="doc.text" size={20} color={Colors[colorScheme ?? 'light'].tint} />
           <ThemedText style={[styles.secondaryButtonText, { color: Colors[colorScheme ?? 'light'].tint }]}>
-            Import from CSV
+            Import from Google Sheets
           </ThemedText>
         </TouchableOpacity>
       </View>
@@ -267,7 +304,7 @@ export default function RosterScreen() {
           <IconSymbol name="person.2" size={48} color={colorScheme === 'dark' ? '#666' : '#999'} />
           <ThemedText style={styles.emptyTitle}>No players yet</ThemedText>
           <ThemedText style={styles.emptySubtitle}>
-            Add players manually or import from Excel/Google Sheets (export as CSV, then paste below).
+            Add players manually or import from a Google Sheet (Name, Number, Position, Grade).
           </ThemedText>
         </View>
       )}
@@ -283,94 +320,139 @@ export default function RosterScreen() {
       )}
 
       {/* Add/Edit modal */}
-      <Modal visible={modalVisible} animationType="slide" transparent>
-        <TouchableOpacity
+      <Modal visible={modalVisible} animationType="slide" transparent statusBarTranslucent>
+        <KeyboardAvoidingView
           style={styles.modalOverlay}
-          activeOpacity={1}
-          onPress={() => setModalVisible(false)}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          keyboardVerticalOffset={0}
         >
-          <View
-            style={[styles.modalContent, { backgroundColor: colorScheme === 'dark' ? '#1A1A1A' : '#FFF' }]}
-            onStartShouldSetResponder={() => true}
-          >
-            <ThemedText style={styles.modalTitle}>{editingPlayer ? 'Edit player' : 'Add player'}</ThemedText>
-            <TextInput
-              style={[styles.input, { color: Colors[colorScheme ?? 'light'].text, borderColor: colorScheme === 'dark' ? '#444' : '#DDD' }]}
-              placeholder="Name *"
-              placeholderTextColor="#999"
-              value={formName}
-              onChangeText={setFormName}
-              autoCapitalize="words"
-            />
-            <TextInput
-              style={[styles.input, { color: Colors[colorScheme ?? 'light'].text, borderColor: colorScheme === 'dark' ? '#444' : '#DDD' }]}
-              placeholder="Number"
-              placeholderTextColor="#999"
-              value={formNumber}
-              onChangeText={setFormNumber}
-              keyboardType="number-pad"
-            />
-            <TextInput
-              style={[styles.input, { color: Colors[colorScheme ?? 'light'].text, borderColor: colorScheme === 'dark' ? '#444' : '#DDD' }]}
-              placeholder="Position (e.g. Setter, Libero)"
-              placeholderTextColor="#999"
-              value={formPosition}
-              onChangeText={setFormPosition}
-            />
-            <TextInput
-              style={[styles.input, { color: Colors[colorScheme ?? 'light'].text, borderColor: colorScheme === 'dark' ? '#444' : '#DDD' }]}
-              placeholder="Grade"
-              placeholderTextColor="#999"
-              value={formGrade}
-              onChangeText={setFormGrade}
-            />
-            <View style={styles.modalActions}>
-              <TouchableOpacity style={styles.cancelButton} onPress={() => setModalVisible(false)}>
-                <ThemedText style={styles.cancelButtonText}>Cancel</ThemedText>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.saveButton, { backgroundColor: Colors[colorScheme ?? 'light'].tint }]}
-                onPress={handleSavePlayer}
-                disabled={saving}
+          <TouchableOpacity
+            style={styles.modalOverlayTouchable}
+            activeOpacity={1}
+            onPress={() => {
+              Keyboard.dismiss();
+              setModalVisible(false);
+            }}
+          />
+          <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+            <View
+              style={[styles.modalContent, styles.modalContentKeyboard, { backgroundColor: colorScheme === 'dark' ? '#1A1A1A' : '#FFF' }]}
+              onStartShouldSetResponder={() => true}
+            >
+              <ScrollView
+                keyboardShouldPersistTaps="handled"
+                keyboardDismissMode="on-drag"
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={styles.modalScrollContent}
               >
-                {saving ? <ActivityIndicator size="small" color="#FFF" /> : <ThemedText style={styles.saveButtonText}>Save</ThemedText>}
-              </TouchableOpacity>
+                <ThemedText style={styles.modalTitle}>{editingPlayer ? 'Edit player' : 'Add player'}</ThemedText>
+                <TextInput
+                  style={[styles.input, { color: Colors[colorScheme ?? 'light'].text, borderColor: colorScheme === 'dark' ? '#444' : '#DDD' }]}
+                  placeholder="Name *"
+                  placeholderTextColor="#999"
+                  value={formName}
+                  onChangeText={setFormName}
+                  autoCapitalize="words"
+                />
+                <TextInput
+                  style={[styles.input, { color: Colors[colorScheme ?? 'light'].text, borderColor: colorScheme === 'dark' ? '#444' : '#DDD' }]}
+                  placeholder="Number"
+                  placeholderTextColor="#999"
+                  value={formNumber}
+                  onChangeText={setFormNumber}
+                  keyboardType="number-pad"
+                />
+                <ThemedText style={styles.positionLabel}>Position</ThemedText>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.positionChipScroll} contentContainerStyle={styles.positionChipRow}>
+                  {POSITION_OPTIONS.map((pos) => (
+                    <TouchableOpacity
+                      key={pos || '_none'}
+                      style={[styles.positionChip, formPosition === pos && { backgroundColor: Colors[colorScheme ?? 'light'].tint }]}
+                      onPress={() => setFormPosition(pos)}
+                    >
+                      <ThemedText style={[styles.positionChipText, formPosition === pos && { color: '#FFF' }]}>
+                        {pos || 'None'}
+                      </ThemedText>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+                <TextInput
+                  style={[styles.input, { color: Colors[colorScheme ?? 'light'].text, borderColor: colorScheme === 'dark' ? '#444' : '#DDD' }]}
+                  placeholder="Grade"
+                  placeholderTextColor="#999"
+                  value={formGrade}
+                  onChangeText={setFormGrade}
+                />
+                <View style={styles.modalActions}>
+                  <TouchableOpacity style={styles.cancelButton} onPress={() => setModalVisible(false)}>
+                    <ThemedText style={styles.cancelButtonText}>Cancel</ThemedText>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.saveButton, { backgroundColor: Colors[colorScheme ?? 'light'].tint }]}
+                    onPress={handleSavePlayer}
+                    disabled={saving}
+                  >
+                    {saving ? <ActivityIndicator size="small" color="#FFF" /> : <ThemedText style={styles.saveButtonText}>Save</ThemedText>}
+                  </TouchableOpacity>
+                </View>
+              </ScrollView>
             </View>
-          </View>
-        </TouchableOpacity>
+          </TouchableWithoutFeedback>
+        </KeyboardAvoidingView>
       </Modal>
 
-      {/* Import CSV modal */}
+      {/* Import from Google Sheets modal */}
       <Modal visible={importModalVisible} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
           <View
             style={[styles.importModalContent, { backgroundColor: colorScheme === 'dark' ? '#1A1A1A' : '#FFF' }]}
           >
-            <ThemedText style={styles.modalTitle}>Import from CSV</ThemedText>
-            <ThemedText style={styles.importHint}>
-              Paste data from Excel or Google Sheets. Use columns: Name, Number, Position, Grade (or a header row).
-            </ThemedText>
-            <TextInput
-              style={[styles.csvInput, { color: Colors[colorScheme ?? 'light'].text, borderColor: colorScheme === 'dark' ? '#444' : '#DDD' }]}
-              placeholder="Name,Number,Position,Grade&#10;Sarah,7,Setter,10&#10;..."
-              placeholderTextColor="#999"
-              value={csvText}
-              onChangeText={setCsvText}
-              multiline
-              numberOfLines={8}
-            />
-            <View style={styles.modalActions}>
-              <TouchableOpacity style={styles.cancelButton} onPress={() => { setImportModalVisible(false); setCsvText(''); }}>
-                <ThemedText style={styles.cancelButtonText}>Cancel</ThemedText>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.saveButton, { backgroundColor: Colors[colorScheme ?? 'light'].tint }]}
-                onPress={handleImportCsv}
-                disabled={importing}
-              >
-                {importing ? <ActivityIndicator size="small" color="#FFF" /> : <ThemedText style={styles.saveButtonText}>Import</ThemedText>}
-              </TouchableOpacity>
-            </View>
+            <ThemedText style={styles.modalTitle}>Import from Google Sheets</ThemedText>
+            {importStep === 'connect' && (
+              <>
+                <ThemedText style={styles.importHint}>
+                  Sign in with Google to choose a spreadsheet from your Drive. The sheet should have columns: Name, Number, Position, Grade (first row can be a header).
+                </ThemedText>
+                <View style={styles.modalActions}>
+                  <TouchableOpacity style={styles.cancelButton} onPress={() => setImportModalVisible(false)}>
+                    <ThemedText style={styles.cancelButtonText}>Cancel</ThemedText>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.saveButton, { backgroundColor: Colors[colorScheme ?? 'light'].tint }]}
+                    onPress={handleConnectGoogle}
+                    disabled={importing}
+                  >
+                    {importing ? <ActivityIndicator size="small" color="#FFF" /> : <ThemedText style={styles.saveButtonText}>Sign in with Google</ThemedText>}
+                  </TouchableOpacity>
+                </View>
+              </>
+            )}
+            {importStep === 'list' && (
+              <>
+                <ThemedText style={styles.importHint}>Choose a spreadsheet to import (Name, Number, Position, Grade):</ThemedText>
+                <ScrollView style={styles.sheetListScroll} keyboardShouldPersistTaps="handled">
+                  {sheetsList.map((sheet) => (
+                    <TouchableOpacity
+                      key={sheet.id}
+                      style={[styles.sheetListItem, { backgroundColor: colorScheme === 'dark' ? '#2A2A2A' : '#F5F5F5' }]}
+                      onPress={() => handlePickSheet(sheet.id)}
+                      disabled={importing}
+                    >
+                      <ThemedText style={styles.sheetListItemText} numberOfLines={1}>{sheet.name}</ThemedText>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+                <TouchableOpacity style={styles.cancelButton} onPress={() => setImportModalVisible(false)}>
+                  <ThemedText style={styles.cancelButtonText}>Cancel</ThemedText>
+                </TouchableOpacity>
+              </>
+            )}
+            {importStep === 'importing' && (
+              <View style={styles.importingRow}>
+                <ActivityIndicator size="small" color={Colors[colorScheme ?? 'light'].tint} />
+                <ThemedText style={styles.importingText}>Importing roster…</ThemedText>
+              </View>
+            )}
           </View>
         </View>
       </Modal>
@@ -493,11 +575,20 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.5)',
     justifyContent: 'flex-end',
   },
+  modalOverlayTouchable: {
+    flex: 1,
+  },
   modalContent: {
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     padding: 24,
     paddingBottom: Platform.OS === 'ios' ? 40 : 24,
+  },
+  modalContentKeyboard: {
+    maxHeight: '90%',
+  },
+  modalScrollContent: {
+    paddingBottom: 24,
   },
   importModalContent: {
     borderTopLeftRadius: 20,
@@ -516,6 +607,28 @@ const styles = StyleSheet.create({
     opacity: 0.8,
     marginBottom: 12,
   },
+  sheetListScroll: {
+    maxHeight: 280,
+    marginBottom: 16,
+  },
+  sheetListItem: {
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderRadius: 10,
+    marginBottom: 8,
+  },
+  sheetListItemText: {
+    fontSize: 16,
+  },
+  importingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingVertical: 20,
+  },
+  importingText: {
+    fontSize: 16,
+  },
   input: {
     borderWidth: 1,
     borderRadius: 10,
@@ -523,6 +636,30 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     fontSize: 16,
     marginBottom: 12,
+  },
+  positionLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    marginBottom: 8,
+    opacity: 0.9,
+  },
+  positionChipScroll: {
+    marginBottom: 12,
+  },
+  positionChipRow: {
+    flexDirection: 'row',
+    gap: 8,
+    paddingRight: 24,
+  },
+  positionChip: {
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 20,
+    backgroundColor: 'rgba(128,128,128,0.2)',
+  },
+  positionChipText: {
+    fontSize: 14,
+    fontWeight: '500',
   },
   csvInput: {
     borderWidth: 1,

@@ -40,6 +40,7 @@ export const POSITIONS = {
   OPPOSITE: 'opposite',
   LIBERO: 'libero',
   DEFENSIVE_SPECIALIST: 'defensive_specialist',
+  ENTIRE_TEAM: 'entire_team',
 };
 
 export const POSITION_LABELS = {
@@ -49,6 +50,7 @@ export const POSITION_LABELS = {
   [POSITIONS.OPPOSITE]: 'Opposite',
   [POSITIONS.LIBERO]: 'Libero',
   [POSITIONS.DEFENSIVE_SPECIALIST]: 'Defensive Specialist',
+  [POSITIONS.ENTIRE_TEAM]: 'Entire Team',
 };
 
 /** Common formations (offensive systems) */
@@ -132,6 +134,7 @@ export const POSITION_TERMS = {
   [POSITIONS.OPPOSITE]: ['opposite', 'right side', 'RS', 'right side hitter'],
   [POSITIONS.LIBERO]: ['libero', 'lib', 'L', 'libero'],
   [POSITIONS.DEFENSIVE_SPECIALIST]: ['DS', 'defensive specialist', 'defensive sub'],
+  [POSITIONS.ENTIRE_TEAM]: ['entire team', 'whole team', 'team', 'everyone', 'all players', 'full team'],
 };
 
 /** Play/formation keywords */

@@ -3,6 +3,7 @@ import { transcribeAudio } from './transcription';
 import { generateLabel } from './labelGeneration';
 import { serializeAiLabels, applyVolleyballTranscriptionCorrections } from './volleyballVocabulary';
 import { getPlayerNamesForGameSession, buildRosterNameCorrections } from './roster';
+import { getCustomBucketsForPrompt } from './customBuckets';
 
 // Helper function to check if error is missing column error
 const isMissingColumnError = (error, column) => {
@@ -104,8 +105,9 @@ export async function processRecording(recordingId, userId) {
     const { names: playerNames } = recording.game_session_id
       ? await getPlayerNamesForGameSession(recording.game_session_id)
       : { names: [] };
+    const customBuckets = await getCustomBucketsForPrompt(userId);
     console.log('🏷️  Generating AI label (volleyball)...');
-    const labelResult = await generateLabel(correctedTranscription, { playerNames });
+    const labelResult = await generateLabel(correctedTranscription, { playerNames, customBuckets });
 
     let aiLabel = null;
     if (labelResult.error || !labelResult.label) {
@@ -283,6 +285,7 @@ export async function generateLabelsForGameSession(gameSessionId, userId) {
     console.log(`📋 Found ${recordings.length} recordings to process`);
 
     const { names: playerNames } = await getPlayerNamesForGameSession(gameSessionId);
+    const customBuckets = await getCustomBucketsForPrompt(userId);
 
     let processedCount = 0;
     let failedCount = 0;
@@ -297,7 +300,7 @@ export async function generateLabelsForGameSession(gameSessionId, userId) {
 
       console.log(`🏷️  Generating label for recording ${recording.id}...`);
 
-      const labelResult = await generateLabel(recording.transcription, { playerNames });
+      const labelResult = await generateLabel(recording.transcription, { playerNames, customBuckets });
 
       if (labelResult.error || !labelResult.label) {
         console.error(`❌ Label generation failed for ${recording.id}:`, labelResult.error);
@@ -396,6 +399,7 @@ export async function generateMissingLabels(userId, gameSessionId) {
     console.log(`📋 Found ${recordings.length} recordings to generate labels for`);
 
     const { names: playerNames } = await getPlayerNamesForGameSession(gameSessionId);
+    const customBuckets = await getCustomBucketsForPrompt(userId);
 
     let processedCount = 0;
     let failedCount = 0;
@@ -404,7 +408,7 @@ export async function generateMissingLabels(userId, gameSessionId) {
     for (const recording of recordings) {
       console.log(`🏷️  Generating label for recording ${recording.id}...`);
 
-      const labelResult = await generateLabel(recording.transcription, { playerNames });
+      const labelResult = await generateLabel(recording.transcription, { playerNames, customBuckets });
 
       if (labelResult.error || !labelResult.label) {
         console.error(`❌ Label generation failed for ${recording.id}:`, labelResult.error);

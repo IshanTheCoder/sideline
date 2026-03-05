@@ -20,6 +20,7 @@ const MAPPING = {
   'list.bullet': 'list',
   'xmark': 'close',
   'line.3.horizontal': 'menu',
+  'line.3.horizontal.decrease.circle': 'filter-list',
   'rectangle.portrait.and.arrow.right': 'logout',
   'pencil': 'mode-edit',
   'moon': 'nightlight',
@@ -28,6 +29,8 @@ const MAPPING = {
   'sportscourt': 'sports-volleyball',
   'camera': 'camera-alt',
   'doc.text': 'description',
+  'plus.circle': 'add-circle',
+  'sparkles': 'auto-awesome',
 };
 
 /**

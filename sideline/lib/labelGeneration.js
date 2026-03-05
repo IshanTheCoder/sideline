@@ -31,7 +31,7 @@ const VOLLEYBALL_LABEL_EXAMPLES = [
   'Double block hand penetration',
 ];
 
-function buildVolleyballSystemPrompt(isLongRecording, playerNames = []) {
+function buildVolleyballSystemPrompt(isLongRecording, playerNames = [], customBuckets = {}) {
   const namesHint =
     playerNames.length > 0
       ? `\nKnown player names on this team (use EXACT spelling when mentioned): ${playerNames.join(', ')}.\n`
@@ -42,16 +42,20 @@ function buildVolleyballSystemPrompt(isLongRecording, playerNames = []) {
 
   const rulesContext = getVolleyballRulesContext();
 
+  const customSkill = (customBuckets.skill && customBuckets.skill.length) ? `, ${customBuckets.skill.join(', ')}` : '';
+  const customPosition = (customBuckets.position && customBuckets.position.length) ? `, ${customBuckets.position.join(', ')}` : '';
+  const customFeedback = (customBuckets.feedback && customBuckets.feedback.length) ? `, ${customBuckets.feedback.join(', ')}` : '';
+
   return `You are a volleyball coach assistant. You create labels and metadata for coaching recordings using VOLLEYBALL terminology only.
 ${namesHint}
 Volleyball rules (use to interpret technique/rule discussion; flag possible violations or incorrect calls):
 ${rulesContext}
 
-Volleyball skill categories (use exactly one, or null if unclear): ${SKILL_LIST}
+Volleyball skill categories (use exactly one, or null if unclear): ${SKILL_LIST}${customSkill}
 
-Player positions (use exactly one if mentioned, else null): ${POSITION_LIST}
+Player positions (use exactly one if mentioned, else null): ${POSITION_LIST}${customPosition}
 
-Feedback types (use exactly one, or null): ${FEEDBACK_LIST}
+Feedback types (use exactly one, or null): ${FEEDBACK_LIST}${customFeedback}
 
 Play patterns (use if mentioned, else null): "6-2", "5-1", "4-2", "rotation one" through "rotation six", "serve receive", "out of system", or null.
 
@@ -114,13 +118,14 @@ export async function generateLabel(transcriptionText, options = {}) {
     }
 
     const playerNames = options.playerNames && Array.isArray(options.playerNames) ? options.playerNames : [];
+    const customBuckets = options.customBuckets && typeof options.customBuckets === 'object' ? options.customBuckets : {};
 
     console.log('Generating label for transcription:', transcriptionText.substring(0, 100) + '...');
 
     const wordCount = transcriptionText.trim().split(/\s+/).length;
     const isLongRecording = wordCount > 50;
 
-    const systemPrompt = buildVolleyballSystemPrompt(isLongRecording, playerNames);
+    const systemPrompt = buildVolleyballSystemPrompt(isLongRecording, playerNames, customBuckets);
     const userPrompt = isLongRecording
       ? `Create a general summary label and metadata for this longer coaching recording. Reply with JSON only:\n\n${transcriptionText}`
       : `Create a specific coaching label and metadata for this recording. Include any player names. Reply with JSON only:\n\n${transcriptionText}`;

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import {
   ActivityIndicator,
   Alert,
@@ -33,12 +34,10 @@ import {
 import { generateMissingLabels } from '@/lib/recordingProcessing';
 import {
   parseAiLabels,
-  aggregateVolleyballStats,
   SKILL_CATEGORY_LABELS,
   POSITION_LABELS,
   FEEDBACK_TYPE_LABELS,
 } from '@/lib/volleyballVocabulary';
-import { getPlayerNamesForGameSession } from '@/lib/roster';
 
 export default function GameRecordingsScreen() {
   const { id } = useLocalSearchParams();
@@ -80,31 +79,10 @@ export default function GameRecordingsScreen() {
   const [isScrollingTranscription, setIsScrollingTranscription] = useState(false);
   const modalScrollRef = useRef(null);
   const [generatingLabels, setGeneratingLabels] = useState(false);
-
   const gameId = useMemo(() => {
     if (Array.isArray(id)) return id[0];
     return id;
   }, [id]);
-
-  const volleyballStats = useMemo(() => aggregateVolleyballStats(recordings), [recordings]);
-
-  const [rosterNames, setRosterNames] = useState([]);
-  useEffect(() => {
-    if (!gameId) return;
-    getPlayerNamesForGameSession(gameId).then(({ names }) => setRosterNames(names ?? []));
-  }, [gameId]);
-
-  const mentionedPlayers = useMemo(() => {
-    const count = {};
-    rosterNames.forEach((name) => { count[name] = 0; });
-    recordings.forEach((rec) => {
-      const text = [rec.transcription, parseAiLabels(rec.ai_labels).displayLabel].filter(Boolean).join(' ').toLowerCase();
-      rosterNames.forEach((name) => {
-        if (name && text.includes(name.toLowerCase())) count[name]++;
-      });
-    });
-    return Object.entries(count).filter(([, n]) => n > 0).sort((a, b) => b[1] - a[1]).slice(0, 8);
-  }, [recordings, rosterNames]);
 
   const loadRecordings = useCallback(async () => {
     if (!user?.id || !gameId) {
@@ -139,6 +117,12 @@ export default function GameRecordingsScreen() {
   useEffect(() => {
     loadRecordings();
   }, [loadRecordings]);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadRecordings();
+    }, [loadRecordings])
+  );
 
   // Initialize editing notes when modal opens
   useEffect(() => {
@@ -460,13 +444,20 @@ export default function GameRecordingsScreen() {
     return cleaned;
   };
 
+  /** Normalize bucket value: null/empty = "Any"; literal "other" = "Other"; else label from map or raw value */
+  const bucketDisplay = (value, labelsMap) => {
+    if (value == null || value === '' || String(value).toLowerCase() === 'null') return 'Any';
+    if (String(value).toLowerCase() === 'other') return 'Other';
+    return labelsMap[value] ?? value;
+  };
+
   /** Parse ai_labels (plain or JSON) and return display label + volleyball metadata for UI */
   const getRecordingLabelInfo = (recording) => {
     const parsed = parseAiLabels(recording?.ai_labels ?? null);
     const displayLabel = cleanLabel(parsed.displayLabel) || 'Untitled Recording';
-    const skillLabel = parsed.skillCategory ? (SKILL_CATEGORY_LABELS[parsed.skillCategory] ?? parsed.skillCategory) : null;
-    const positionLabel = parsed.position ? (POSITION_LABELS[parsed.position] ?? parsed.position) : null;
-    const feedbackLabel = parsed.feedbackType ? (FEEDBACK_TYPE_LABELS[parsed.feedbackType] ?? parsed.feedbackType) : null;
+    const skillLabel = bucketDisplay(parsed.skillCategory, SKILL_CATEGORY_LABELS);
+    const positionLabel = bucketDisplay(parsed.position, POSITION_LABELS);
+    const feedbackLabel = bucketDisplay(parsed.feedbackType, FEEDBACK_TYPE_LABELS);
     return {
       displayLabel,
       skillLabel,
@@ -713,18 +704,17 @@ export default function GameRecordingsScreen() {
                   <ThemedText style={styles.recordingTitle} numberOfLines={2}>
                     {labelInfo.displayLabel}
                   </ThemedText>
-                  {(labelInfo.skillLabel || labelInfo.positionLabel) ? (
+                  {(labelInfo.skillLabel || labelInfo.positionLabel || labelInfo.feedbackLabel) ? (
                     <View style={styles.volleyballChipsRow}>
-                      {labelInfo.skillLabel && (
-                        <View style={[styles.volleyballChip, { backgroundColor: colorScheme === 'dark' ? '#333' : '#E8E8E8' }]}>
-                          <ThemedText style={styles.volleyballChipText}>{labelInfo.skillLabel}</ThemedText>
-                        </View>
-                      )}
-                      {labelInfo.positionLabel && (
-                        <View style={[styles.volleyballChip, { backgroundColor: colorScheme === 'dark' ? '#333' : '#E8E8E8' }]}>
-                          <ThemedText style={styles.volleyballChipText}>{labelInfo.positionLabel}</ThemedText>
-                        </View>
-                      )}
+                      <View style={[styles.volleyballChip, { backgroundColor: colorScheme === 'dark' ? '#333' : '#E8E8E8' }]}>
+                        <ThemedText style={styles.volleyballChipText}>{labelInfo.skillLabel}</ThemedText>
+                      </View>
+                      <View style={[styles.volleyballChip, { backgroundColor: colorScheme === 'dark' ? '#333' : '#E8E8E8' }]}>
+                        <ThemedText style={styles.volleyballChipText}>{labelInfo.positionLabel}</ThemedText>
+                      </View>
+                      <View style={[styles.volleyballChip, { backgroundColor: colorScheme === 'dark' ? '#333' : '#E8E8E8' }]}>
+                        <ThemedText style={styles.volleyballChipText}>{labelInfo.feedbackLabel}</ThemedText>
+                      </View>
                     </View>
                   ) : null}
                 </>
@@ -755,17 +745,18 @@ export default function GameRecordingsScreen() {
           />
         </TouchableOpacity>
         
-        {/* Info button - right side, below delete button */}
+        {/* Edit button - right side, below delete button */}
         <TouchableOpacity
-          style={styles.infoButton}
+          style={styles.editButton}
           onPress={() => {
             setSelectedRecording(item);
             setModalVisible(true);
           }}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          accessibilityLabel="Edit recording"
         >
           <IconSymbol
-            name="info.circle"
+            name="pencil"
             size={20}
             color={Colors[colorScheme ?? 'light'].tint}
           />
@@ -859,11 +850,11 @@ export default function GameRecordingsScreen() {
           style={styles.headerRightButton}
           onPress={openMatchReflection}
           activeOpacity={0.7}
-          accessibilityLabel="Match Reflection"
+          accessibilityLabel="Post-Game Summary"
         >
           <IconSymbol
             name="doc.text"
-            size={24}
+            size={32}
             color={Colors[colorScheme ?? 'light'].tint}
           />
         </TouchableOpacity>
@@ -922,58 +913,13 @@ export default function GameRecordingsScreen() {
             </TouchableOpacity>
           </View>
 
-          {/* Volleyball session summary (skills, positions, most mentioned players) */}
-          {(volleyballStats.totalWithMeta > 0 || mentionedPlayers.length > 0) && (
-            <View style={[styles.statsSummaryBox, { backgroundColor: colorScheme === 'dark' ? '#2A2A2A' : '#F5F5F5' }]}>
-              <ThemedText style={styles.statsSummaryTitle}>Session summary</ThemedText>
-              <View style={styles.statsSummaryRow}>
-                {mentionedPlayers.length > 0 && (
-                  <View style={styles.statsSummaryCol}>
-                    <ThemedText style={styles.statsSummaryLabel}>Most mentioned players</ThemedText>
-                    {mentionedPlayers.map(([name, count]) => (
-                      <ThemedText key={name} style={styles.statsSummaryItem}>
-                        {name}: {count}
-                      </ThemedText>
-                    ))}
-                  </View>
-                )}
-                {Object.keys(volleyballStats.bySkill).length > 0 && (
-                  <View style={styles.statsSummaryCol}>
-                    <ThemedText style={styles.statsSummaryLabel}>By skill</ThemedText>
-                    {Object.entries(volleyballStats.bySkill)
-                      .sort((a, b) => b[1] - a[1])
-                      .slice(0, 5)
-                      .map(([key, count]) => (
-                        <ThemedText key={key} style={styles.statsSummaryItem}>
-                          {SKILL_CATEGORY_LABELS[key] ?? key}: {count}
-                        </ThemedText>
-                      ))}
-                  </View>
-                )}
-                {Object.keys(volleyballStats.byPosition).length > 0 && (
-                  <View style={styles.statsSummaryCol}>
-                    <ThemedText style={styles.statsSummaryLabel}>By position</ThemedText>
-                    {Object.entries(volleyballStats.byPosition)
-                      .sort((a, b) => b[1] - a[1])
-                      .slice(0, 5)
-                      .map(([key, count]) => (
-                        <ThemedText key={key} style={styles.statsSummaryItem}>
-                          {POSITION_LABELS[key] ?? key}: {count}
-                        </ThemedText>
-                      ))}
-                  </View>
-                )}
-              </View>
-            </View>
-          )}
-
           <FlatList
             data={recordings}
-          renderItem={renderRecordingItem}
-          keyExtractor={(item) => item.id}
-          contentContainerStyle={styles.listContent}
-          ItemSeparatorComponent={() => <View style={styles.separator} />}
-        />
+            renderItem={renderRecordingItem}
+            keyExtractor={(item) => item.id}
+            contentContainerStyle={styles.listContent}
+            ItemSeparatorComponent={() => <View style={styles.separator} />}
+          />
         </>
       )}
 
@@ -1049,23 +995,6 @@ export default function GameRecordingsScreen() {
                 nestedScrollEnabled={true}
                 directionalLockEnabled={true}
               >
-                {/* Volleyball metadata (skill, position, feedback, play pattern, rule note) */}
-                {selectedRecording && (() => {
-                  const info = getRecordingLabelInfo(selectedRecording);
-                  const hasMeta = info.skillLabel || info.positionLabel || info.feedbackLabel || info.playPattern;
-                  if (!hasMeta) return null;
-                  return (
-                    <View style={styles.modalSection}>
-                      <ThemedText style={styles.modalSectionTitle}>Volleyball</ThemedText>
-                      <View style={[styles.volleyballMetaRow, { backgroundColor: colorScheme === 'dark' ? '#2A2A2A' : '#F5F5F5' }]}>
-                        {info.skillLabel && <ThemedText style={styles.volleyballMetaText}>Skill: {info.skillLabel}</ThemedText>}
-                        {info.positionLabel && <ThemedText style={styles.volleyballMetaText}>Position: {info.positionLabel}</ThemedText>}
-                        {info.feedbackLabel && <ThemedText style={styles.volleyballMetaText}>Feedback: {info.feedbackLabel}</ThemedText>}
-                        {info.playPattern && <ThemedText style={styles.volleyballMetaText}>Play: {info.playPattern}</ThemedText>}
-                      </View>
-                    </View>
-                  );
-                })()}
                 {/* Transcription Section */}
                 {selectedRecording?.transcription && (
                   <View style={styles.modalSection}>
@@ -1187,6 +1116,7 @@ export default function GameRecordingsScreen() {
           </View>
         </TouchableOpacity>
       </Modal>
+
     </ThemedView>
   );
 }
@@ -1219,9 +1149,11 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   headerRightButton: {
-    padding: 8,
-    minWidth: 40,
-    alignItems: 'flex-end',
+    padding: 10,
+    minWidth: 48,
+    minHeight: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   listContent: {
     paddingBottom: 40,
@@ -1269,14 +1201,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     opacity: 0.9,
   },
-  volleyballMetaRow: {
-    padding: 12,
-    borderRadius: 10,
-    gap: 6,
-  },
-  volleyballMetaText: {
-    fontSize: 14,
-  },
   markerRow: {
     marginTop: 6,
   },
@@ -1290,7 +1214,7 @@ const styles = StyleSheet.create({
     right: 16,
     padding: 4,
   },
-  infoButton: {
+  editButton: {
     position: 'absolute',
     top: 50,
     right: 16,
