@@ -21,7 +21,7 @@ export default function ChangeEmailModal({
   onClose,
   currentEmail,
 }) {
-  const colorScheme = 'dark';
+  const colorScheme = 'light';
   const [newEmail, setNewEmail] = useState('');
   const [password, setPassword] = useState('');
   const [saving, setSaving] = useState(false);
