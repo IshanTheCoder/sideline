@@ -1,0 +1,30 @@
+<!--
+  EASIEST FREE HOSTING: GitHub Pages (no Vercel needed)
+  1. Create a new repo on GitHub (e.g. "sideline-oauth").
+  2. Upload this file as "index.html" (so URL is shorter).
+  3. Repo → Settings → Pages → Source: Deploy from branch → main → / (root) → Save.
+  4. Your URL: https://YOUR_USERNAME.github.io/sideline-oauth/
+  5. In .env set: EXPO_PUBLIC_GOOGLE_OAUTH_REDIRECT_URI=https://YOUR_USERNAME.github.io/sideline-oauth/
+  6. Add that exact URL in Google Cloud Console → Authorized redirect URIs.
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Sign-in complete</title>
+  <style>
+    body { font-family: system-ui, sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; background: #1a1a1a; color: #eee; }
+    p { font-size: 18px; }
+  </style>
+</head>
+<body>
+  <p>Sign-in complete. You can close this window and return to the app.</p>
+  <script>
+    // Optional: redirect back to app so the in-app browser closes (scheme must match your app.json scheme).
+    if (window.location.hash && /^(https?:)?\/\//.test(window.location.href)) {
+      try { window.location.replace('sideline://google-sheets-callback' + window.location.hash); } catch (_) {}
+    }
+  </script>
+</body>
+</html>

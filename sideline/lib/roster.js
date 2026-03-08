@@ -166,6 +166,31 @@ export function parseRosterCsv(csvText) {
 }
 
 /**
+ * Parse 2D array (e.g. from Google Sheets) into roster rows.
+ * First row can be header (Name, Number, Position, Grade). Detects columns by header or order.
+ * @param {string[][]} rows - Array of rows, each row is array of cell values
+ * @returns {Array<{ name: string, number: string, position: string, grade: string }>}
+ */
+export function parseRosterSheetRows(rows) {
+  if (!Array.isArray(rows) || rows.length === 0) return [];
+  const first = rows[0].map((c) => String(c ?? '').toLowerCase().trim());
+  const hasHeader =
+    first.some((c) => c === 'name' || c === 'number' || c === 'position' || c === 'grade') ||
+    (first.length >= 1 && first[0] === 'name');
+  const dataRows = hasHeader ? rows.slice(1) : rows;
+  const nameIdx = hasHeader ? (first.indexOf('name') >= 0 ? first.indexOf('name') : 0) : 0;
+  const numIdx = hasHeader ? (first.indexOf('number') >= 0 ? first.indexOf('number') : 1) : 1;
+  const posIdx = hasHeader ? (first.indexOf('position') >= 0 ? first.indexOf('position') : 2) : 2;
+  const gradeIdx = hasHeader ? (first.indexOf('grade') >= 0 ? first.indexOf('grade') : 3) : 3;
+  return dataRows.map((row) => ({
+    name: String(row[nameIdx] ?? '').trim() || '',
+    number: String(row[numIdx] ?? '').trim() || '',
+    position: String(row[posIdx] ?? '').trim() || '',
+    grade: String(row[gradeIdx] ?? '').trim() || '',
+  })).filter((r) => r.name);
+}
+
+/**
  * Import players from CSV text into a team. Does not clear existing roster.
  * @param {string} teamId
  * @param {string} csvText
@@ -176,6 +201,24 @@ export async function importRosterFromCsv(teamId, csvText) {
   let added = 0;
   const errors = [];
   for (const row of rows) {
+    const { data, error } = await addPlayer(teamId, row);
+    if (error) errors.push(`${row.name}: ${error.message || 'Failed'}`);
+    else added++;
+  }
+  return { added, errors, error: null };
+}
+
+/**
+ * Import players from sheet rows (2D array, e.g. from Google Sheets). Does not clear existing roster.
+ * @param {string} teamId
+ * @param {string[][]} rows
+ * @returns {Promise<{ added: number, errors: string[], error: Error|null }>}
+ */
+export async function importRosterFromSheetRows(teamId, rows) {
+  const parsed = parseRosterSheetRows(rows);
+  let added = 0;
+  const errors = [];
+  for (const row of parsed) {
     const { data, error } = await addPlayer(teamId, row);
     if (error) errors.push(`${row.name}: ${error.message || 'Failed'}`);
     else added++;

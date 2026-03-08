@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   Alert,
   KeyboardAvoidingView,
+  Modal,
   Platform,
   ScrollView,
   StyleSheet,
@@ -25,6 +26,7 @@ import {
 import { parseAiLabels, serializeAiLabels, SKILL_CATEGORY_LABELS, POSITION_LABELS, FEEDBACK_TYPE_LABELS } from '@/lib/volleyballVocabulary';
 import { fetchRosterForUser, getPlayerNamesForGameSession } from '@/lib/roster';
 import { generateLabel } from '@/lib/labelGeneration';
+import { getCustomBucketsForPrompt, getCustomBuckets, addCustomBucket, describeBucketWithAI } from '@/lib/customBuckets';
 
 export default function RecordingDetailScreen() {
   const { id } = useLocalSearchParams();
@@ -43,6 +45,11 @@ export default function RecordingDetailScreen() {
   const [roster, setRoster] = useState([]);
   const [savingField, setSavingField] = useState(null);
   const [fillingMetadata, setFillingMetadata] = useState(false);
+  const [customBuckets, setCustomBuckets] = useState({ skill: [], position: [], feedback: [] });
+  const [addCategoryModalVisible, setAddCategoryModalVisible] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState('');
+  const [newCategoryType, setNewCategoryType] = useState('skill');
+  const [addingCategory, setAddingCategory] = useState(false);
 
   const recordingId = useMemo(() => {
     if (Array.isArray(id)) return id[0];
@@ -89,6 +96,16 @@ export default function RecordingDetailScreen() {
     fetchRosterForUser(user.id).then(({ data }) => setRoster(data ?? []));
   }, [user?.id]);
 
+  useEffect(() => {
+    if (!user?.id) return;
+    getCustomBuckets(user.id).then((buckets) => {
+      const skill = buckets.filter((b) => b.type === 'skill').map((b) => b.name);
+      const position = buckets.filter((b) => b.type === 'position').map((b) => b.name);
+      const feedback = buckets.filter((b) => b.type === 'feedback').map((b) => b.name);
+      setCustomBuckets({ skill, position, feedback });
+    });
+  }, [user?.id]);
+
   // When user opens Edit: if there's transcription but no/empty labels, run AI to pre-fill metadata
   useEffect(() => {
     if (!recording?.transcription?.trim() || !user?.id || !recordingId) return;
@@ -102,7 +119,8 @@ export default function RecordingDetailScreen() {
         ? await getPlayerNamesForGameSession(recording.game_session_id)
         : { names: [] };
       if (cancelled) return;
-      const result = await generateLabel(recording.transcription, { playerNames });
+      const customBuckets = user?.id ? await getCustomBucketsForPrompt(user.id) : {};
+      const result = await generateLabel(recording.transcription, { playerNames, customBuckets });
       if (cancelled || result.error || !result.label) {
         setFillingMetadata(false);
         return;
@@ -168,17 +186,48 @@ export default function RecordingDetailScreen() {
     setSavingField('labels');
     const parsed = parseAiLabels(recording.ai_labels ?? null);
     const aiLabels = serializeAiLabels(editLabel || parsed.displayLabel || 'Untitled', {
-      skillCategory: editSkill || parsed.skillCategory || undefined,
-      position: editPosition || parsed.position || undefined,
+      skillCategory: editSkill === '' ? undefined : (editSkill || undefined),
+      position: editPosition === '' ? undefined : (editPosition || undefined),
       playPattern: parsed.playPattern || undefined,
-      feedbackType: editFeedback || parsed.feedbackType || undefined,
+      feedbackType: editFeedback === '' ? undefined : (editFeedback || undefined),
       ruleNote: parsed.ruleNote || undefined,
       taggedPlayers: taggedPlayerNames.length ? taggedPlayerNames : (parsed.taggedPlayers?.length ? parsed.taggedPlayers : undefined),
     });
     const { error: err } = await updateRecording(user.id, recordingId, { ai_labels: aiLabels });
     setSavingField(null);
     if (err) Alert.alert('Save failed', err.message);
-    else setRecording((p) => (p ? { ...p, ai_labels: aiLabels } : p));
+    else {
+      setRecording((p) => (p ? { ...p, ai_labels: aiLabels } : p));
+      const savedParsed = parseAiLabels(aiLabels);
+      setEditLabel(savedParsed.displayLabel ?? editLabel);
+      setEditSkill(savedParsed.skillCategory ?? '');
+      setEditPosition(savedParsed.position ?? '');
+      setEditFeedback(savedParsed.feedbackType ?? '');
+      if (Array.isArray(savedParsed.taggedPlayers)) setTaggedPlayerNames(savedParsed.taggedPlayers);
+      router.back();
+    }
+  };
+
+  const handleAddCategory = async () => {
+    const name = newCategoryName.trim();
+    if (!name || !user?.id) return;
+    setAddingCategory(true);
+    try {
+      const description = await describeBucketWithAI(name, editLabel || recording?.transcription?.slice(0, 200) || '');
+      await addCustomBucket(user.id, name, newCategoryType, description);
+      const buckets = await getCustomBuckets(user.id);
+      const skill = buckets.filter((b) => b.type === 'skill').map((b) => b.name);
+      const position = buckets.filter((b) => b.type === 'position').map((b) => b.name);
+      const feedback = buckets.filter((b) => b.type === 'feedback').map((b) => b.name);
+      setCustomBuckets({ skill, position, feedback });
+      setNewCategoryName('');
+      setAddCategoryModalVisible(false);
+      Alert.alert('Category added', `"${name}" is saved and will appear in the ${newCategoryType} list for future recordings.`);
+    } catch (e) {
+      Alert.alert('Error', 'Could not save category. Please try again.');
+    } finally {
+      setAddingCategory(false);
+    }
   };
 
   const toggleTaggedPlayer = (name) => {
@@ -286,19 +335,26 @@ export default function RecordingDetailScreen() {
             <View style={styles.labelMetaRow}>
               <ThemedText style={styles.labelMetaLabel}>Skill</ThemedText>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipScroll}>
-                {['', 'serving', 'passing', 'setting', 'attacking', 'blocking', 'defense'].map((s) => (
+                {['', ...Object.keys(SKILL_CATEGORY_LABELS), ...customBuckets.skill, 'other'].map((s) => (
                   <TouchableOpacity key={s || '_'} style={[styles.metaChip, editSkill === s && { backgroundColor: Colors[colorScheme ?? 'light'].tint }]} onPress={() => setEditSkill(s)}>
-                    <ThemedText style={[styles.metaChipText, editSkill === s && { color: '#FFF' }]}>{s ? (SKILL_CATEGORY_LABELS[s] ?? s) : 'Any'}</ThemedText>
+                    <ThemedText style={[styles.metaChipText, editSkill === s && { color: '#FFF' }]}>
+                      {s === '' ? 'Any' : s === 'other' ? 'Other' : (SKILL_CATEGORY_LABELS[s] ?? s)}
+                    </ThemedText>
                   </TouchableOpacity>
                 ))}
               </ScrollView>
+              <TouchableOpacity style={styles.addCategoryLink} onPress={() => { setNewCategoryType('skill'); setNewCategoryName(''); setAddCategoryModalVisible(true); }}>
+                <ThemedText style={[styles.addCategoryLinkText, { color: Colors[colorScheme ?? 'light'].tint }]}>+ Add category</ThemedText>
+              </TouchableOpacity>
             </View>
             <View style={styles.labelMetaRow}>
               <ThemedText style={styles.labelMetaLabel}>Position</ThemedText>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipScroll}>
-                {['', 'setter', 'outside_hitter', 'middle_blocker', 'opposite', 'libero'].map((p) => (
+                {['', ...Object.keys(POSITION_LABELS), ...customBuckets.position, 'other'].map((p) => (
                   <TouchableOpacity key={p || '_'} style={[styles.metaChip, editPosition === p && { backgroundColor: Colors[colorScheme ?? 'light'].tint }]} onPress={() => setEditPosition(p)}>
-                    <ThemedText style={[styles.metaChipText, editPosition === p && { color: '#FFF' }]}>{p ? (POSITION_LABELS[p] ?? p) : 'Any'}</ThemedText>
+                    <ThemedText style={[styles.metaChipText, editPosition === p && { color: '#FFF' }]}>
+                      {p === '' ? 'Any' : p === 'other' ? 'Other' : (POSITION_LABELS[p] ?? p)}
+                    </ThemedText>
                   </TouchableOpacity>
                 ))}
               </ScrollView>
@@ -306,12 +362,17 @@ export default function RecordingDetailScreen() {
             <View style={styles.labelMetaRow}>
               <ThemedText style={styles.labelMetaLabel}>Feedback</ThemedText>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipScroll}>
-                {['', 'technique', 'positioning', 'communication'].map((f) => (
+                {['', ...Object.keys(FEEDBACK_TYPE_LABELS), ...customBuckets.feedback, 'other'].map((f) => (
                   <TouchableOpacity key={f || '_'} style={[styles.metaChip, editFeedback === f && { backgroundColor: Colors[colorScheme ?? 'light'].tint }]} onPress={() => setEditFeedback(f)}>
-                    <ThemedText style={[styles.metaChipText, editFeedback === f && { color: '#FFF' }]}>{f ? (FEEDBACK_TYPE_LABELS[f] ?? f) : 'Any'}</ThemedText>
+                    <ThemedText style={[styles.metaChipText, editFeedback === f && { color: '#FFF' }]}>
+                      {f === '' ? 'Any' : f === 'other' ? 'Other' : (FEEDBACK_TYPE_LABELS[f] ?? f)}
+                    </ThemedText>
                   </TouchableOpacity>
                 ))}
               </ScrollView>
+              <TouchableOpacity style={styles.addCategoryLink} onPress={() => { setNewCategoryType('feedback'); setNewCategoryName(''); setAddCategoryModalVisible(true); }}>
+                <ThemedText style={[styles.addCategoryLinkText, { color: Colors[colorScheme ?? 'light'].tint }]}>+ Add category</ThemedText>
+              </TouchableOpacity>
             </View>
             <TouchableOpacity
               style={[styles.saveFieldButton, { backgroundColor: Colors[colorScheme ?? 'light'].tint }]}
@@ -355,6 +416,35 @@ export default function RecordingDetailScreen() {
         </ScrollView>
         </KeyboardAvoidingView>
       )}
+
+      <Modal animationType="slide" transparent visible={addCategoryModalVisible} onRequestClose={() => setAddCategoryModalVisible(false)}>
+        <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setAddCategoryModalVisible(false)}>
+          <View onStartShouldSetResponder={() => true} style={[styles.addCategoryModalContent, { backgroundColor: colorScheme === 'dark' ? '#1A1A1A' : '#FFFFFF' }]}>
+            <ThemedText style={styles.addCategoryModalTitle}>Add category</ThemedText>
+            <ThemedText style={styles.addCategoryModalHint}>New category for {newCategoryType}. It will appear here and when generating recording names.</ThemedText>
+            <TextInput
+              style={[styles.addCategoryInput, { color: Colors[colorScheme ?? 'light'].text, borderColor: colorScheme === 'dark' ? '#444' : '#DDD' }]}
+              placeholder="Category name"
+              placeholderTextColor={colorScheme === 'dark' ? '#666' : '#999'}
+              value={newCategoryName}
+              onChangeText={setNewCategoryName}
+              autoCapitalize="words"
+            />
+            <View style={styles.addCategoryActions}>
+              <TouchableOpacity style={[styles.addCategoryCancelBtn, { borderColor: colorScheme === 'dark' ? '#444' : '#DDD' }]} onPress={() => setAddCategoryModalVisible(false)}>
+                <ThemedText style={styles.addCategoryCancelText}>Cancel</ThemedText>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.addCategorySubmitBtn, { backgroundColor: Colors[colorScheme ?? 'light'].tint }]}
+                onPress={handleAddCategory}
+                disabled={!newCategoryName.trim() || addingCategory}
+              >
+                {addingCategory ? <ActivityIndicator size="small" color="#FFF" /> : <ThemedText style={styles.addCategorySubmitText}>Add</ThemedText>}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </TouchableOpacity>
+      </Modal>
     </ThemedView>
   );
 }
@@ -507,6 +597,71 @@ const styles = StyleSheet.create({
   metaChipText: {
     fontSize: 13,
     fontWeight: '500',
+  },
+  addCategoryLink: {
+    marginTop: 6,
+    alignSelf: 'flex-start',
+  },
+  addCategoryLinkText: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    paddingHorizontal: 24,
+  },
+  addCategoryModalContent: {
+    padding: 20,
+    borderRadius: 16,
+    maxWidth: 400,
+    alignSelf: 'center',
+    width: '100%',
+  },
+  addCategoryModalTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    marginBottom: 8,
+  },
+  addCategoryModalHint: {
+    fontSize: 13,
+    opacity: 0.8,
+    marginBottom: 16,
+  },
+  addCategoryInput: {
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontSize: 16,
+    marginBottom: 16,
+  },
+  addCategoryActions: {
+    flexDirection: 'row',
+    gap: 12,
+    justifyContent: 'flex-end',
+  },
+  addCategoryCancelBtn: {
+    paddingVertical: 10,
+    paddingHorizontal: 18,
+    borderRadius: 10,
+    borderWidth: 1,
+  },
+  addCategoryCancelText: {
+    fontSize: 15,
+  },
+  addCategorySubmitBtn: {
+    paddingVertical: 10,
+    paddingHorizontal: 22,
+    borderRadius: 10,
+    minWidth: 80,
+    alignItems: 'center',
+  },
+  addCategorySubmitText: {
+    color: '#FFF',
+    fontSize: 15,
+    fontWeight: '600',
   },
   tagRow: {
     flexDirection: 'row',
