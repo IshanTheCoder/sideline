@@ -11,6 +11,7 @@ const MAPPING = {
   'house.fill': 'home',
   'paperplane.fill': 'send',
   'chevron.left.forwardslash.chevron.right': 'code',
+  'person.fill': 'person',
   'chevron.right': 'chevron-right',
   'chevron.left': 'chevron-left',
   'gearshape.fill': 'settings',

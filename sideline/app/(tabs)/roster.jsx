@@ -7,6 +7,7 @@ import {
   KeyboardAvoidingView,
   Modal,
   Platform,
+  Pressable,
   ScrollView,
   StyleSheet,
   TextInput,
@@ -397,8 +398,8 @@ export default function RosterScreen() {
                 </View>
               </ScrollView>
             </View>
-          </TouchableWithoutFeedback>
-        </KeyboardAvoidingView>
+          </Pressable>
+        </Pressable>
       </Modal>
 
       {/* Import from Google Sheets modal */}
