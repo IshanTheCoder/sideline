@@ -21,7 +21,7 @@ export default function ChangePasswordModal({
   onClose,
   userEmail,
 }) {
-  const colorScheme = 'dark';
+  const colorScheme = 'light';
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
