@@ -37,10 +37,9 @@ export function AuthProvider({ children }) {
 
   // Initialize auth state
   useEffect(() => {
-    // Safety timeout - ensure loading never gets stuck
     const loadingTimeout = setTimeout(() => {
       setLoading(false);
-    }, 3000); // 3 second timeout for faster web loading
+    }, 1500);
     
     // Get initial session
     supabase.auth.getSession()

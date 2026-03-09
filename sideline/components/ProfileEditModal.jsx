@@ -231,21 +231,16 @@ export default function ProfileEditModal({
         return;
       }
 
-      // Success - call onSave to refresh profile
       setSaving(false);
-      console.log('Calling onSave to refresh profile in parent...');
       await onSave();
-      console.log('onSave completed');
       
-      Alert.alert('Success', 'Profile updated successfully!', [
-        {
-          text: 'OK',
-          onPress: () => {
-            console.log('Closing modal after profile update');
-            onClose();
-          },
-        },
-      ]);
+      if (Platform.OS === 'web') {
+        onClose();
+      } else {
+        Alert.alert('Success', 'Profile updated successfully!', [
+          { text: 'OK', onPress: () => onClose() },
+        ]);
+      }
     } catch (error) {
       console.log('Unexpected error updating profile:', error);
       Alert.alert('Error', 'An unexpected error occurred. Please try again.');
@@ -387,9 +382,6 @@ export default function ProfileEditModal({
                 autoCapitalize="words"
                 maxLength={50}
               />
-              <ThemedText style={styles.hint}>
-                This is how other users will see your name
-              </ThemedText>
             </View>
           </ScrollView>
         </View>

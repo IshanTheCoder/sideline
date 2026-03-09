@@ -32,6 +32,19 @@ const MAPPING = {
   'doc.text': 'description',
   'plus.circle': 'add-circle',
   'sparkles': 'auto-awesome',
+  'calendar': 'event',
+  'play.fill': 'play-arrow',
+  'pause.fill': 'pause',
+  'trash': 'delete',
+  'info.circle': 'info',
+  'exclamationmark.circle.fill': 'error',
+  'eye': 'visibility',
+  'eye.slash': 'visibility-off',
+  'chevron.up': 'expand-less',
+  'chevron.down': 'expand-more',
+  'xmark.circle.fill': 'cancel',
+  'person.2': 'group',
+  'plus': 'add',
 };
 
 /**

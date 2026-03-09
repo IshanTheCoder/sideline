@@ -14,6 +14,7 @@ import {
 import { ThemedText } from './themed-text';
 import { IconSymbol } from './ui/icon-symbol';
 import { Colors } from '@/constants/theme';
+import { useColorScheme } from '@/hooks/use-color-scheme';
 import { supabase } from '@/lib/supabase';
 
 export default function ChangePasswordModal({
@@ -21,7 +22,7 @@ export default function ChangePasswordModal({
   onClose,
   userEmail,
 }) {
-  const colorScheme = 'light';
+  const colorScheme = useColorScheme();
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');

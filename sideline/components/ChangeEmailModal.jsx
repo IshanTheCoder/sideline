@@ -14,6 +14,7 @@ import {
 import { ThemedText } from './themed-text';
 import { IconSymbol } from './ui/icon-symbol';
 import { Colors } from '@/constants/theme';
+import { useColorScheme } from '@/hooks/use-color-scheme';
 import { supabase } from '@/lib/supabase';
 
 export default function ChangeEmailModal({
@@ -21,7 +22,7 @@ export default function ChangeEmailModal({
   onClose,
   currentEmail,
 }) {
-  const colorScheme = 'light';
+  const colorScheme = useColorScheme();
   const [newEmail, setNewEmail] = useState('');
   const [password, setPassword] = useState('');
   const [saving, setSaving] = useState(false);

@@ -3,6 +3,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import {
   ActivityIndicator,
   Dimensions,
+  Platform,
   ScrollView,
   StyleSheet,
   TouchableOpacity,
@@ -213,7 +214,11 @@ export default function PostGameSummaryScreen() {
     return () => { cancelled = true; };
   }, [gameId, recordings]);
 
-  const screenWidth = Dimensions.get('window').width - 40;
+  const windowWidth = Dimensions.get('window').width;
+  const [containerWidth, setContainerWidth] = useState(
+    Platform.OS === 'web' ? Math.min(windowWidth, 440) - 40 : windowWidth - 40
+  );
+  const screenWidth = containerWidth;
   const tintColor = Colors[colorScheme ?? 'light'].tint;
   const isDark = colorScheme === 'dark';
   const chartConfig = useMemo(() => ({
@@ -324,7 +329,6 @@ export default function PostGameSummaryScreen() {
         <View style={styles.header}>
           <TouchableOpacity style={styles.backButton} onPress={handleBack} activeOpacity={0.7}>
             <IconSymbol name="chevron.left" size={28} color={Colors[colorScheme ?? 'light'].text} />
-            <ThemedText style={styles.backText}>Back</ThemedText>
           </TouchableOpacity>
         </View>
         <View style={styles.loadingContainer}>
@@ -340,7 +344,6 @@ export default function PostGameSummaryScreen() {
       <View style={styles.header}>
         <TouchableOpacity style={styles.backButton} onPress={handleBack} activeOpacity={0.7}>
           <IconSymbol name="chevron.left" size={28} color={Colors[colorScheme ?? 'light'].text} />
-          <ThemedText style={styles.backText}>Back</ThemedText>
         </TouchableOpacity>
       </View>
 
@@ -353,6 +356,12 @@ export default function PostGameSummaryScreen() {
           style={styles.scroll}
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
+          onLayout={(e) => {
+            const layoutWidth = e.nativeEvent.layout.width;
+            if (layoutWidth > 0) {
+              setContainerWidth(layoutWidth - 40);
+            }
+          }}
         >
           <ThemedText style={styles.pageTitle} numberOfLines={2}>Post-Game Summary</ThemedText>
           {opponentName ? (

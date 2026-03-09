@@ -94,6 +94,11 @@ export default function RecordDetailsScreen() {
 
   const handleCancel = () => {
     if (opponent || matchType) {
+      if (Platform.OS === 'web') {
+        const confirmed = window.confirm('Discard game details? Your inputs will be cleared.');
+        if (confirmed) router.back();
+        return;
+      }
       Alert.alert('Discard game details?', 'Your inputs will be cleared.', [
         { text: 'Keep Editing', style: 'cancel' },
         { text: 'Discard', style: 'destructive', onPress: () => router.back() },

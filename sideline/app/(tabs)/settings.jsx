@@ -11,7 +11,7 @@ import { useTheme } from '@/contexts/ThemeContext';
 import { supabase } from '@/lib/supabase';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Alert, Platform, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 
 export default function SettingsScreen() {
@@ -27,13 +27,17 @@ export default function SettingsScreen() {
   const [showChangePasswordModal, setShowChangePasswordModal] = useState(false);
   const [showSportModal, setShowSportModal] = useState(false);
   const [savingSport, setSavingSport] = useState(false);
+  const prevPictureUrl = useRef(profile?.profile_picture_url || null);
+  const cacheBusterRef = useRef(Date.now());
 
-  // Always show the latest profile picture from context (with cache buster so image reloads)
   useEffect(() => {
     if (profile?.profile_picture_url) {
+      if (profile.profile_picture_url !== prevPictureUrl.current) {
+        cacheBusterRef.current = Date.now();
+        prevPictureUrl.current = profile.profile_picture_url;
+      }
       const separator = profile.profile_picture_url.includes('?') ? '&' : '?';
-      const cacheBuster = `${separator}t=${Date.now()}`;
-      setProfileImageUri(profile.profile_picture_url + cacheBuster);
+      setProfileImageUri(profile.profile_picture_url + `${separator}t=${cacheBusterRef.current}`);
       setImageError(false);
     } else {
       setProfileImageUri(null);
@@ -186,37 +190,9 @@ export default function SettingsScreen() {
                   key={profileImageUri}
                   source={{ uri: profileImageUri }}
                   style={styles.profilePicture}
-                  onLoadStart={() => {
-                    console.log('🔄 Starting to load profile picture (React Native Image)...');
-                    console.log('📍 URI:', profileImageUri);
-                  }}
-                  onLoad={() => {
-                    console.log('✅ Profile picture loaded successfully!');
-                    console.log('📍 Loaded URI:', profileImageUri);
-                    setImageError(false);
-                  }}
-                  onError={(event) => {
-                    console.log('❌ React Native Image failed, error:', event.nativeEvent.error);
-                    console.log('📍 Image URI:', profileImageUri);
-                    console.log('🧪 Testing URL accessibility...');
-                    
-                    // Test if URL is accessible
-                    fetch(profileImageUri.split('?')[0], { method: 'HEAD' })
-                      .then(response => {
-                        console.log('📡 URL test response status:', response.status);
-                        console.log('📡 Response headers:', JSON.stringify(Object.fromEntries(response.headers.entries())));
-                        if (response.ok) {
-                          console.log('✅ URL is accessible via fetch');
-                        } else {
-                          console.log('❌ URL returned error status:', response.status);
-                        }
-                      })
-                      .catch(err => {
-                        console.log('❌ Failed to test URL:', err);
-                      });
-                    
-                    setImageError(true);
-                  }}
+                  cachePolicy="memory-disk"
+                  onLoad={() => setImageError(false)}
+                  onError={() => setImageError(true)}
                 />
               ) : (
                   <View style={[styles.profilePicturePlaceholder, {
@@ -401,11 +377,10 @@ export default function SettingsScreen() {
           currentProfilePicture={profileImageUri}
           onSave={handleModalSave}
           onImageUploaded={(imageUrl) => {
-            // Immediately update the image URI when uploaded
-            console.log('📥 Received new image URL from modal:', imageUrl);
+            cacheBusterRef.current = Date.now();
+            prevPictureUrl.current = imageUrl;
             const separator = imageUrl.includes('?') ? '&' : '?';
-            const cacheBuster = `${separator}t=${Date.now()}`;
-            setProfileImageUri(imageUrl + cacheBuster);
+            setProfileImageUri(imageUrl + `${separator}t=${cacheBusterRef.current}`);
             setImageError(false);
           }}
         />

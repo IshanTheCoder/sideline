@@ -17,12 +17,12 @@ export default function TabLayout() {
         tabBarActiveTintColor: colors.tint,
         headerShown: false,
         tabBarButton: HapticTab,
+        tabBarShowLabel: false,
         tabBarStyle: Platform.OS === 'web' ? {
           backgroundColor: colorScheme === 'dark' ? '#0D0D0D' : '#FAFAFA',
           borderTopWidth: 1,
           borderTopColor: colorScheme === 'dark' ? '#2A2A2A' : '#E8E8E8',
         } : undefined,
-        tabBarLabelStyle: Platform.OS === 'web' ? { fontSize: 12, fontWeight: '600' } : undefined,
       }}>
       {/* Home tab - Main navigation hub */}
       <Tabs.Screen
@@ -48,10 +48,10 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="review/index"
+        name="review"
         options={{
           title: 'Recordings',
-          href: null, // Hide from tab bar
+          href: null,
         }}
       />
       <Tabs.Screen

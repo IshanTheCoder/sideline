@@ -141,8 +141,32 @@ export default function RecordingDetailScreen() {
     return () => { cancelled = true; };
   }, [recording?.id, recording?.transcription, recording?.ai_labels, recording?.game_session_id, user?.id, recordingId]);
 
+  const executeDelete = async () => {
+    setDeleting(true);
+    const { error: deleteError } = await deleteRecordingForUser(
+      user.id,
+      recordingId,
+      recording.audio_url
+    );
+    setDeleting(false);
+
+    if (deleteError) {
+      if (Platform.OS === 'web') window.alert('Delete failed: ' + deleteError.message);
+      else Alert.alert('Delete failed', deleteError.message);
+      return;
+    }
+
+    router.replace('/(tabs)/review');
+  };
+
   const handleDelete = () => {
     if (!user?.id || !recordingId || !recording) return;
+
+    if (Platform.OS === 'web') {
+      const confirmed = window.confirm('Delete recording? This will permanently remove this recording.');
+      if (confirmed) executeDelete();
+      return;
+    }
 
     Alert.alert(
       'Delete recording?',
@@ -152,22 +176,7 @@ export default function RecordingDetailScreen() {
         {
           text: 'Delete',
           style: 'destructive',
-          onPress: async () => {
-            setDeleting(true);
-            const { error: deleteError } = await deleteRecordingForUser(
-              user.id,
-              recordingId,
-              recording.audio_url
-            );
-            setDeleting(false);
-
-            if (deleteError) {
-              Alert.alert('Delete failed', deleteError.message);
-              return;
-            }
-
-            router.replace('/(tabs)/review');
-          },
+          onPress: executeDelete,
         },
       ]
     );
@@ -251,7 +260,6 @@ export default function RecordingDetailScreen() {
             size={28}
             color={Colors[colorScheme ?? 'light'].text}
           />
-          <ThemedText style={styles.backText}>Back</ThemedText>
         </TouchableOpacity>
         <TouchableOpacity
           style={styles.deleteAction}

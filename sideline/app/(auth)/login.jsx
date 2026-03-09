@@ -175,9 +175,7 @@ export default function LoginScreen() {
       console.log('✅ Password reset email sent');
       
       if (Platform.OS === 'web') {
-        window.alert(
-          `Password reset email sent!\n\nCheck your email (${email}) for a link to reset your password.`
-        );
+        window.alert(`Password reset email sent! Check your email (${email}) for a link to reset your password.`);
       } else {
         Alert.alert(
           'Email Sent',

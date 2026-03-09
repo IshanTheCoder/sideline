@@ -370,25 +370,66 @@ export default function RecordScreen() {
       await stopRecording();
     } else {
       if (!activeSession) {
-        Alert.alert(
-          'Add game details',
-          'Please add opponent, date, and match type before recording.',
-          [
-            { text: 'Cancel', style: 'cancel' },
-            {
-              text: 'Set Details',
-              onPress: () => router.push('/(tabs)/record-details'),
-            },
-          ]
-        );
+        if (Platform.OS === 'web') {
+          const confirmed = window.confirm('Please add opponent, date, and match type before recording. Go to Set Details?');
+          if (confirmed) router.push('/(tabs)/record-details');
+        } else {
+          Alert.alert(
+            'Add game details',
+            'Please add opponent, date, and match type before recording.',
+            [
+              { text: 'Cancel', style: 'cancel' },
+              {
+                text: 'Set Details',
+                onPress: () => router.push('/(tabs)/record-details'),
+              },
+            ]
+          );
+        }
         return;
       }
       await startRecording();
     }
   };
 
+  const endGameAndNavigate = async () => {
+    if (isRecording) {
+      await stopRecording();
+    }
+    
+    if (activeSession?.id && user?.id) {
+      setTimeout(() => {
+        generateLabelsForGameSession(activeSession.id, user.id)
+          .then((result) => {
+            if (result.success && result.processedCount > 0) {
+              if (Platform.OS !== 'web') {
+                Alert.alert(
+                  'Labels Generated',
+                  `Successfully generated labels for ${result.processedCount} recording${result.processedCount !== 1 ? 's' : ''}!`,
+                  [{ text: 'OK' }]
+                );
+              }
+            }
+          })
+          .catch(() => {});
+      }, 10000);
+    }
+    
+    resetSessionDetails();
+    router.push('/(tabs)/review');
+  };
+
   const handleDonePress = () => {
     if (isLoading) return;
+
+    if (Platform.OS === 'web') {
+      const confirmed = window.confirm('End game recordings? You will not be able to record anymore for this game.');
+      if (confirmed) {
+        endGameAndNavigate();
+      }
+      return;
+    }
+
     Alert.alert(
       'End game recordings?',
       'You will not be able to record anymore for this game.',
@@ -397,48 +438,7 @@ export default function RecordScreen() {
         {
           text: 'End Game',
           style: 'destructive',
-          onPress: async () => {
-            if (isRecording) {
-              await stopRecording();
-            }
-            
-            // Generate labels for all recordings in this game session
-            if (activeSession?.id && user?.id) {
-              console.log('🏷️  Starting batch label generation for game session...');
-              Alert.alert(
-                'Processing Recordings',
-                'Waiting for transcriptions to complete, then generating AI labels...',
-                [{ text: 'OK' }]
-              );
-              
-              // Wait 10 seconds for any in-progress transcriptions to complete
-              // before starting label generation
-              setTimeout(() => {
-                console.log('🏷️  Starting label generation after delay...');
-                generateLabelsForGameSession(activeSession.id, user.id)
-                  .then((result) => {
-                    if (result.success) {
-                      console.log(`✅ Label generation complete! Processed: ${result.processedCount}, Failed: ${result.failedCount}`);
-                      if (result.processedCount > 0) {
-                        Alert.alert(
-                          'Labels Generated',
-                          `Successfully generated labels for ${result.processedCount} recording${result.processedCount !== 1 ? 's' : ''}!`,
-                          [{ text: 'OK' }]
-                        );
-                      }
-                    } else {
-                      console.error('❌ Batch label generation failed:', result.error);
-                    }
-                  })
-                  .catch((error) => {
-                    console.error('❌ Unexpected error during batch label generation:', error);
-                  });
-              }, 10000); // Wait 10 seconds
-            }
-            
-            resetSessionDetails();
-            router.push('/(tabs)/review');
-          },
+          onPress: endGameAndNavigate,
         },
       ]
     );

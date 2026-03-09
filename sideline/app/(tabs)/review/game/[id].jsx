@@ -393,8 +393,35 @@ export default function GameRecordingsScreen() {
   };
 
 
+  const executeDeleteRecording = async (recording) => {
+    if (playingRecordingId === recording.id) {
+      await stopAndUnloadAudio();
+      setPlayingRecordingId(null);
+    }
+
+    const { error: deleteError } = await deleteRecordingForUser(
+      user.id,
+      recording.id,
+      recording.audio_url
+    );
+
+    if (deleteError) {
+      if (Platform.OS === 'web') window.alert('Delete failed: ' + deleteError.message);
+      else Alert.alert('Delete failed', deleteError.message);
+      return;
+    }
+
+    setRecordings((prev) => prev.filter((item) => item.id !== recording.id));
+  };
+
   const handleDelete = (recording) => {
     if (!user?.id) return;
+
+    if (Platform.OS === 'web') {
+      const confirmed = window.confirm('Delete recording? This will permanently remove the audio file and its notes.');
+      if (confirmed) executeDeleteRecording(recording);
+      return;
+    }
 
     Alert.alert(
       'Delete recording?',
@@ -404,26 +431,7 @@ export default function GameRecordingsScreen() {
         {
           text: 'Delete',
           style: 'destructive',
-          onPress: async () => {
-            // Stop audio if this recording is playing
-            if (playingRecordingId === recording.id) {
-              await stopAndUnloadAudio();
-              setPlayingRecordingId(null);
-            }
-
-            const { error: deleteError } = await deleteRecordingForUser(
-              user.id,
-              recording.id,
-              recording.audio_url
-            );
-
-            if (deleteError) {
-              Alert.alert('Delete failed', deleteError.message);
-              return;
-            }
-
-            setRecordings((prev) => prev.filter((item) => item.id !== recording.id));
-          },
+          onPress: () => executeDeleteRecording(recording),
         },
       ]
     );
@@ -841,7 +849,6 @@ export default function GameRecordingsScreen() {
             size={28}
             color={Colors[colorScheme ?? 'light'].text}
           />
-          <ThemedText style={styles.backText}>Back</ThemedText>
         </TouchableOpacity>
         <ThemedText type="title" style={styles.title} numberOfLines={1}>
           {headerTitle}

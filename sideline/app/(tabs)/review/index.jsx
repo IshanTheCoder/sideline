@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   Alert,
   FlatList,
+  Platform,
   StyleSheet,
   TouchableOpacity,
   View,
@@ -120,8 +121,30 @@ export default function ReviewScreen() {
     return Array.from(map.values());
   }, [recordings]);
 
+  const executeDeleteGame = async (gameId) => {
+    const { error: deleteError } = await deleteGameForUser(user.id, gameId);
+    if (deleteError) {
+      if (Platform.OS === 'web') window.alert('Delete failed: ' + deleteError.message);
+      else Alert.alert('Delete failed', deleteError.message);
+      return;
+    }
+    setRecordings((prev) =>
+      prev.filter((rec) =>
+        gameId === 'unassigned'
+          ? rec.game_session_id !== null
+          : rec.game_session_id !== gameId
+      )
+    );
+  };
+
   const handleDeleteGame = (gameId) => {
     if (!user?.id) return;
+
+    if (Platform.OS === 'web') {
+      const confirmed = window.confirm('Delete game? This will permanently remove all recordings for this game.');
+      if (confirmed) executeDeleteGame(gameId);
+      return;
+    }
 
     Alert.alert(
       'Delete game?',
@@ -131,21 +154,7 @@ export default function ReviewScreen() {
         {
           text: 'Delete',
           style: 'destructive',
-          onPress: async () => {
-            const { error: deleteError } = await deleteGameForUser(user.id, gameId);
-            if (deleteError) {
-              Alert.alert('Delete failed', deleteError.message);
-              return;
-            }
-
-            setRecordings((prev) =>
-              prev.filter((rec) =>
-                gameId === 'unassigned'
-                  ? rec.game_session_id !== null
-                  : rec.game_session_id !== gameId
-              )
-            );
-          },
+          onPress: () => executeDeleteGame(gameId),
         },
       ]
     );
@@ -220,7 +229,6 @@ export default function ReviewScreen() {
             size={28}
             color={Colors[colorScheme ?? 'light'].text}
           />
-          <ThemedText style={styles.backText}>Back</ThemedText>
         </TouchableOpacity>
         <ThemedText type="title" style={styles.title}>
           {titleText}

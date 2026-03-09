@@ -11,7 +11,6 @@ import {
   StyleSheet,
   TextInput,
   TouchableOpacity,
-  TouchableWithoutFeedback,
   View,
 } from 'react-native';
 import { useRouter } from 'expo-router';
@@ -90,17 +89,25 @@ export default function RosterScreen() {
     setModalVisible(true);
   };
 
+  const showError = (title, message) => {
+    if (Platform.OS === 'web') {
+      window.alert(`${title}: ${message}`);
+    } else {
+      Alert.alert(title, message);
+    }
+  };
+
   const handleSavePlayer = async () => {
     const name = formName.trim();
     if (!name) {
-      Alert.alert('Name required', 'Please enter a player name.');
+      showError('Name required', 'Please enter a player name.');
       return;
     }
     setSaving(true);
     try {
       const { teamId, error: teamError } = await getTeamIdForUser(user.id);
       if (teamError || !teamId) {
-        Alert.alert('Error', 'Could not load team.');
+        showError('Error', 'Could not load team.');
         setSaving(false);
         return;
       }
@@ -111,7 +118,7 @@ export default function RosterScreen() {
           position: formPosition.trim() || null,
           grade: formGrade.trim() || null,
         });
-        if (updateError) Alert.alert('Error', updateError.message);
+        if (updateError) showError('Error', updateError.message);
         else {
           setModalVisible(false);
           loadRoster();
@@ -123,18 +130,31 @@ export default function RosterScreen() {
           position: formPosition.trim() || undefined,
           grade: formGrade.trim() || undefined,
         });
-        if (insertError) Alert.alert('Error', insertError.message);
+        if (insertError) showError('Error', insertError.message);
         else {
           setModalVisible(false);
           loadRoster();
         }
       }
+    } catch (e) {
+      showError('Error', e.message || 'An unexpected error occurred.');
     } finally {
       setSaving(false);
     }
   };
 
   const handleDelete = (p) => {
+    if (Platform.OS === 'web') {
+      const confirmed = window.confirm(`Remove ${p.name} from the roster?`);
+      if (confirmed) {
+        deletePlayer(p.id).then(({ error: delError }) => {
+          if (delError) showError('Error', delError.message);
+          else loadRoster();
+        });
+      }
+      return;
+    }
+
     Alert.alert(
       'Remove player?',
       `Remove ${p.name} from the roster?`,
@@ -267,17 +287,15 @@ export default function RosterScreen() {
               setModalVisible(false);
             }}
           />
-          <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-            <View
-              style={[styles.modalContent, { backgroundColor: isDark ? '#1A1A1A' : '#FFF' }]}
-              onStartShouldSetResponder={() => true}
+          <View
+            style={[styles.modalContent, { backgroundColor: isDark ? '#1A1A1A' : '#FFF' }]}
+          >
+            <ScrollView
+              keyboardShouldPersistTaps="handled"
+              keyboardDismissMode="on-drag"
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={styles.modalScrollContent}
             >
-              <ScrollView
-                keyboardShouldPersistTaps="handled"
-                keyboardDismissMode="on-drag"
-                showsVerticalScrollIndicator={false}
-                contentContainerStyle={styles.modalScrollContent}
-              >
                 <ThemedText style={styles.modalTitle}>{editingPlayer ? 'Edit player' : 'Add player'}</ThemedText>
                 <TextInput
                   style={[styles.input, { color: Colors[colorScheme ?? 'light'].text, borderColor: isDark ? '#444' : '#DDD' }]}
@@ -328,9 +346,8 @@ export default function RosterScreen() {
                     {saving ? <ActivityIndicator size="small" color="#FFF" /> : <ThemedText style={styles.saveButtonText}>Save</ThemedText>}
                   </TouchableOpacity>
                 </View>
-              </ScrollView>
-            </View>
-          </TouchableWithoutFeedback>
+            </ScrollView>
+          </View>
         </KeyboardAvoidingView>
       </Modal>
     </ThemedView>
