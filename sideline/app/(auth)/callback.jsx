@@ -1,9 +1,11 @@
 import React, { useEffect } from 'react';
 import { View, StyleSheet, ActivityIndicator, Platform } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { supabase } from '@/lib/supabase';
+import { GOOGLE_SHEETS_FLOW_KEY, GOOGLE_SHEETS_PENDING_TOKEN_KEY } from '@/lib/googleSheets';
 
 export default function CallbackScreen() {
   const router = useRouter();
@@ -86,7 +88,6 @@ export default function CallbackScreen() {
         }
 
         if (accessToken && refreshToken) {
-          // Set the session in Supabase
           const { data, error: sessionError } = await supabase.auth.setSession({
             access_token: accessToken,
             refresh_token: refreshToken,
@@ -101,8 +102,20 @@ export default function CallbackScreen() {
             return;
           }
 
+          const isSheetsFlow = await AsyncStorage.getItem(GOOGLE_SHEETS_FLOW_KEY);
+          if (isSheetsFlow === '1') {
+            await AsyncStorage.removeItem(GOOGLE_SHEETS_FLOW_KEY);
+            const { data: { session } } = await supabase.auth.getSession();
+            const providerToken =
+              session?.provider_token ?? session?.user?.user_metadata?.provider_token;
+            if (providerToken) {
+              await AsyncStorage.setItem(GOOGLE_SHEETS_PENDING_TOKEN_KEY, providerToken);
+              router.replace('/(tabs)/roster?sheets_ready=1');
+              return;
+            }
+          }
+
           console.log('✅ Session established for user:', data?.user?.email);
-          // AuthContext will handle navigation
           router.replace('/(tabs)');
         } else {
           console.error('❌ No tokens found in callback');

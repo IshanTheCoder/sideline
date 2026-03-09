@@ -2,22 +2,28 @@ import { DarkTheme, DefaultTheme, ThemeProvider as NavigationThemeProvider } fro
 import { Slot, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
-import { View, ActivityIndicator, StyleSheet } from 'react-native';
+import { View, ActivityIndicator, StyleSheet, Platform } from 'react-native';
 import 'react-native-reanimated';
 
 import { ThemeProvider, useTheme } from '@/contexts/ThemeContext';
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
 import { ActiveSessionProvider } from '@/contexts/ActiveSessionContext';
+import { useColorScheme } from '@/hooks/use-color-scheme';
+import { Colors } from '@/constants/theme';
 
 export const unstable_settings = {
   initialRouteName: '(tabs)',
 };
 
-// Protected route component that handles navigation based on auth state
+// On web, wrap app in a centered mobile-width column so UI matches mobile
+const WEB_MAX_WIDTH = 440;
+
 function RootLayoutNav() {
   const { user, loading } = useAuth();
   const segments = useSegments();
   const router = useRouter();
+  const colorScheme = useColorScheme();
+  const backgroundColor = Colors[colorScheme ?? 'dark']?.background ?? '#000000';
 
   useEffect(() => {
     if (loading) return;
@@ -45,16 +51,30 @@ function RootLayoutNav() {
 
   // Show loading screen while checking auth state
   if (loading) {
-    return (
-      <View style={[
-        styles.loadingContainer,
-        { backgroundColor: '#000000' }
-      ]}>
+    const loadingView = (
+      <View style={[styles.loadingContainer, { backgroundColor: backgroundColor || '#000000' }]}>
         <ActivityIndicator size="large" color="#5BA3F5" />
       </View>
     );
+    if (Platform.OS === 'web') {
+      return (
+        <View style={[styles.webOuter, { backgroundColor: backgroundColor || '#000000' }]}>
+          <View style={styles.webInner}>{loadingView}</View>
+        </View>
+      );
+    }
+    return loadingView;
   }
 
+  if (Platform.OS === 'web') {
+    return (
+      <View style={[styles.webOuter, { backgroundColor }]}>
+        <View style={styles.webInner}>
+          <Slot />
+        </View>
+      </View>
+    );
+  }
   return <Slot />;
 }
 
@@ -85,5 +105,21 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  webOuter: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: '100vh',
+    width: '100%',
+  },
+  webInner: {
+    width: '100%',
+    maxWidth: WEB_MAX_WIDTH,
+    flex: 1,
+    minHeight: '100vh',
+    ...(Platform.OS === 'web' && {
+      boxShadow: '0 0 0 1px rgba(255,255,255,0.06)',
+    }),
   },
 });

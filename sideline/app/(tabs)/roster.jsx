@@ -2,7 +2,6 @@ import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
-  FlatList,
   Keyboard,
   KeyboardAvoidingView,
   Modal,
@@ -28,11 +27,9 @@ import {
   updatePlayer,
   deletePlayer,
   getTeamIdForUser,
-  importRosterFromSheetRows,
 } from '@/lib/roster';
-import { requestGoogleSheetsAccess, listSpreadsheets, getSheetValues } from '@/lib/googleSheets';
 
-const POSITION_OPTIONS = ['', 'Setter', 'Outside Hitter', 'Middle Blocker', 'Opposite', 'Libero', 'Defensive Specialist', 'Entire Team'];
+const POSITION_OPTIONS = ['', 'Setter', 'Outside Hitter', 'Middle Blocker', 'Opposite', 'Libero', 'Defensive Specialist'];
 
 export default function RosterScreen() {
   const router = useRouter();
@@ -42,17 +39,12 @@ export default function RosterScreen() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [modalVisible, setModalVisible] = useState(false);
-  const [importModalVisible, setImportModalVisible] = useState(false);
   const [editingPlayer, setEditingPlayer] = useState(null);
   const [formName, setFormName] = useState('');
   const [formNumber, setFormNumber] = useState('');
   const [formPosition, setFormPosition] = useState('');
   const [formGrade, setFormGrade] = useState('');
   const [saving, setSaving] = useState(false);
-  const [importing, setImporting] = useState(false);
-  const [importStep, setImportStep] = useState('connect'); // 'connect' | 'list' | 'importing'
-  const [googleAccessToken, setGoogleAccessToken] = useState(null);
-  const [sheetsList, setSheetsList] = useState([]);
 
   const loadRoster = useCallback(async () => {
     if (!user?.id) {
@@ -161,92 +153,12 @@ export default function RosterScreen() {
     );
   };
 
-  const openImportModal = () => {
-    setImportStep('connect');
-    setGoogleAccessToken(null);
-    setSheetsList([]);
-    setImportModalVisible(true);
-  };
-
-  const handleConnectGoogle = async () => {
-    setImporting(true);
-    try {
-      const { accessToken, error } = await requestGoogleSheetsAccess();
-      if (error) {
-        Alert.alert('Error', error.message || 'Could not connect to Google.');
-        return;
-      }
-      setGoogleAccessToken(accessToken);
-      const { files, error: listError } = await listSpreadsheets(accessToken);
-      if (listError || !files.length) {
-        Alert.alert('No sheets', listError?.message || 'No spreadsheets found in your Google Drive.');
-        return;
-      }
-      setSheetsList(files);
-      setImportStep('list');
-    } finally {
-      setImporting(false);
-    }
-  };
-
-  const handlePickSheet = async (spreadsheetId) => {
-    if (!user?.id || !googleAccessToken) return;
-    const { teamId, error: teamError } = await getTeamIdForUser(user.id);
-    if (teamError || !teamId) {
-      Alert.alert('Error', 'Could not load team.');
-      return;
-    }
-    setImportStep('importing');
-    setImporting(true);
-    try {
-      const { values, error: sheetError } = await getSheetValues(googleAccessToken, spreadsheetId);
-      if (sheetError || !values.length) {
-        Alert.alert('Error', sheetError?.message || 'Could not read sheet. Ensure it has columns: Name, Number, Position, Grade.');
-        setImportStep('list');
-        return;
-      }
-      const { added, errors } = await importRosterFromSheetRows(teamId, values);
-      setImportModalVisible(false);
-      setImportStep('connect');
-      setGoogleAccessToken(null);
-      setSheetsList([]);
-      loadRoster();
-      if (errors.length > 0) {
-        Alert.alert('Import done', `Added ${added} player(s). Some rows had errors: ${errors.slice(0, 3).join('; ')}${errors.length > 3 ? '...' : ''}`);
-      } else {
-        Alert.alert('Import complete', `Added ${added} player(s) to your roster.`);
-      }
-    } finally {
-      setImporting(false);
-      setImportStep('list');
-    }
-  };
-
-  const renderPlayer = ({ item }) => (
-    <View
-      style={[
-        styles.playerRow,
-        { backgroundColor: colorScheme === 'dark' ? '#2A2A2A' : '#F5F5F5', borderColor: colorScheme === 'dark' ? '#3A3A3A' : '#E5E5E5' },
-      ]}
-    >
-      <View style={styles.playerInfo}>
-        <ThemedText style={styles.playerName}>{item.name}</ThemedText>
-        <View style={styles.playerMeta}>
-          {item.number ? <ThemedText style={styles.playerMetaText}>#{item.number}</ThemedText> : null}
-          {item.position ? <ThemedText style={styles.playerMetaText}> · {item.position}</ThemedText> : null}
-          {item.grade ? <ThemedText style={styles.playerMetaText}> · {item.grade}</ThemedText> : null}
-        </View>
-      </View>
-      <View style={styles.playerActions}>
-        <TouchableOpacity onPress={() => openEdit(item)} hitSlop={8} style={styles.iconBtn}>
-          <IconSymbol name="pencil" size={20} color={Colors[colorScheme ?? 'light'].tint} />
-        </TouchableOpacity>
-        <TouchableOpacity onPress={() => handleDelete(item)} hitSlop={8} style={styles.iconBtn}>
-          <IconSymbol name="trash" size={20} color={colorScheme === 'dark' ? '#FF6B6B' : '#D32F2F'} />
-        </TouchableOpacity>
-      </View>
-    </View>
-  );
+  const tint = Colors[colorScheme ?? 'light'].tint;
+  const isDark = colorScheme === 'dark';
+  const tableBg = isDark ? '#1E1E1E' : '#FFF';
+  const headerBg = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)';
+  const rowBg = (i) => (i % 2 === 0 ? (isDark ? '#252525' : '#FAFAFA') : (isDark ? '#1E1E1E' : '#FFF'));
+  const borderColor = isDark ? '#333' : '#E8E8E8';
 
   return (
     <ThemedView style={styles.container}>
@@ -263,30 +175,18 @@ export default function RosterScreen() {
         Add players so transcriptions and AI summaries use correct names
       </ThemedText>
 
-      <View style={styles.toolbar}>
-        <TouchableOpacity
-          style={[styles.primaryButton, { backgroundColor: Colors[colorScheme ?? 'light'].tint }]}
-          onPress={openAdd}
-          activeOpacity={0.7}
-        >
-          <IconSymbol name="plus" size={20} color="#FFF" />
-          <ThemedText style={styles.primaryButtonText}>Add player</ThemedText>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.secondaryButton, { borderColor: Colors[colorScheme ?? 'light'].tint }]}
-          onPress={openImportModal}
-          activeOpacity={0.7}
-        >
-          <IconSymbol name="doc.text" size={20} color={Colors[colorScheme ?? 'light'].tint} />
-          <ThemedText style={[styles.secondaryButtonText, { color: Colors[colorScheme ?? 'light'].tint }]}>
-            Import from Google Sheets
-          </ThemedText>
-        </TouchableOpacity>
-      </View>
+      <TouchableOpacity
+        style={[styles.addButton, { backgroundColor: tint }]}
+        onPress={openAdd}
+        activeOpacity={0.8}
+      >
+        <IconSymbol name="plus" size={22} color="#FFF" />
+        <ThemedText style={styles.addButtonText}>Add player</ThemedText>
+      </TouchableOpacity>
 
       {loading && (
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={Colors[colorScheme ?? 'light'].tint} />
+          <ActivityIndicator size="large" color={tint} />
           <ThemedText style={styles.loadingText}>Loading roster...</ThemedText>
         </View>
       )}
@@ -295,32 +195,64 @@ export default function RosterScreen() {
         <View style={styles.errorContainer}>
           <ThemedText style={styles.errorText}>{error}</ThemedText>
           <TouchableOpacity style={styles.retryButton} onPress={loadRoster}>
-            <ThemedText style={[styles.retryButtonText, { color: Colors[colorScheme ?? 'light'].tint }]}>Retry</ThemedText>
+            <ThemedText style={[styles.retryButtonText, { color: tint }]}>Retry</ThemedText>
           </TouchableOpacity>
         </View>
       )}
 
       {!loading && !error && players.length === 0 && (
         <View style={styles.emptyContainer}>
-          <IconSymbol name="person.2" size={48} color={colorScheme === 'dark' ? '#666' : '#999'} />
+          <View style={[styles.emptyIconWrap, { backgroundColor: isDark ? '#2A2A2A' : '#F0F0F0' }]}>
+            <IconSymbol name="person.2" size={40} color={isDark ? '#666' : '#999'} />
+          </View>
           <ThemedText style={styles.emptyTitle}>No players yet</ThemedText>
           <ThemedText style={styles.emptySubtitle}>
-            Add players manually or import from a Google Sheet (Name, Number, Position, Grade).
+            Tap “Add player” to build your roster. Names are used in transcriptions and AI summaries.
           </ThemedText>
         </View>
       )}
 
       {!loading && !error && players.length > 0 && (
-        <FlatList
-          data={players}
-          renderItem={renderPlayer}
-          keyExtractor={(item) => item.id}
-          contentContainerStyle={styles.listContent}
-          ItemSeparatorComponent={() => <View style={styles.separator} />}
-        />
+        <View style={[styles.tableWrap, { backgroundColor: tableBg, borderColor }]}>
+          <View style={[styles.tableHeader, { backgroundColor: headerBg, borderBottomColor: borderColor }]}>
+            <ThemedText style={[styles.thName, styles.th]} numberOfLines={1}>Name</ThemedText>
+            <ThemedText style={[styles.thNum, styles.th]} numberOfLines={1}>#</ThemedText>
+            <ThemedText style={[styles.thPos, styles.th]} numberOfLines={1}>Position</ThemedText>
+            <ThemedText style={[styles.thGrade, styles.th]} numberOfLines={1}>Grade</ThemedText>
+            <View style={styles.thActions} />
+          </View>
+          <ScrollView
+            style={styles.tableBody}
+            showsVerticalScrollIndicator={true}
+            contentContainerStyle={styles.tableBodyContent}
+          >
+            {players.map((p, i) => (
+              <View
+                key={p.id}
+                style={[
+                  styles.tableRow,
+                  { backgroundColor: rowBg(i), borderBottomColor: borderColor },
+                  i === players.length - 1 && styles.tableRowLast,
+                ]}
+              >
+                <ThemedText style={styles.tdName} numberOfLines={1}>{p.name || '—'}</ThemedText>
+                <ThemedText style={styles.tdNum} numberOfLines={1}>{p.number || '—'}</ThemedText>
+                <ThemedText style={styles.tdPos} numberOfLines={1}>{p.position || '—'}</ThemedText>
+                <ThemedText style={styles.tdGrade} numberOfLines={1}>{p.grade || '—'}</ThemedText>
+                <View style={styles.tdActions}>
+                  <TouchableOpacity onPress={() => openEdit(p)} hitSlop={8} style={styles.actionBtn}>
+                    <IconSymbol name="pencil" size={18} color={tint} />
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={() => handleDelete(p)} hitSlop={8} style={styles.actionBtn}>
+                    <IconSymbol name="trash" size={18} color={isDark ? '#FF7B7B' : '#D32F2F'} />
+                  </TouchableOpacity>
+                </View>
+              </View>
+            ))}
+          </ScrollView>
+        </View>
       )}
 
-      {/* Add/Edit modal */}
       <Modal visible={modalVisible} animationType="slide" transparent statusBarTranslucent>
         <KeyboardAvoidingView
           style={styles.modalOverlay}
@@ -337,7 +269,7 @@ export default function RosterScreen() {
           />
           <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
             <View
-              style={[styles.modalContent, styles.modalContentKeyboard, { backgroundColor: colorScheme === 'dark' ? '#1A1A1A' : '#FFF' }]}
+              style={[styles.modalContent, { backgroundColor: isDark ? '#1A1A1A' : '#FFF' }]}
               onStartShouldSetResponder={() => true}
             >
               <ScrollView
@@ -348,7 +280,7 @@ export default function RosterScreen() {
               >
                 <ThemedText style={styles.modalTitle}>{editingPlayer ? 'Edit player' : 'Add player'}</ThemedText>
                 <TextInput
-                  style={[styles.input, { color: Colors[colorScheme ?? 'light'].text, borderColor: colorScheme === 'dark' ? '#444' : '#DDD' }]}
+                  style={[styles.input, { color: Colors[colorScheme ?? 'light'].text, borderColor: isDark ? '#444' : '#DDD' }]}
                   placeholder="Name *"
                   placeholderTextColor="#999"
                   value={formName}
@@ -356,7 +288,7 @@ export default function RosterScreen() {
                   autoCapitalize="words"
                 />
                 <TextInput
-                  style={[styles.input, { color: Colors[colorScheme ?? 'light'].text, borderColor: colorScheme === 'dark' ? '#444' : '#DDD' }]}
+                  style={[styles.input, { color: Colors[colorScheme ?? 'light'].text, borderColor: isDark ? '#444' : '#DDD' }]}
                   placeholder="Number"
                   placeholderTextColor="#999"
                   value={formNumber}
@@ -368,7 +300,7 @@ export default function RosterScreen() {
                   {POSITION_OPTIONS.map((pos) => (
                     <TouchableOpacity
                       key={pos || '_none'}
-                      style={[styles.positionChip, formPosition === pos && { backgroundColor: Colors[colorScheme ?? 'light'].tint }]}
+                      style={[styles.positionChip, formPosition === pos && { backgroundColor: tint }]}
                       onPress={() => setFormPosition(pos)}
                     >
                       <ThemedText style={[styles.positionChipText, formPosition === pos && { color: '#FFF' }]}>
@@ -378,7 +310,7 @@ export default function RosterScreen() {
                   ))}
                 </ScrollView>
                 <TextInput
-                  style={[styles.input, { color: Colors[colorScheme ?? 'light'].text, borderColor: colorScheme === 'dark' ? '#444' : '#DDD' }]}
+                  style={[styles.input, { color: Colors[colorScheme ?? 'light'].text, borderColor: isDark ? '#444' : '#DDD' }]}
                   placeholder="Grade"
                   placeholderTextColor="#999"
                   value={formGrade}
@@ -389,7 +321,7 @@ export default function RosterScreen() {
                     <ThemedText style={styles.cancelButtonText}>Cancel</ThemedText>
                   </TouchableOpacity>
                   <TouchableOpacity
-                    style={[styles.saveButton, { backgroundColor: Colors[colorScheme ?? 'light'].tint }]}
+                    style={[styles.saveButton, { backgroundColor: tint }]}
                     onPress={handleSavePlayer}
                     disabled={saving}
                   >
@@ -401,62 +333,6 @@ export default function RosterScreen() {
           </TouchableWithoutFeedback>
         </KeyboardAvoidingView>
       </Modal>
-
-      {/* Import from Google Sheets modal */}
-      <Modal visible={importModalVisible} animationType="slide" transparent>
-        <View style={styles.modalOverlay}>
-          <View
-            style={[styles.importModalContent, { backgroundColor: colorScheme === 'dark' ? '#1A1A1A' : '#FFF' }]}
-          >
-            <ThemedText style={styles.modalTitle}>Import from Google Sheets</ThemedText>
-            {importStep === 'connect' && (
-              <>
-                <ThemedText style={styles.importHint}>
-                  Sign in with Google to choose a spreadsheet from your Drive. The sheet should have columns: Name, Number, Position, Grade (first row can be a header).
-                </ThemedText>
-                <View style={styles.modalActions}>
-                  <TouchableOpacity style={styles.cancelButton} onPress={() => setImportModalVisible(false)}>
-                    <ThemedText style={styles.cancelButtonText}>Cancel</ThemedText>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[styles.saveButton, { backgroundColor: Colors[colorScheme ?? 'light'].tint }]}
-                    onPress={handleConnectGoogle}
-                    disabled={importing}
-                  >
-                    {importing ? <ActivityIndicator size="small" color="#FFF" /> : <ThemedText style={styles.saveButtonText}>Sign in with Google</ThemedText>}
-                  </TouchableOpacity>
-                </View>
-              </>
-            )}
-            {importStep === 'list' && (
-              <>
-                <ThemedText style={styles.importHint}>Choose a spreadsheet to import (Name, Number, Position, Grade):</ThemedText>
-                <ScrollView style={styles.sheetListScroll} keyboardShouldPersistTaps="handled">
-                  {sheetsList.map((sheet) => (
-                    <TouchableOpacity
-                      key={sheet.id}
-                      style={[styles.sheetListItem, { backgroundColor: colorScheme === 'dark' ? '#2A2A2A' : '#F5F5F5' }]}
-                      onPress={() => handlePickSheet(sheet.id)}
-                      disabled={importing}
-                    >
-                      <ThemedText style={styles.sheetListItemText} numberOfLines={1}>{sheet.name}</ThemedText>
-                    </TouchableOpacity>
-                  ))}
-                </ScrollView>
-                <TouchableOpacity style={styles.cancelButton} onPress={() => setImportModalVisible(false)}>
-                  <ThemedText style={styles.cancelButtonText}>Cancel</ThemedText>
-                </TouchableOpacity>
-              </>
-            )}
-            {importStep === 'importing' && (
-              <View style={styles.importingRow}>
-                <ActivityIndicator size="small" color={Colors[colorScheme ?? 'light'].tint} />
-                <ThemedText style={styles.importingText}>Importing roster…</ThemedText>
-              </View>
-            )}
-          </View>
-        </View>
-      </Modal>
     </ThemedView>
   );
 }
@@ -464,7 +340,7 @@ export default function RosterScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    paddingTop: Platform.OS === 'ios' ? 56 : 40,
+    paddingTop: Platform.OS === 'ios' ? 56 : Platform.OS === 'web' ? 24 : 40,
   },
   header: {
     flexDirection: 'row',
@@ -473,13 +349,7 @@ const styles = StyleSheet.create({
     paddingBottom: 8,
   },
   backButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  backText: {
-    fontSize: 16,
-    fontWeight: '600',
+    padding: 4,
   },
   title: {
     fontSize: 28,
@@ -489,64 +359,84 @@ const styles = StyleSheet.create({
     fontSize: 14,
     opacity: 0.8,
     paddingHorizontal: 20,
-    paddingBottom: 16,
+    paddingBottom: 12,
   },
-  toolbar: {
-    flexDirection: 'row',
-    gap: 12,
-    paddingHorizontal: 20,
-    paddingBottom: 16,
-  },
-  primaryButton: {
+  addButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 18,
-    borderRadius: 12,
+    justifyContent: 'center',
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    borderRadius: 14,
+    marginHorizontal: 20,
+    marginBottom: 20,
     gap: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
-  primaryButtonText: {
+  addButtonText: {
     color: '#FFF',
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '600',
   },
-  secondaryButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 18,
-    borderRadius: 12,
-    borderWidth: 1.5,
-    gap: 8,
-  },
-  secondaryButtonText: {
-    fontSize: 15,
-    fontWeight: '600',
-  },
-  listContent: {
-    paddingHorizontal: 20,
-    paddingBottom: 40,
-  },
-  separator: {
-    height: 8,
-  },
-  playerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: 16,
-    borderRadius: 12,
+  tableWrap: {
+    flex: 1,
+    marginHorizontal: 20,
+    borderRadius: 16,
     borderWidth: 1,
+    overflow: 'hidden',
+    minHeight: 200,
   },
-  playerInfo: { flex: 1 },
-  playerName: {
-    fontSize: 17,
-    fontWeight: '600',
+  tableHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 14,
+    paddingHorizontal: 12,
+    borderBottomWidth: 1.5,
   },
-  playerMeta: { flexDirection: 'row', marginTop: 4 },
-  playerMetaText: { fontSize: 14, opacity: 0.8 },
-  playerActions: { flexDirection: 'row', gap: 12 },
-  iconBtn: { padding: 4 },
+  th: {
+    fontSize: 12,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.6,
+    opacity: 0.9,
+  },
+  thName: { flex: 2, paddingRight: 8 },
+  thNum: { width: 36, textAlign: 'center' },
+  thPos: { flex: 1.4, paddingRight: 8 },
+  thGrade: { width: 44 },
+  thActions: { width: 72 },
+  tableBody: {
+    flex: 1,
+  },
+  tableBodyContent: {
+    paddingBottom: 24,
+  },
+  tableRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 14,
+    paddingHorizontal: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  tableRowLast: {
+    borderBottomWidth: 0,
+  },
+  tdName: { flex: 2, fontSize: 16, fontWeight: '600', paddingRight: 8 },
+  tdNum: { width: 36, fontSize: 15, textAlign: 'center', opacity: 0.9 },
+  tdPos: { flex: 1.4, fontSize: 14, paddingRight: 8, opacity: 0.9 },
+  tdGrade: { width: 44, fontSize: 14, opacity: 0.9 },
+  tdActions: {
+    width: 72,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    gap: 4,
+  },
+  actionBtn: { padding: 6 },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -567,72 +457,39 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     padding: 40,
-    gap: 12,
+    gap: 16,
+  },
+  emptyIconWrap: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   emptyTitle: { fontSize: 20, fontWeight: '600' },
-  emptySubtitle: { fontSize: 14, opacity: 0.8, textAlign: 'center' },
+  emptySubtitle: { fontSize: 14, opacity: 0.8, textAlign: 'center', lineHeight: 22 },
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.5)',
     justifyContent: 'flex-end',
   },
-  modalOverlayTouchable: {
-    flex: 1,
-  },
+  modalOverlayTouchable: { flex: 1 },
   modalContent: {
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     padding: 24,
     paddingBottom: Platform.OS === 'ios' ? 40 : 24,
-  },
-  modalContentKeyboard: {
     maxHeight: '90%',
   },
-  modalScrollContent: {
-    paddingBottom: 24,
-  },
-  importModalContent: {
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    padding: 24,
-    paddingBottom: Platform.OS === 'ios' ? 40 : 24,
-    maxHeight: '80%',
-  },
+  modalScrollContent: { paddingBottom: 24 },
   modalTitle: {
     fontSize: 22,
     fontWeight: '700',
     marginBottom: 20,
   },
-  importHint: {
-    fontSize: 14,
-    opacity: 0.8,
-    marginBottom: 12,
-  },
-  sheetListScroll: {
-    maxHeight: 280,
-    marginBottom: 16,
-  },
-  sheetListItem: {
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    borderRadius: 10,
-    marginBottom: 8,
-  },
-  sheetListItemText: {
-    fontSize: 16,
-  },
-  importingRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    paddingVertical: 20,
-  },
-  importingText: {
-    fontSize: 16,
-  },
   input: {
     borderWidth: 1,
-    borderRadius: 10,
+    borderRadius: 12,
     paddingHorizontal: 14,
     paddingVertical: 12,
     fontSize: 16,
@@ -644,9 +501,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     opacity: 0.9,
   },
-  positionChipScroll: {
-    marginBottom: 12,
-  },
+  positionChipScroll: { marginBottom: 12 },
   positionChipRow: {
     flexDirection: 'row',
     gap: 8,
@@ -658,20 +513,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     backgroundColor: 'rgba(128,128,128,0.2)',
   },
-  positionChipText: {
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  csvInput: {
-    borderWidth: 1,
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    fontSize: 14,
-    minHeight: 160,
-    textAlignVertical: 'top',
-    marginBottom: 20,
-  },
+  positionChipText: { fontSize: 14, fontWeight: '500' },
   modalActions: {
     flexDirection: 'row',
     justifyContent: 'flex-end',

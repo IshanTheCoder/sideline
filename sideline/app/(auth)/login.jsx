@@ -355,7 +355,7 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     padding: 24,
-    paddingTop: 60,
+    paddingTop: Platform.OS === 'web' ? 32 : 60,
   },
   header: {
     marginBottom: 32,

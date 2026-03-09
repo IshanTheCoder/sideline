@@ -152,7 +152,7 @@ export default function SettingsScreen() {
   return (
     <ThemedView style={styles.container}>
       {/* Header */}
-      <View style={[styles.header, { paddingTop: Platform.OS === 'ios' ? 60 : 40 }]}>
+      <View style={[styles.header, { paddingTop: Platform.OS === 'ios' ? 60 : Platform.OS === 'web' ? 24 : 40 }]}>
         <TouchableOpacity 
           style={styles.backButton}
           onPress={() => router.back()}
