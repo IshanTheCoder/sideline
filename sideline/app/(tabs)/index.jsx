@@ -1,4 +1,5 @@
-import { Platform, StyleSheet, TouchableOpacity, Alert, View, ScrollView, ActivityIndicator } from 'react-native';
+import { Platform, StyleSheet, TouchableOpacity, View, ScrollView, ActivityIndicator } from 'react-native';
+import { showAlert } from '@/lib/alert';
 import { useState, useEffect, useMemo, useCallback } from 'react';
 
 import { ThemedText } from '@/components/themed-text';
@@ -85,7 +86,7 @@ export default function HomeScreen() {
       return;
     }
 
-    Alert.alert(
+    showAlert(
       'Sign Out',
       'Are you sure you want to sign out?',
       [

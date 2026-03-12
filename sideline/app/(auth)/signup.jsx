@@ -7,7 +7,6 @@ import {
   ActivityIndicator,
   ScrollView,
   Platform,
-  Alert,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { ThemedText } from '@/components/themed-text';
@@ -15,6 +14,7 @@ import { ThemedView } from '@/components/themed-view';
 import { SportButtonSelector } from '@/components/SportButtonSelector';
 import { SportSelectionModal } from '@/components/SportSelectionModal';
 import { supabase } from '@/lib/supabase';
+import { showAlert } from '@/lib/alert';
 import { signInWithGoogle } from '@/lib/googleAuth';
 import { Ionicons } from '@expo/vector-icons';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -98,7 +98,7 @@ export default function SignupScreen() {
         if (Platform.OS === 'web') {
           window.alert(`Signup Error: ${authError.message}`);
         } else {
-          Alert.alert('Signup Error', authError.message);
+          showAlert('Signup Error', authError.message);
         }
         setLoading(false);
         return;
@@ -108,7 +108,7 @@ export default function SignupScreen() {
         if (Platform.OS === 'web') {
           window.alert('Error: Failed to create account. Please try again.');
         } else {
-          Alert.alert('Error', 'Failed to create account. Please try again.');
+          showAlert('Error', 'Failed to create account. Please try again.');
         }
         setLoading(false);
         return;
@@ -133,7 +133,7 @@ export default function SignupScreen() {
           window.alert(errorMsg);
           router.push('/(auth)/login');
         } else {
-          Alert.alert(
+          showAlert(
             'Profile Creation Warning',
             errorMsg,
             [
@@ -161,7 +161,7 @@ export default function SignupScreen() {
         setConfirmPassword('');
         router.push('/(auth)/login');
       } else {
-        Alert.alert(
+        showAlert(
           'Success',
           successMsg,
           [
@@ -187,7 +187,7 @@ export default function SignupScreen() {
       if (Platform.OS === 'web') {
         window.alert(`Error: ${errorMsg}`);
       } else {
-        Alert.alert('Error', errorMsg);
+        showAlert('Error', errorMsg);
       }
       setLoading(false);
     }
@@ -198,7 +198,7 @@ export default function SignupScreen() {
     try {
       const { data, error } = await signInWithGoogle();
       if (error) {
-        Alert.alert('Google Sign-In Error', error.message);
+        showAlert('Google Sign-In Error', error.message);
         setLoading(false);
         return;
       }
@@ -210,7 +210,7 @@ export default function SignupScreen() {
         setLoading(false);
       }
     } catch (error) {
-      Alert.alert('Error', error.message || 'An error occurred during Google sign-in');
+      showAlert('Error', error.message || 'An error occurred during Google sign-in');
       setLoading(false);
     }
   };
@@ -230,7 +230,7 @@ export default function SignupScreen() {
       if (selectError && selectError.code !== 'PGRST116') {
         // PGRST116 is the "no rows returned" error, which is expected for new users
         console.error('Profile fetch error:', selectError);
-        Alert.alert('Error', 'Failed to check profile. Please try again.');
+        showAlert('Error', 'Failed to check profile. Please try again.');
         setLoading(false);
         return;
       }
@@ -248,7 +248,7 @@ export default function SignupScreen() {
 
         if (profileError) {
           console.error('Profile creation error:', profileError);
-          Alert.alert(
+          showAlert(
             'Profile Error',
             'Failed to create your profile. Please try again.\n\nError: ' + profileError.message
           );
@@ -264,7 +264,7 @@ export default function SignupScreen() {
 
         if (updateError) {
           console.error('Profile update error:', updateError);
-          Alert.alert(
+          showAlert(
             'Update Error',
             'Failed to update your sport preference. You can change it later in settings.'
           );
@@ -275,7 +275,7 @@ export default function SignupScreen() {
       // No need to manually navigate - the useEffect in _layout.tsx will handle it
     } catch (error) {
       console.error('Sport selection error:', error);
-      Alert.alert(
+      showAlert(
         'Error',
         error.message || 'An unexpected error occurred while completing signup'
       );

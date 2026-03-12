@@ -5,7 +5,6 @@ import {
   Modal,
   TextInput,
   TouchableOpacity,
-  Alert,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -16,6 +15,7 @@ import { IconSymbol } from './ui/icon-symbol';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { supabase } from '@/lib/supabase';
+import { showAlert } from '@/lib/alert';
 
 export default function ChangePasswordModal({
   visible,
@@ -141,9 +141,9 @@ export default function ChangePasswordModal({
         if (error.message.includes('same old password')) {
           setNewPasswordError('New password must be different from current password');
         } else if (error.message.includes('rate limit')) {
-          Alert.alert('Error', 'Too many attempts. Please try again later.');
+          showAlert('Error', 'Too many attempts. Please try again later.');
         } else {
-          Alert.alert('Error', error.message || 'Failed to update password. Please try again.');
+          showAlert('Error', error.message || 'Failed to update password. Please try again.');
         }
         
         setSaving(false);
@@ -153,7 +153,7 @@ export default function ChangePasswordModal({
       // Success
       setSaving(false);
       
-      Alert.alert(
+      showAlert(
         'Password Changed',
         'Your password has been successfully updated.',
         [
@@ -167,7 +167,7 @@ export default function ChangePasswordModal({
       );
     } catch (error) {
       console.log('Unexpected error updating password:', error);
-      Alert.alert('Error', 'An unexpected error occurred. Please try again.');
+      showAlert('Error', 'An unexpected error occurred. Please try again.');
       setSaving(false);
     }
   };

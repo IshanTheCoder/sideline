@@ -7,12 +7,12 @@ import {
   ActivityIndicator,
   ScrollView,
   Platform,
-  Alert,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { supabase } from '@/lib/supabase';
+import { showAlert } from '@/lib/alert';
 import { signInWithGoogle } from '@/lib/googleAuth';
 import { Ionicons } from '@expo/vector-icons';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -36,7 +36,7 @@ export default function LoginScreen() {
       if (Platform.OS === 'web') {
         window.alert(`Authentication Error: ${params.error}`);
       } else {
-        Alert.alert('Authentication Error', params.error);
+        showAlert('Authentication Error', params.error);
       }
     }
   }, [params.error]);
@@ -80,7 +80,7 @@ export default function LoginScreen() {
         if (Platform.OS === 'web') {
           window.alert(`Login Error: ${error.message}`);
         } else {
-          Alert.alert('Login Error', error.message);
+          showAlert('Login Error', error.message);
         }
         setLoading(false);
         return;
@@ -96,7 +96,7 @@ export default function LoginScreen() {
       if (Platform.OS === 'web') {
         window.alert(`Error: ${errorMsg}`);
       } else {
-        Alert.alert('Error', errorMsg);
+        showAlert('Error', errorMsg);
       }
     } finally {
       setLoading(false);
@@ -111,7 +111,7 @@ export default function LoginScreen() {
         if (Platform.OS === 'web') {
           window.alert(`Google Sign-In Error: ${error.message}`);
         } else {
-          Alert.alert('Google Sign-In Error', error.message);
+          showAlert('Google Sign-In Error', error.message);
         }
         setLoading(false);
         return;
@@ -125,7 +125,7 @@ export default function LoginScreen() {
       if (Platform.OS === 'web') {
         window.alert(`Error: ${errorMsg}`);
       } else {
-        Alert.alert('Error', errorMsg);
+        showAlert('Error', errorMsg);
       }
       setLoading(false);
     }
@@ -137,7 +137,7 @@ export default function LoginScreen() {
       if (Platform.OS === 'web') {
         window.alert('Please enter your email address first');
       } else {
-        Alert.alert('Email Required', 'Please enter your email address first');
+        showAlert('Email Required', 'Please enter your email address first');
       }
       return;
     }
@@ -146,7 +146,7 @@ export default function LoginScreen() {
       if (Platform.OS === 'web') {
         window.alert('Please enter a valid email address');
       } else {
-        Alert.alert('Invalid Email', 'Please enter a valid email address');
+        showAlert('Invalid Email', 'Please enter a valid email address');
       }
       return;
     }
@@ -166,7 +166,7 @@ export default function LoginScreen() {
         if (Platform.OS === 'web') {
           window.alert(`Error: ${error.message}`);
         } else {
-          Alert.alert('Error', error.message);
+          showAlert('Error', error.message);
         }
         setResetLoading(false);
         return;
@@ -177,7 +177,7 @@ export default function LoginScreen() {
       if (Platform.OS === 'web') {
         window.alert(`Password reset email sent! Check your email (${email}) for a link to reset your password.`);
       } else {
-        Alert.alert(
+        showAlert(
           'Email Sent',
           `Check your email (${email}) for a link to reset your password.`,
           [{ text: 'OK' }]
@@ -192,7 +192,7 @@ export default function LoginScreen() {
       if (Platform.OS === 'web') {
         window.alert(`Error: ${errorMsg}`);
       } else {
-        Alert.alert('Error', errorMsg);
+        showAlert('Error', errorMsg);
       }
       
       setResetLoading(false);

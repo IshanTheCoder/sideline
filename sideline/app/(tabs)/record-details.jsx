@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react';
-import { StyleSheet, View, TouchableOpacity, TextInput, Alert, Modal, Platform, ActivityIndicator } from 'react-native';
+import { StyleSheet, View, TouchableOpacity, TextInput, Modal, Platform, ActivityIndicator } from 'react-native';
+import { showAlert } from '@/lib/alert';
 
 const DateTimePicker = Platform.OS !== 'web'
   ? require('@react-native-community/datetimepicker').default
@@ -68,7 +69,7 @@ export default function RecordDetailsScreen() {
       return;
     }
     if (!user?.id) {
-      Alert.alert('Sign in required', 'Please sign in to start recording.');
+      showAlert('Sign in required', 'Please sign in to start recording.');
       return;
     }
 
@@ -82,7 +83,7 @@ export default function RecordDetailsScreen() {
 
     if (error || !id) {
       setIsSaving(false);
-      Alert.alert(
+      showAlert(
         'Could not create session',
         error?.message ?? 'Please try again.'
       );
@@ -107,7 +108,7 @@ export default function RecordDetailsScreen() {
         if (confirmed) router.back();
         return;
       }
-      Alert.alert('Discard game details?', 'Your inputs will be cleared.', [
+      showAlert('Discard game details?', 'Your inputs will be cleared.', [
         { text: 'Keep Editing', style: 'cancel' },
         { text: 'Discard', style: 'destructive', onPress: () => router.back() },
       ]);

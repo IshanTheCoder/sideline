@@ -55,15 +55,18 @@ const isMissingColumnError = (error, column) => {
  */
 export const uploadRecording = async (userId, recordingId, audioUri) => {
   try {
-    const fileName = `${userId}/${recordingId}.m4a`;
-    const contentType = 'audio/m4a';
+    // On web, Expo records in webm; on native it's m4a (AAC).
+    const isWeb = Platform.OS === 'web';
+    const ext = isWeb ? 'webm' : 'm4a';
+    const contentType = isWeb ? 'audio/webm' : 'audio/m4a';
+    const fileName = `${userId}/${recordingId}.${ext}`;
 
-    console.log('Preparing audio file for upload. URI:', audioUri);
+    console.log('Preparing audio file for upload. URI:', audioUri, 'format:', ext);
 
     let fileToUpload;
 
     // For web: convert blob URL to ArrayBuffer
-    if (Platform.OS === 'web' && (audioUri.startsWith('blob:') || audioUri.startsWith('http://') || audioUri.startsWith('https://'))) {
+    if (isWeb && (audioUri.startsWith('blob:') || audioUri.startsWith('http://') || audioUri.startsWith('https://'))) {
       console.log('Web detected - fetching blob and converting to ArrayBuffer');
       const response = await fetch(audioUri);
       const blob = await response.blob();

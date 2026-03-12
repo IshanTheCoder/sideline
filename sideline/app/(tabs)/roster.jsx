@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Keyboard,
   KeyboardAvoidingView,
   Modal,
@@ -20,6 +19,7 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useAuth } from '@/contexts/AuthContext';
+import { showAlert } from '@/lib/alert';
 import {
   fetchRosterForUser,
   addPlayer,
@@ -93,7 +93,7 @@ export default function RosterScreen() {
     if (Platform.OS === 'web') {
       window.alert(`${title}: ${message}`);
     } else {
-      Alert.alert(title, message);
+      showAlert(title, message);
     }
   };
 
@@ -155,7 +155,7 @@ export default function RosterScreen() {
       return;
     }
 
-    Alert.alert(
+    showAlert(
       'Remove player?',
       `Remove ${p.name} from the roster?`,
       [
@@ -165,7 +165,7 @@ export default function RosterScreen() {
           style: 'destructive',
           onPress: async () => {
             const { error: delError } = await deletePlayer(p.id);
-            if (delError) Alert.alert('Error', delError.message);
+            if (delError) showAlert('Error', delError.message);
             else loadRoster();
           },
         },

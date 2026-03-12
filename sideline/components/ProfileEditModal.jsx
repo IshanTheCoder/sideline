@@ -6,7 +6,6 @@ import {
   TextInput,
   TouchableOpacity,
   Image,
-  Alert,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -20,6 +19,7 @@ import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { uploadProfilePicture } from '@/lib/profilePicture';
 import { supabase } from '@/lib/supabase';
+import { showAlert } from '@/lib/alert';
 
 export default function ProfileEditModal({
   visible,
@@ -80,7 +80,7 @@ export default function ProfileEditModal({
       
       if (finalStatus !== 'granted') {
         console.log('❌ Permission denied, showing alert');
-        Alert.alert(
+        showAlert(
           'Photo Access Needed',
           'Sideline needs access to your camera roll to set your profile picture.',
           [
@@ -93,7 +93,7 @@ export default function ProfileEditModal({
                     await Linking.openURL('app-settings:');
                   } catch (error) {
                     console.log('Could not open settings:', error);
-                    Alert.alert(
+                    showAlert(
                       'Cannot Open Settings',
                       'Please go to Settings > Sideline > Photos to enable access.'
                     );
@@ -153,7 +153,7 @@ export default function ProfileEditModal({
         );
 
         if (error) {
-          Alert.alert('Upload Failed', 'Failed to upload profile picture. Please try again.');
+          showAlert('Upload Failed', 'Failed to upload profile picture. Please try again.');
           console.log('❌ Upload error:', error);
           setUploadingImage(false);
         } else if (url) {
@@ -184,32 +184,32 @@ export default function ProfileEditModal({
           console.log('✅ Profile refreshed');
           
           // Show success message
-          Alert.alert(
+          showAlert(
             'Success', 
             'Profile picture uploaded successfully!\n\nThe image should now be visible.'
           );
         } else {
           console.log('❌ No URL returned from upload');
-          Alert.alert('Error', 'Upload succeeded but no URL was returned. Please try again.');
+          showAlert('Error', 'Upload succeeded but no URL was returned. Please try again.');
           setUploadingImage(false);
         }
       }
     } catch (error) {
       console.log('Error picking image:', error);
-      Alert.alert('Error', 'Failed to pick image. Please try again.');
+      showAlert('Error', 'Failed to pick image. Please try again.');
       setUploadingImage(false);
     }
   };
 
   const handleSave = async () => {
     if (!name.trim()) {
-      Alert.alert('Error', 'Please enter your name');
+      showAlert('Error', 'Please enter your name');
       return;
     }
 
     // Wait for any ongoing image upload to complete
     if (uploadingImage) {
-      Alert.alert('Please wait', 'Image is still uploading...');
+      showAlert('Please wait', 'Image is still uploading...');
       return;
     }
 
@@ -226,7 +226,7 @@ export default function ProfileEditModal({
 
       if (error) {
         console.log('Error updating profile:', error);
-        Alert.alert('Error', 'Failed to update profile. Please try again.');
+        showAlert('Error', 'Failed to update profile. Please try again.');
         setSaving(false);
         return;
       }
@@ -237,13 +237,13 @@ export default function ProfileEditModal({
       if (Platform.OS === 'web') {
         onClose();
       } else {
-        Alert.alert('Success', 'Profile updated successfully!', [
+        showAlert('Success', 'Profile updated successfully!', [
           { text: 'OK', onPress: () => onClose() },
         ]);
       }
     } catch (error) {
       console.log('Unexpected error updating profile:', error);
-      Alert.alert('Error', 'An unexpected error occurred. Please try again.');
+      showAlert('Error', 'An unexpected error occurred. Please try again.');
       setSaving(false);
     }
   };

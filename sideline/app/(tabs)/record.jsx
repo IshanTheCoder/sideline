@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
-import { StyleSheet, View, TouchableOpacity, ActivityIndicator, Alert, Platform } from 'react-native';
+import { Animated, StyleSheet, View, TouchableOpacity, ActivityIndicator, Platform } from 'react-native';
+import { showAlert } from '@/lib/alert';
 import { Audio } from 'expo-av';
 import { useRouter } from 'expo-router';
 import * as Crypto from 'expo-crypto';
@@ -31,6 +32,9 @@ export default function RecordScreen() {
   const [selectedSet, setSelectedSet] = useState(null);
   const [selectedSetOffsetSeconds, setSelectedSetOffsetSeconds] = useState(null);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [toast, setToast] = useState(null); // { type: 'success'|'error', message: string }
+  const toastOpacity = useRef(new Animated.Value(0)).current;
+  const toastTimer = useRef(null);
 
   // Audio recording reference
   const recordingRef = useRef(null);
@@ -92,7 +96,7 @@ export default function RecordScreen() {
           setIsLoading(false);
           const errorMsg = 'Microphone permission is required to record. Please enable it in Settings.';
           setError(errorMsg);
-          Alert.alert(
+          showAlert(
             'Permission Required',
             errorMsg,
             [{ text: 'OK' }]
@@ -113,7 +117,7 @@ export default function RecordScreen() {
         const errorMsg = 'Failed to configure audio settings. Please try again.';
         setError(errorMsg);
         setIsLoading(false);
-        Alert.alert(
+        showAlert(
           'Audio Configuration Error',
           errorMsg,
           [{ text: 'OK' }]
@@ -150,7 +154,7 @@ export default function RecordScreen() {
       setIsLoading(false);
       const errorMsg = getErrorMessage(error, 'Failed to start recording. Please try again.');
       setError(errorMsg);
-      Alert.alert(
+      showAlert(
         'Recording Error',
         errorMsg,
         [{ text: 'OK', onPress: clearError }]
@@ -174,7 +178,7 @@ export default function RecordScreen() {
         setIsLoading(false);
         const errorMsg = 'You must be logged in to save recordings. Please log in and try again.';
         setError(errorMsg);
-        Alert.alert(
+        showAlert(
           'Authentication Error',
           errorMsg,
           [{ text: 'OK', onPress: clearError }]
@@ -192,7 +196,7 @@ export default function RecordScreen() {
         const errorMsg = getErrorMessage(stopError, 'Failed to stop recording. The audio may be lost.');
         setError(errorMsg);
         setIsLoading(false);
-        Alert.alert(
+        showAlert(
           'Recording Stop Error',
           errorMsg,
           [{ text: 'OK', onPress: clearError }]
@@ -206,7 +210,7 @@ export default function RecordScreen() {
         const errorMsg = 'Recording file not found. Please try recording again.';
         setError(errorMsg);
         setIsLoading(false);
-        Alert.alert(
+        showAlert(
           'Recording Error',
           errorMsg,
           [{ text: 'OK', onPress: clearError }]
@@ -225,7 +229,7 @@ export default function RecordScreen() {
         const errorMsg = 'Failed to generate recording ID. Please try again.';
         setError(errorMsg);
         setIsLoading(false);
-        Alert.alert(
+        showAlert(
           'Error',
           errorMsg,
           [{ text: 'OK', onPress: clearError }]
@@ -253,7 +257,7 @@ export default function RecordScreen() {
         );
         setError(errorMsg);
         setIsLoading(false);
-        Alert.alert(
+        showAlert(
           'Upload Error',
           errorMsg,
           [
@@ -288,7 +292,7 @@ export default function RecordScreen() {
           'Your recording was uploaded, but there was an issue saving it to the database. The audio file is safe.'
         );
         // Don't set error state for database errors - file is uploaded
-        Alert.alert(
+        showAlert(
           'Recording Saved',
           dbErrorMsg,
           [{ text: 'OK' }]
@@ -305,19 +309,18 @@ export default function RecordScreen() {
             if (result.success) {
               console.log('✅ Recording transcribed successfully!');
               console.log('Transcription:', result.transcription?.substring(0, 100));
-              
-              // Silent success - labels will be generated when game ends
-              // No alert needed to avoid interrupting the user
+              showToast('success', 'Transcription complete');
             } else {
-              console.error('⚠️ Recording transcription failed:', result.error);
-              // Don't show error alert - processing is a background task
-              // The recording is still saved and usable
+              const msg = result.error?.message || 'Unknown error';
+              console.error('⚠️ Recording transcription failed:', msg);
+              showToast('error', `Transcription failed: ${msg}`, 8000);
             }
           })
-          .catch((error) => {
+          .catch((err) => {
             setIsProcessing(false);
-            console.error('❌ Unexpected error during transcription:', error);
-            // Don't show error alert - processing is a background task
+            const msg = err?.message || 'Unknown error';
+            console.error('❌ Unexpected error during transcription:', msg);
+            showToast('error', `Transcription error: ${msg}`, 8000);
           });
       }
 
@@ -352,7 +355,7 @@ export default function RecordScreen() {
       setIsLoading(false);
       const errorMsg = getErrorMessage(error, 'Failed to save recording. Please try again.');
       setError(errorMsg);
-      Alert.alert(
+      showAlert(
         'Recording Error',
         errorMsg,
         [{ text: 'OK', onPress: clearError }]
@@ -370,22 +373,17 @@ export default function RecordScreen() {
       await stopRecording();
     } else {
       if (!activeSession) {
-        if (Platform.OS === 'web') {
-          const confirmed = window.confirm('Please add opponent, date, and match type before recording. Go to Set Details?');
-          if (confirmed) router.push('/(tabs)/record-details');
-        } else {
-          Alert.alert(
-            'Add game details',
-            'Please add opponent, date, and match type before recording.',
-            [
-              { text: 'Cancel', style: 'cancel' },
-              {
-                text: 'Set Details',
-                onPress: () => router.push('/(tabs)/record-details'),
-              },
-            ]
-          );
-        }
+        showAlert(
+          'Add game details',
+          'Please add opponent, date, and match type before recording.',
+          [
+            { text: 'Cancel', style: 'cancel' },
+            {
+              text: 'Set Details',
+              onPress: () => router.push('/(tabs)/record-details'),
+            },
+          ]
+        );
         return;
       }
       await startRecording();
@@ -402,13 +400,11 @@ export default function RecordScreen() {
         generateLabelsForGameSession(activeSession.id, user.id)
           .then((result) => {
             if (result.success && result.processedCount > 0) {
-              if (Platform.OS !== 'web') {
-                Alert.alert(
-                  'Labels Generated',
-                  `Successfully generated labels for ${result.processedCount} recording${result.processedCount !== 1 ? 's' : ''}!`,
-                  [{ text: 'OK' }]
-                );
-              }
+              showAlert(
+                'Labels Generated',
+                `Successfully generated labels for ${result.processedCount} recording${result.processedCount !== 1 ? 's' : ''}!`,
+                [{ text: 'OK' }]
+              );
             }
           })
           .catch(() => {});
@@ -421,16 +417,7 @@ export default function RecordScreen() {
 
   const handleDonePress = () => {
     if (isLoading) return;
-
-    if (Platform.OS === 'web') {
-      const confirmed = window.confirm('End game recordings? You will not be able to record anymore for this game.');
-      if (confirmed) {
-        endGameAndNavigate();
-      }
-      return;
-    }
-
-    Alert.alert(
+    showAlert(
       'End game recordings?',
       'You will not be able to record anymore for this game.',
       [
@@ -490,6 +477,15 @@ export default function RecordScreen() {
     setError(null);
   };
 
+  const showToast = (type, message, durationMs = 5000) => {
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    setToast({ type, message });
+    Animated.timing(toastOpacity, { toValue: 1, duration: 250, useNativeDriver: true }).start();
+    toastTimer.current = setTimeout(() => {
+      Animated.timing(toastOpacity, { toValue: 0, duration: 300, useNativeDriver: true }).start(() => setToast(null));
+    }, durationMs);
+  };
+
   const getStatusText = () => {
     switch (status) {
       case 'granted':
@@ -539,6 +535,29 @@ export default function RecordScreen() {
           <ThemedText style={styles.doneButtonText}>Done</ThemedText>
         </TouchableOpacity>
       </View>
+
+      {/* Background-task toast banner */}
+      {toast && (
+        <Animated.View
+          style={[
+            styles.toast,
+            toast.type === 'success' ? styles.toastSuccess : styles.toastError,
+            { opacity: toastOpacity },
+          ]}
+        >
+          <ThemedText style={styles.toastText}>
+            {toast.type === 'success' ? '✅ ' : '⚠️ '}{toast.message}
+          </ThemedText>
+        </Animated.View>
+      )}
+
+      {/* Processing indicator */}
+      {isProcessing && (
+        <View style={styles.processingBanner}>
+          <ActivityIndicator size="small" color="#5BA3F5" />
+          <ThemedText style={styles.processingText}>Transcribing recording...</ThemedText>
+        </View>
+      )}
 
       {/* Current Game Session Display */}
       <View style={styles.gameSessionSection}>
@@ -780,5 +799,42 @@ const styles = StyleSheet.create({
   },
   markerButtonTextActive: {
     color: '#fff',
+  },
+  toast: {
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 10,
+    marginBottom: 12,
+  },
+  toastSuccess: {
+    backgroundColor: 'rgba(52, 199, 89, 0.15)',
+    borderWidth: 1,
+    borderColor: 'rgba(52, 199, 89, 0.3)',
+  },
+  toastError: {
+    backgroundColor: 'rgba(255, 59, 48, 0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 59, 48, 0.3)',
+  },
+  toastText: {
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  processingBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 10,
+    backgroundColor: 'rgba(91, 163, 245, 0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(91, 163, 245, 0.25)',
+    marginBottom: 12,
+  },
+  processingText: {
+    fontSize: 14,
+    fontWeight: '500',
+    opacity: 0.9,
   },
 });

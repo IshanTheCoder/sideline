@@ -5,7 +5,6 @@ import {
   Modal,
   TextInput,
   TouchableOpacity,
-  Alert,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -16,6 +15,7 @@ import { IconSymbol } from './ui/icon-symbol';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { supabase } from '@/lib/supabase';
+import { showAlert } from '@/lib/alert';
 
 export default function ChangeEmailModal({
   visible,
@@ -99,9 +99,9 @@ export default function ChangeEmailModal({
         if (error.message.includes('already registered') || error.message.includes('already in use')) {
           setEmailError('This email is already in use');
         } else if (error.message.includes('rate limit')) {
-          Alert.alert('Error', 'Too many attempts. Please try again later.');
+          showAlert('Error', 'Too many attempts. Please try again later.');
         } else {
-          Alert.alert('Error', error.message || 'Failed to update email. Please try again.');
+          showAlert('Error', error.message || 'Failed to update email. Please try again.');
         }
         
         setSaving(false);
@@ -111,7 +111,7 @@ export default function ChangeEmailModal({
       // Success
       setSaving(false);
       
-      Alert.alert(
+      showAlert(
         'Verification Email Sent',
         `A confirmation email has been sent to ${newEmail}. Please check your inbox and click the verification link to complete the email change.`,
         [
@@ -125,7 +125,7 @@ export default function ChangeEmailModal({
       );
     } catch (error) {
       console.log('Unexpected error updating email:', error);
-      Alert.alert('Error', 'An unexpected error occurred. Please try again.');
+      showAlert('Error', 'An unexpected error occurred. Please try again.');
       setSaving(false);
     }
   };

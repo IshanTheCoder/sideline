@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 import {
   ActivityIndicator,
-  Alert,
   FlatList,
   KeyboardAvoidingView,
   Modal,
@@ -23,6 +22,7 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useAuth } from '@/contexts/AuthContext';
+import { showAlert } from '@/lib/alert';
 import {
   deleteRecordingForUser,
   fetchRecordingsForGame,
@@ -31,7 +31,7 @@ import {
   saveRecordingNotes,
   serializeRecordingNotes,
 } from '@/lib/recording';
-import { generateMissingLabels } from '@/lib/recordingProcessing';
+import { generateMissingLabels, processRecording } from '@/lib/recordingProcessing';
 import {
   parseAiLabels,
   SKILL_CATEGORY_LABELS,
@@ -79,6 +79,7 @@ export default function GameRecordingsScreen() {
   const [isScrollingTranscription, setIsScrollingTranscription] = useState(false);
   const modalScrollRef = useRef(null);
   const [generatingLabels, setGeneratingLabels] = useState(false);
+  const [retryingTranscription, setRetryingTranscription] = useState(false);
   const gameId = useMemo(() => {
     if (Array.isArray(id)) return id[0];
     return id;
@@ -234,7 +235,7 @@ export default function GameRecordingsScreen() {
       if (signedError || !signedUrl) {
         console.error('Error creating signed URL:', signedError);
         console.error('Recording audio_url was:', recording.audio_url);
-        Alert.alert('Error', 'Failed to access audio file. Please try again.');
+        showAlert('Error', 'Failed to access audio file. Please try again.');
         setLoadingAudio(false);
         isLoadingAudioRef.current = false;
         setPlayingRecordingId(null);
@@ -303,7 +304,7 @@ export default function GameRecordingsScreen() {
       setIsPlaying(true);
     } catch (err) {
       console.error('Error loading audio:', err);
-      Alert.alert('Error', 'Failed to load audio file');
+      showAlert('Error', 'Failed to load audio file');
       setPlayingRecordingId(null);
       currentRecordingIdRef.current = null;
       await stopAndUnloadAudio();
@@ -407,7 +408,7 @@ export default function GameRecordingsScreen() {
 
     if (deleteError) {
       if (Platform.OS === 'web') window.alert('Delete failed: ' + deleteError.message);
-      else Alert.alert('Delete failed', deleteError.message);
+      else showAlert('Delete failed', deleteError.message);
       return;
     }
 
@@ -423,7 +424,7 @@ export default function GameRecordingsScreen() {
       return;
     }
 
-    Alert.alert(
+    showAlert(
       'Delete recording?',
       'This will permanently remove the audio file and its notes.',
       [
@@ -507,7 +508,7 @@ export default function GameRecordingsScreen() {
       );
 
       if (error) {
-        Alert.alert('Error', 'Failed to save notes');
+        showAlert('Error', 'Failed to save notes');
         return;
       }
 
@@ -527,7 +528,7 @@ export default function GameRecordingsScreen() {
       );
     } catch (err) {
       console.error('Error saving notes:', err);
-      Alert.alert('Error', 'Failed to save notes');
+      showAlert('Error', 'Failed to save notes');
     } finally {
       setSavingNotes(false);
     }
@@ -634,6 +635,34 @@ export default function GameRecordingsScreen() {
     []
   );
 
+  const handleRetryTranscriptions = async () => {
+    if (!user || !gameId) return;
+    setRetryingTranscription(true);
+    try {
+      const untranscribed = recordings.filter((r) => !r.transcription);
+      if (untranscribed.length === 0) {
+        showAlert('All Done', 'Every recording already has a transcription.');
+        return;
+      }
+      let okCount = 0;
+      let failCount = 0;
+      for (const rec of untranscribed) {
+        const result = await processRecording(rec.id, user.id);
+        if (result.success) { okCount++; } else { failCount++; }
+      }
+      await loadRecordings();
+      showAlert(
+        'Transcription Complete',
+        `Transcribed ${okCount} recording${okCount !== 1 ? 's' : ''}.${failCount > 0 ? ` ${failCount} failed — check the Diagnostics in Settings.` : ''}`
+      );
+    } catch (error) {
+      console.error('Retry transcription error:', error);
+      showAlert('Error', `Transcription failed: ${error.message || 'Unknown error'}`);
+    } finally {
+      setRetryingTranscription(false);
+    }
+  };
+
   const handleGenerateLabels = async () => {
     if (!user || !gameId) return;
     
@@ -642,11 +671,17 @@ export default function GameRecordingsScreen() {
       const result = await generateMissingLabels(user.id, gameId);
       
       if (result.error) {
-        Alert.alert('Error', 'Failed to generate recording names. Please try again.');
+        showAlert('Error', 'Failed to generate recording names. Please try again.');
       } else if (result.processedCount === 0 && result.failedCount === 0) {
-        Alert.alert('No Recordings', 'No recordings with transcriptions found in this game.');
+        const untranscribed = recordings.filter((r) => !r.transcription).length;
+        showAlert(
+          'No Transcriptions',
+          untranscribed > 0
+            ? `${untranscribed} recording${untranscribed !== 1 ? 's have' : ' has'} no transcription yet. Tap "Retry Transcriptions" first, then try again.`
+            : 'No recordings with transcriptions found in this game.'
+        );
       } else {
-        Alert.alert(
+        showAlert(
           'Names Generated',
           `Successfully generated ${result.processedCount} recording name${result.processedCount !== 1 ? 's' : ''} for this game.${result.failedCount > 0 ? ` ${result.failedCount} failed.` : ''}`
         );
@@ -655,7 +690,7 @@ export default function GameRecordingsScreen() {
       }
     } catch (error) {
       console.error('Error generating labels:', error);
-      Alert.alert('Error', 'An unexpected error occurred while generating labels.');
+      showAlert('Error', 'An unexpected error occurred while generating labels.');
     } finally {
         setGeneratingLabels(false);
       }
@@ -896,8 +931,31 @@ export default function GameRecordingsScreen() {
 
       {!loading && !error && recordings.length > 0 && (
         <>
-          {/* Button: generate labels */}
+          {/* Action buttons: retry transcriptions + generate labels */}
           <View style={styles.generateLabelsContainer}>
+            {recordings.some((r) => !r.transcription) && (
+              <TouchableOpacity
+                style={[
+                  styles.generateLabelsButton,
+                  styles.retryTranscriptionButton,
+                  { borderColor: Colors[colorScheme ?? 'light'].tint }
+                ]}
+                onPress={handleRetryTranscriptions}
+                disabled={retryingTranscription}
+                activeOpacity={0.7}
+              >
+                {retryingTranscription ? (
+                  <ActivityIndicator size="small" color={Colors[colorScheme ?? 'light'].tint} />
+                ) : (
+                  <>
+                    <IconSymbol name="arrow.clockwise" size={18} color={Colors[colorScheme ?? 'light'].tint} />
+                    <ThemedText style={[styles.generateLabelsButtonText, { color: Colors[colorScheme ?? 'light'].tint }]}>
+                      Retry Transcriptions
+                    </ThemedText>
+                  </>
+                )}
+              </TouchableOpacity>
+            )}
             <TouchableOpacity
               style={[
                 styles.generateLabelsButton,
@@ -1465,6 +1523,11 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     gap: 8,
     minHeight: 44,
+  },
+  retryTranscriptionButton: {
+    backgroundColor: 'transparent',
+    borderWidth: 1.5,
+    marginBottom: 8,
   },
   generateLabelsButtonText: {
     color: '#FFFFFF',

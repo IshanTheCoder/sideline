@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Alert, Platform, Linking } from 'react-native';
+import { Platform, Linking } from 'react-native';
+import { showAlert } from '@/lib/alert';
 import { Audio } from 'expo-av';
 
 /**
@@ -78,7 +79,7 @@ export function useAudioPermissions() {
   }, []);
 
   const showPermissionDeniedAlert = () => {
-    Alert.alert(
+    showAlert(
       'Microphone Permission Required',
       'Sideline needs access to your microphone to record voice memos. Please enable microphone access in your device settings.',
       [

@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   FlatList,
   Platform,
   StyleSheet,
@@ -22,6 +21,7 @@ import {
   formatDuration,
 } from '@/lib/recording';
 import { parseAiLabels } from '@/lib/volleyballVocabulary';
+import { showAlert } from '@/lib/alert';
 
 export default function ReviewScreen() {
   const router = useRouter();
@@ -125,7 +125,7 @@ export default function ReviewScreen() {
     const { error: deleteError } = await deleteGameForUser(user.id, gameId);
     if (deleteError) {
       if (Platform.OS === 'web') window.alert('Delete failed: ' + deleteError.message);
-      else Alert.alert('Delete failed', deleteError.message);
+      else showAlert('Delete failed', deleteError.message);
       return;
     }
     setRecordings((prev) =>
@@ -146,7 +146,7 @@ export default function ReviewScreen() {
       return;
     }
 
-    Alert.alert(
+    showAlert(
       'Delete game?',
       'This will permanently remove all recordings for this game.',
       [

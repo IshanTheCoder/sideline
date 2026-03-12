@@ -12,7 +12,8 @@ import { supabase } from '@/lib/supabase';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { Alert, Platform, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Platform, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { showAlert } from '@/lib/alert';
 
 export default function SettingsScreen() {
   const { user, profile, signOut, refreshProfile } = useAuth();
@@ -27,6 +28,7 @@ export default function SettingsScreen() {
   const [showChangePasswordModal, setShowChangePasswordModal] = useState(false);
   const [showSportModal, setShowSportModal] = useState(false);
   const [savingSport, setSavingSport] = useState(false);
+  const [diagRunning, setDiagRunning] = useState(false);
   const prevPictureUrl = useRef(profile?.profile_picture_url || null);
   const cacheBusterRef = useRef(Date.now());
 
@@ -66,7 +68,7 @@ export default function SettingsScreen() {
 
       if (error) {
         console.log('Error updating sport:', error);
-        Alert.alert('Error', 'Failed to update sport. Please try again.');
+        showAlert('Error', 'Failed to update sport. Please try again.');
         setSavingSport(false);
         return;
       }
@@ -75,10 +77,10 @@ export default function SettingsScreen() {
       await refreshProfile();
       setSavingSport(false);
       
-      Alert.alert('Success', `Your sport has been updated to ${sport}!`);
+      showAlert('Success', `Your sport has been updated to ${sport}!`);
     } catch (error) {
       console.log('Unexpected error updating sport:', error);
-      Alert.alert('Error', 'An unexpected error occurred. Please try again.');
+      showAlert('Error', 'An unexpected error occurred. Please try again.');
       setSavingSport(false);
     }
   };
@@ -89,16 +91,11 @@ export default function SettingsScreen() {
         await signOut();
       } catch (error) {
         console.error('Sign out error:', error);
-        Alert.alert('Error', 'Failed to sign out. Please try again.');
+        showAlert('Error', 'Failed to sign out. Please try again.');
       }
     };
 
-    if (Platform.OS === 'web') {
-      await doSignOut();
-      return;
-    }
-
-    Alert.alert(
+    showAlert(
       'Sign Out',
       'Are you sure you want to sign out?',
       [
@@ -110,6 +107,72 @@ export default function SettingsScreen() {
         },
       ]
     );
+  };
+
+  const runDiagnostics = async () => {
+    setDiagRunning(true);
+    const results = [];
+    const groqKey = process.env.EXPO_PUBLIC_GROQ_API_KEY;
+
+    // 1. Check env key exists
+    if (!groqKey) {
+      results.push('EXPO_PUBLIC_GROQ_API_KEY is missing from .env');
+    } else {
+      results.push(`Groq API key found (${groqKey.substring(0, 8)}...)`);
+
+      // 2. Test chat completions (label generation)
+      try {
+        const chatRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${groqKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            model: 'llama-3.3-70b-versatile',
+            messages: [{ role: 'user', content: 'Say OK' }],
+            max_tokens: 5,
+          }),
+        });
+        if (chatRes.ok) {
+          results.push('Chat completions API (labels): OK');
+        } else {
+          const errText = await chatRes.text();
+          results.push(`Chat API error ${chatRes.status}: ${errText.substring(0, 120)}`);
+        }
+      } catch (e) {
+        results.push(`Chat API network error: ${e.message}`);
+      }
+
+      // 3. Test Whisper endpoint reachability (OPTIONS/HEAD — we can't send audio but can verify auth)
+      try {
+        const whisperRes = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${groqKey}` },
+          body: new FormData(),
+        });
+        if (whisperRes.status === 400) {
+          results.push('Whisper API (transcription): reachable (auth OK)');
+        } else if (whisperRes.status === 401 || whisperRes.status === 403) {
+          results.push(`Whisper API auth failed: ${whisperRes.status}`);
+        } else {
+          results.push(`Whisper API response: ${whisperRes.status}`);
+        }
+      } catch (e) {
+        results.push(`Whisper API network error: ${e.message}`);
+      }
+    }
+
+    // 4. Check Supabase connection
+    try {
+      const { error: sbErr } = await supabase.from('profiles').select('id').limit(1);
+      results.push(sbErr ? `Supabase error: ${sbErr.message}` : 'Supabase connection: OK');
+    } catch (e) {
+      results.push(`Supabase network error: ${e.message}`);
+    }
+
+    setDiagRunning(false);
+    showAlert('Diagnostics', results.join('\n\n'));
   };
 
   const getInitials = () => {
@@ -306,6 +369,45 @@ export default function SettingsScreen() {
                 <ThemedText style={styles.settingTitle}>Current Sport</ThemedText>
                 <ThemedText style={styles.settingSubtitle}>
                   {profile?.sport || 'Not set'}
+                </ThemedText>
+              </View>
+            </View>
+            <IconSymbol
+              name="chevron.right"
+              size={20}
+              color={Colors[colorScheme].icon}
+            />
+          </TouchableOpacity>
+        </View>
+
+        {/* Diagnostics Section */}
+        <View style={styles.section}>
+          <ThemedText style={styles.sectionTitle}>Diagnostics</ThemedText>
+
+          <TouchableOpacity
+            style={[styles.settingItem, {
+              backgroundColor: Colors[colorScheme].cardBackground,
+            }]}
+            onPress={runDiagnostics}
+            disabled={diagRunning}
+            activeOpacity={0.7}
+          >
+            <View style={styles.settingLeft}>
+              {diagRunning ? (
+                <ActivityIndicator size="small" color={Colors[colorScheme ?? 'light'].tint} />
+              ) : (
+                <IconSymbol
+                  name="stethoscope"
+                  size={24}
+                  color={Colors[colorScheme ?? 'light'].text}
+                />
+              )}
+              <View style={styles.settingTextContainer}>
+                <ThemedText style={styles.settingTitle}>
+                  {diagRunning ? 'Running...' : 'Test API Connection'}
+                </ThemedText>
+                <ThemedText style={styles.settingSubtitle}>
+                  Check Groq AI and Supabase
                 </ThemedText>
               </View>
             </View>

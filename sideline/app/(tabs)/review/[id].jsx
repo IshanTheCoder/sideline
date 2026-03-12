@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -27,6 +26,7 @@ import { parseAiLabels, serializeAiLabels, SKILL_CATEGORY_LABELS, POSITION_LABEL
 import { fetchRosterForUser, getPlayerNamesForGameSession } from '@/lib/roster';
 import { generateLabel } from '@/lib/labelGeneration';
 import { getCustomBucketsForPrompt, getCustomBuckets, addCustomBucket, describeBucketWithAI } from '@/lib/customBuckets';
+import { showAlert } from '@/lib/alert';
 
 export default function RecordingDetailScreen() {
   const { id } = useLocalSearchParams();
@@ -152,7 +152,7 @@ export default function RecordingDetailScreen() {
 
     if (deleteError) {
       if (Platform.OS === 'web') window.alert('Delete failed: ' + deleteError.message);
-      else Alert.alert('Delete failed', deleteError.message);
+      else showAlert('Delete failed', deleteError.message);
       return;
     }
 
@@ -168,7 +168,7 @@ export default function RecordingDetailScreen() {
       return;
     }
 
-    Alert.alert(
+    showAlert(
       'Delete recording?',
       'This will permanently remove this recording.',
       [
@@ -204,7 +204,7 @@ export default function RecordingDetailScreen() {
     });
     const { error: err } = await updateRecording(user.id, recordingId, { ai_labels: aiLabels });
     setSavingField(null);
-    if (err) Alert.alert('Save failed', err.message);
+    if (err) showAlert('Save failed', err.message);
     else {
       setRecording((p) => (p ? { ...p, ai_labels: aiLabels } : p));
       const savedParsed = parseAiLabels(aiLabels);
@@ -231,9 +231,9 @@ export default function RecordingDetailScreen() {
       setCustomBuckets({ skill, position, feedback });
       setNewCategoryName('');
       setAddCategoryModalVisible(false);
-      Alert.alert('Category added', `"${name}" is saved and will appear in the ${newCategoryType} list for future recordings.`);
+      showAlert('Category added', `"${name}" is saved and will appear in the ${newCategoryType} list for future recordings.`);
     } catch (e) {
-      Alert.alert('Error', 'Could not save category. Please try again.');
+      showAlert('Error', 'Could not save category. Please try again.');
     } finally {
       setAddingCategory(false);
     }
