@@ -291,15 +291,11 @@ export default function RecordScreen() {
           dbError,
           'Your recording was uploaded, but there was an issue saving it to the database. The audio file is safe.'
         );
-        // Don't set error state for database errors - file is uploaded
-        showAlert(
-          'Recording Saved',
-          dbErrorMsg,
-          [{ text: 'OK' }]
-        );
+        showToast('error', dbErrorMsg, 6000);
       } else {
         console.log('Recording record created successfully:', recordingRecord);
-        
+        showToast('success', 'Recording saved');
+
         // Start transcribing the recording in the background
         // Labels will be generated when the game ends
         setIsProcessing(true);
@@ -354,13 +350,8 @@ export default function RecordScreen() {
       console.error('Failed to stop recording:', error);
       setIsLoading(false);
       const errorMsg = getErrorMessage(error, 'Failed to save recording. Please try again.');
-      setError(errorMsg);
-      showAlert(
-        'Recording Error',
-        errorMsg,
-        [{ text: 'OK', onPress: clearError }]
-      );
-      
+      showToast('error', errorMsg, 8000);
+
       // Reset state even on error
       recordingRef.current = null;
       setIsRecording(false);
