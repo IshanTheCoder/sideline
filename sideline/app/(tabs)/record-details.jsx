@@ -1,6 +1,9 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { StyleSheet, View, TouchableOpacity, TextInput, Alert, Modal, Platform, ActivityIndicator } from 'react-native';
-import DateTimePicker from '@react-native-community/datetimepicker';
+
+const DateTimePicker = Platform.OS !== 'web'
+  ? require('@react-native-community/datetimepicker').default
+  : null;
 import { useRouter } from 'expo-router';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { ThemedText } from '@/components/themed-text';
@@ -28,6 +31,7 @@ export default function RecordDetailsScreen() {
   const [pendingDate, setPendingDate] = useState(new Date());
   const [matchType, setMatchType] = useState(null);
   const [showDatePicker, setShowDatePicker] = useState(false);
+  const dateInputRef = useRef(null);
   const [formError, setFormError] = useState(null);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -41,6 +45,10 @@ export default function RecordDetailsScreen() {
     });
 
   const openDatePicker = () => {
+    if (Platform.OS === 'web') {
+      dateInputRef.current?.click();
+      return;
+    }
     setPendingDate(gameDate);
     setShowDatePicker(true);
   };
@@ -145,6 +153,17 @@ export default function RecordDetailsScreen() {
         >
           <ThemedText style={styles.dateButtonText}>{formatDate(gameDate)}</ThemedText>
         </TouchableOpacity>
+        {Platform.OS === 'web' && (
+          <input
+            ref={dateInputRef}
+            type="date"
+            style={{ display: 'none' }}
+            value={gameDate.toISOString().split('T')[0]}
+            onChange={(e) => {
+              if (e.target.value) setGameDate(new Date(e.target.value + 'T00:00:00'));
+            }}
+          />
+        )}
         {showDatePicker && Platform.OS === 'android' && (
           <DateTimePicker
             value={gameDate}
@@ -207,7 +226,7 @@ export default function RecordDetailsScreen() {
         </TouchableOpacity>
       </View>
 
-      <Modal visible={showDatePicker && Platform.OS === 'ios'} transparent animationType="fade">
+      <Modal visible={showDatePicker && Platform.OS === 'ios' && Platform.OS !== 'web'} transparent animationType="fade">
         <View style={styles.dateModalBackdrop}>
           <View style={[styles.dateModalCard, { backgroundColor: inputBackground }]}>
             <ThemedText style={styles.dateModalTitle}>Select date</ThemedText>

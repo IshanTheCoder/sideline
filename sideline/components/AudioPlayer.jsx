@@ -1,7 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Platform, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { Audio } from 'expo-av';
-import Slider from '@react-native-community/slider';
+
+const Slider = Platform.OS !== 'web'
+  ? require('@react-native-community/slider').default
+  : null;
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors } from '@/constants/theme';
@@ -161,19 +164,35 @@ export default function AudioPlayer({ audioUrl }) {
 
       <View style={styles.info}>
         <ThemedText style={styles.timeText}>{formattedTime}</ThemedText>
-        <Slider
-          style={styles.slider}
-          minimumValue={0}
-          maximumValue={sliderMax}
-          value={sliderValue}
-          onSlidingStart={handleSeekStart}
-          onValueChange={(value) => setSeekingValue(value)}
-          onSlidingComplete={handleSeekComplete}
-          minimumTrackTintColor={tint}
-          maximumTrackTintColor={colorScheme === 'dark' ? '#333' : '#DDD'}
-          thumbTintColor={tint}
-          disabled={isLoading || !!error || !sound || !durationMs}
-        />
+        {Platform.OS === 'web' ? (
+          <input
+            type="range"
+            min={0}
+            max={sliderMax}
+            value={sliderValue}
+            disabled={isLoading || !!error || !sound || !durationMs}
+            onChange={(e) => setSeekingValue(Number(e.target.value))}
+            onMouseDown={handleSeekStart}
+            onMouseUp={(e) => handleSeekComplete(Number(e.target.value))}
+            onTouchStart={handleSeekStart}
+            onTouchEnd={(e) => handleSeekComplete(Number(e.target.value))}
+            style={{ width: '100%', accentColor: tint, cursor: 'pointer' }}
+          />
+        ) : (
+          <Slider
+            style={styles.slider}
+            minimumValue={0}
+            maximumValue={sliderMax}
+            value={sliderValue}
+            onSlidingStart={handleSeekStart}
+            onValueChange={(value) => setSeekingValue(value)}
+            onSlidingComplete={handleSeekComplete}
+            minimumTrackTintColor={tint}
+            maximumTrackTintColor={colorScheme === 'dark' ? '#333' : '#DDD'}
+            thumbTintColor={tint}
+            disabled={isLoading || !!error || !sound || !durationMs}
+          />
+        )}
         {error && <ThemedText style={styles.errorText}>{error}</ThemedText>}
       </View>
     </View>
