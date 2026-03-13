@@ -1,14 +1,15 @@
 /**
- * Roster (players) per team: CRUD, CSV import, and helpers for transcription/labels.
- * Players have: name, number, position, grade.
+ * Everything roster — adding, editing, deleting, and importing players.
+ * Also has the fuzzy-matching smarts to fix misspelled names in transcriptions.
+ * Each player carries a name, number, position, and grade.
  */
 
 import { supabase } from './supabase';
 import { getOrCreateDefaultTeam } from './gameSessions';
 
 /**
- * Get team ID for the current user (create default team if needed).
- * @param {string} userId
+ * Figures out which team this user belongs to — creates a default one if they're teamless.
+ * @param {string} userId - the user who needs a team
  * @returns {Promise<{ teamId: string|null, error: Error|null }>}
  */
 export async function getTeamIdForUser(userId) {
@@ -17,8 +18,8 @@ export async function getTeamIdForUser(userId) {
 }
 
 /**
- * Fetch all players for a team.
- * @param {string} teamId
+ * Pulls the full roster for a team — everyone sorted by name, like a class attendance sheet.
+ * @param {string} teamId - which team's players to grab
  * @returns {Promise<{ data: Array<{ id: string, name: string, number: string|null, position: string|null, grade: string|null }>, error: Error|null }>}
  */
 export async function fetchPlayersForTeam(teamId) {
@@ -38,8 +39,8 @@ export async function fetchPlayersForTeam(teamId) {
 }
 
 /**
- * Fetch roster for the current user's (default) team.
- * @param {string} userId
+ * Convenience wrapper — grabs the roster for whatever team this user is on.
+ * @param {string} userId - the user whose team roster we want
  * @returns {Promise<{ data: Array, error: Error|null }>}
  */
 export async function fetchRosterForUser(userId) {
@@ -49,9 +50,9 @@ export async function fetchRosterForUser(userId) {
 }
 
 /**
- * Add a player to a team.
- * @param {string} teamId
- * @param {{ name: string, number?: string, position?: string, grade?: string }} player
+ * Adds a new player to the roster — like adding a friend on social media, but for volleyball.
+ * @param {string} teamId - which team gets the new recruit
+ * @param {{ name: string, number?: string, position?: string, grade?: string }} player - the new player's info
  */
 export async function addPlayer(teamId, player) {
   try {
@@ -75,9 +76,9 @@ export async function addPlayer(teamId, player) {
 }
 
 /**
- * Update a player.
- * @param {string} playerId
- * @param {{ name?: string, number?: string, position?: string, grade?: string }} updates
+ * Edits a player's info — name, number, position, whatever needs changing.
+ * @param {string} playerId - who we're updating
+ * @param {{ name?: string, number?: string, position?: string, grade?: string }} updates - only the fields you want to change
  */
 export async function updatePlayer(playerId, updates) {
   try {
@@ -103,8 +104,8 @@ export async function updatePlayer(playerId, updates) {
 }
 
 /**
- * Delete a player.
- * @param {string} playerId
+ * Removes a player from the roster — no takebacks, they're gone.
+ * @param {string} playerId - the player getting cut
  */
 export async function deletePlayer(playerId) {
   try {
@@ -116,10 +117,10 @@ export async function deletePlayer(playerId) {
 }
 
 /**
- * Parse CSV text into rows of { name, number, position, grade }.
- * Supports headers: name, number, position, grade (case-insensitive).
- * Also supports: Name, Number, Position, Grade or no header (first row = name, number, position, grade).
- * @param {string} csvText
+ * Turns raw CSV text into nice player objects. Handles headers in any capitalization,
+ * or no headers at all (just assumes columns go: name, number, position, grade).
+ * Basically the CSV whisperer.
+ * @param {string} csvText - the raw CSV string to parse
  * @returns {Array<{ name: string, number: string, position: string, grade: string }>}
  */
 export function parseRosterCsv(csvText) {
@@ -166,9 +167,9 @@ export function parseRosterCsv(csvText) {
 }
 
 /**
- * Parse 2D array (e.g. from Google Sheets) into roster rows.
- * First row can be header (Name, Number, Position, Grade). Detects columns by header or order.
- * @param {string[][]} rows - Array of rows, each row is array of cell values
+ * Same vibe as parseRosterCsv but for 2D arrays (like what Google Sheets hands you).
+ * Sniffs for a header row; if it doesn't find one, assumes column order.
+ * @param {string[][]} rows - array of rows where each row is an array of cell values
  * @returns {Array<{ name: string, number: string, position: string, grade: string }>}
  */
 export function parseRosterSheetRows(rows) {
@@ -191,9 +192,9 @@ export function parseRosterSheetRows(rows) {
 }
 
 /**
- * Import players from CSV text into a team. Does not clear existing roster.
- * @param {string} teamId
- * @param {string} csvText
+ * Bulk-imports players from CSV text — additive only, won't nuke the existing roster.
+ * @param {string} teamId - the team getting new players
+ * @param {string} csvText - raw CSV content
  * @returns {Promise<{ added: number, errors: string[], error: Error|null }>}
  */
 export async function importRosterFromCsv(teamId, csvText) {
@@ -209,9 +210,9 @@ export async function importRosterFromCsv(teamId, csvText) {
 }
 
 /**
- * Import players from sheet rows (2D array, e.g. from Google Sheets). Does not clear existing roster.
- * @param {string} teamId
- * @param {string[][]} rows
+ * Bulk-imports from a 2D array (Google Sheets style) — additive, keeps the current roster intact.
+ * @param {string} teamId - destination team
+ * @param {string[][]} rows - the sheet data as rows of cell arrays
  * @returns {Promise<{ added: number, errors: string[], error: Error|null }>}
  */
 export async function importRosterFromSheetRows(teamId, rows) {
@@ -227,9 +228,9 @@ export async function importRosterFromSheetRows(teamId, rows) {
 }
 
 /**
- * Simple Levenshtein distance (number of single-char edits).
- * @param {string} a
- * @param {string} b
+ * Classic Levenshtein distance — counts the minimum single-char edits to morph one string into another.
+ * @param {string} a - first string
+ * @param {string} b - second string
  * @returns {number}
  */
 function levenshtein(a, b) {
@@ -252,10 +253,10 @@ function levenshtein(a, b) {
 }
 
 /**
- * Build name correction pairs for transcription: find words in text that are likely
- * misspellings of roster names (same length or ±1, edit distance 1–2).
- * @param {string} transcription - Raw transcription text
- * @param {string[]} correctNames - Roster player names (correct spelling)
+ * Fuzzy-matches words in the transcription against the roster to catch likely
+ * name typos (similar length, edit distance 1–2). Returns find-and-replace pairs.
+ * @param {string} transcription - the raw transcription where names might be mangled
+ * @param {string[]} correctNames - the correctly-spelled roster names to match against
  * @returns {Array<{ from: string, to: string }>}
  */
 export function buildRosterNameCorrections(transcription, correctNames) {
@@ -283,9 +284,9 @@ export function buildRosterNameCorrections(transcription, correctNames) {
 }
 
 /**
- * Get list of player names for a game session (for label/transcription context).
- * Uses game_session.team_id to load players.
- * @param {string} gameSessionId
+ * Grabs just the player names for a game session — used to give the AI roster context
+ * when generating labels and fixing transcription typos.
+ * @param {string} gameSessionId - the session to look up the team for
  * @returns {Promise<{ names: string[], error: Error|null }>}
  */
 export async function getPlayerNamesForGameSession(gameSessionId) {
@@ -314,8 +315,8 @@ export async function getPlayerNamesForGameSession(gameSessionId) {
 }
 
 /**
- * Get players with name and number for a game session (e.g. for Match Reflection).
- * @param {string} gameSessionId
+ * Like getPlayerNamesForGameSession but also brings jersey numbers — handy for Match Reflection.
+ * @param {string} gameSessionId - the game session to pull the roster for
  * @returns {Promise<{ players: Array<{ name: string, number: string|null }>, error: Error|null }>}
  */
 export async function getPlayersForGameSession(gameSessionId) {

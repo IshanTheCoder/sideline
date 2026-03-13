@@ -3,20 +3,20 @@ import * as AuthSession from 'expo-auth-session';
 import * as WebBrowser from 'expo-web-browser';
 import { supabase } from './supabase';
 
-// Complete the auth session for web browser
+// dismiss any lingering OAuth browser popups — nobody likes leftover tabs
 WebBrowser.maybeCompleteAuthSession();
 
-// Get the appropriate redirect URI based on platform
+// figure out where Google should send the user after they log in
 function getRedirectUri() {
   if (Platform.OS === 'web') {
-    // For web, use the current origin + callback path
+    // web: tack /callback onto wherever we're hosted — simple math
     if (typeof window !== 'undefined') {
       return `${window.location.origin}/callback`;
     }
     return 'http://localhost:8081/callback';
   }
   
-  // For native, use the deep link scheme
+  // mobile: deep link via sideline:// so the phone knows to bounce back to our app
   return AuthSession.makeRedirectUri({
     scheme: 'sideline',
     path: 'callback',
@@ -34,12 +34,12 @@ export async function signInWithGoogle() {
     console.log('🔗 Redirect URI:', redirectUri);
 
     if (Platform.OS === 'web') {
-      // Web platform: Use Supabase's built-in OAuth handling
-      // For web, Supabase will automatically redirect back to the current page
+      // Web: let Supabase handle the whole Google OAuth dance — redirect, tokens, everything
+      // we literally just kick it off and Supabase does the rest
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          // Don't specify redirectTo for web - let Supabase use default
+          // web doesn't need redirectTo — Supabase already knows the way home
           skipBrowserRedirect: false,
         },
       });
@@ -51,12 +51,12 @@ export async function signInWithGoogle() {
 
       console.log('✅ OAuth initiated, redirecting to Google...');
       
-      // On web, Supabase handles the redirect automatically
-      // User will be redirected to Google, then back to the app
-      // Supabase will handle the session automatically
+      // full page redirect flow: us → Google login → back to us
+      // Supabase picks up the tokens on re-entry and builds the session
+      // nothing left for us to do here
       return { data, error: null };
     } else {
-      // Native platform: Use expo-web-browser for OAuth flow
+      // Native: pop open an in-app browser for the Google sign-in flow
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
@@ -69,23 +69,23 @@ export async function signInWithGoogle() {
       }
 
       if (data?.url) {
-        // Open the OAuth URL in an in-app browser
+        // launch the auth browser pointing at Google — one-way ticket to sign-in town
         const result = await WebBrowser.openAuthSessionAsync(
           data.url,
           redirectUri
         );
 
         if (result.type === 'success') {
-          // Extract the URL from the result
+          // grab the callback URL that Google sent us back with
           const url = result.url;
           if (url) {
-            // Parse the URL to extract the access token
+            // dig through the URL params to find our precious access & refresh tokens
             const urlObj = new URL(url);
             const accessToken = urlObj.searchParams.get('access_token');
             const refreshToken = urlObj.searchParams.get('refresh_token');
 
             if (accessToken && refreshToken) {
-              // Set the session
+              // hand the tokens to Supabase so it can officially log us in
               const { data: sessionData, error: sessionError } = await supabase.auth.setSession({
                 access_token: accessToken,
                 refresh_token: refreshToken,

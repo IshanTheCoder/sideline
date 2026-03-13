@@ -3,8 +3,8 @@ import { createClient } from '@supabase/supabase-js';
 import { Platform } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
 
-// Get environment variables from .env file
-// Expo automatically loads EXPO_PUBLIC_* variables from .env
+// grab our Supabase keys from .env — these are basically the password to our entire backend
+// Expo auto-injects any EXPO_PUBLIC_* vars at build time, we literally just use them
 const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
 
@@ -15,11 +15,11 @@ if (!supabaseUrl || !supabaseAnonKey) {
   );
 }
 
-// Platform-specific storage adapter
-// Use SecureStore for mobile (iOS/Android) and localStorage for web
+// different platforms have different opinions on secure storage — tale as old as time
+// mobile gets a legit encrypted vault (SecureStore), web gets localStorage (a glorified notepad)
 const storageAdapter = Platform.OS === 'web'
   ? {
-      // Web: Use localStorage
+      // Web: localStorage — the junk drawer of browser storage, but hey it works
       getItem: async (key) => {
         if (typeof window !== 'undefined') {
           return window.localStorage.getItem(key);
@@ -38,15 +38,15 @@ const storageAdapter = Platform.OS === 'web'
       },
     }
   : {
-      // Mobile: Use SecureStore with error handling
-      // SecureStore can fail in background contexts (e.g., during auto-refresh)
-      // when user interaction is not allowed, so we handle this gracefully
+      // Mobile: SecureStore = encrypted storage that locks up when the app is backgrounded
+      // (no foreground activity = no access), so wrapping everything in try/catch
+      // because a random crash would be embarrassing
       getItem: async (key) => {
         try {
           return await SecureStore.getItemAsync(key);
         } catch (error) {
-          // Silently fail if SecureStore is unavailable (e.g., background refresh)
-          // Supabase will handle this gracefully and retry later
+          // SecureStore said "nah"? that's fine, we'll survive
+          // Supabase retries automatically so we don't have to stress
           console.log('SecureStore getItem failed (likely background context):', error);
           return null;
         }
@@ -55,7 +55,7 @@ const storageAdapter = Platform.OS === 'web'
         try {
           await SecureStore.setItemAsync(key, value);
         } catch (error) {
-          // Silently fail if SecureStore is unavailable
+          // save failed? it happens — SecureStore can be dramatic sometimes
           console.log('SecureStore setItem failed (likely background context):', error);
         }
       },
@@ -63,24 +63,24 @@ const storageAdapter = Platform.OS === 'web'
         try {
           await SecureStore.deleteItemAsync(key);
         } catch (error) {
-          // Silently fail if SecureStore is unavailable
+          // delete failed too? whatever, we tried — not worth losing sleep over
           console.log('SecureStore removeItem failed (likely background context):', error);
         }
       },
     };
 
-// Create Supabase client
+// fire up the Supabase client — our single source of truth for everything backend
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
     storage: storageAdapter,
     autoRefreshToken: true,
     persistSession: true,
-    detectSessionInUrl: Platform.OS === 'web', // Enable for web to detect OAuth callbacks
-    flowType: 'pkce', // Use PKCE flow for better security
+    detectSessionInUrl: Platform.OS === 'web', // web needs this for catching the OAuth redirect back from Google
+    flowType: 'pkce', // PKCE = extra security layer, like two-factor but for the auth flow itself
   },
 });
 
-// Log when session changes
+// watch auth state changes on web — handy for debugging login shenanigans
 if (Platform.OS === 'web') {
   supabase.auth.onAuthStateChange((event, session) => {
     console.log('🔐 Auth state changed:', event);

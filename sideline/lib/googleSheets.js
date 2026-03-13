@@ -1,13 +1,13 @@
 /**
- * Google Drive + Sheets API helpers for importing roster from a Google Sheet.
+ * Hooks into Google Drive + Sheets so coaches can import rosters straight from a spreadsheet.
  *
- * By default uses Supabase Google OAuth (no GitHub redirect needed). Add Drive + Sheets scopes
- * in Supabase Dashboard → Authentication → Providers → Google → Additional Scopes:
+ * Default path: Supabase handles the Google OAuth dance (no extra redirect page needed).
+ * Just add Drive + Sheets scopes in Supabase Dashboard → Auth → Providers → Google → Additional Scopes:
  *   https://www.googleapis.com/auth/drive.readonly
  *   https://www.googleapis.com/auth/spreadsheets.readonly
  *
- * Optional: set EXPO_PUBLIC_GOOGLE_OAUTH_REDIRECT_URI to an https URL to use direct Google OAuth
- * instead (e.g. GitHub Pages). Then add that URL in Google Cloud Console → Authorized redirect URIs.
+ * Power-user path: set EXPO_PUBLIC_GOOGLE_OAUTH_REDIRECT_URI to skip Supabase and talk to
+ * Google directly (you'll need a hosted redirect page and the URI in Google Cloud Console).
  */
 
 import { Platform } from 'react-native';
@@ -18,7 +18,7 @@ import { supabase } from './supabase';
 
 WebBrowser.maybeCompleteAuthSession();
 
-/** Storage keys for Sheets OAuth flow (callback stores token, roster reads it) */
+/** where we stash tokens during the Google Sheets OAuth dance */
 export const GOOGLE_SHEETS_FLOW_KEY = 'google_sheets_flow';
 export const GOOGLE_SHEETS_PENDING_TOKEN_KEY = 'google_sheets_pending_token';
 
@@ -36,8 +36,8 @@ function getSheetsRedirectUri() {
 }
 
 /**
- * Request Google OAuth token for Drive + Sheets read access.
- * Always uses Supabase Google OAuth (redirect to app, no GitHub page needed).
+ * Kicks off the Google OAuth flow to get read access to Drive + Sheets.
+ * Routes through Supabase by default — no extra hosting required.
  * @returns {Promise<{ accessToken: string }|{ error: Error }>}
  */
 export async function requestGoogleSheetsAccess() {
@@ -45,7 +45,7 @@ export async function requestGoogleSheetsAccess() {
 }
 
 /**
- * Supabase-based flow: redirect goes to app (e.g. sideline://callback), no GitHub page needed.
+ * The Supabase route — bounces back to the app (sideline://callback) without needing a hosted page.
  */
 async function requestGoogleSheetsAccessViaSupabase() {
   const redirectUri = getSheetsRedirectUri();
@@ -116,7 +116,7 @@ async function requestGoogleSheetsAccessViaSupabase() {
 }
 
 /**
- * Direct Google OAuth (requires EXPO_PUBLIC_GOOGLE_OAUTH_REDIRECT_URI and a hosted redirect page, e.g. GitHub).
+ * The direct-to-Google route — needs a real redirect URI and a hosted page (like GitHub Pages) to land on.
  */
 async function requestGoogleSheetsAccessDirect(redirectUri) {
   console.log('[Google Sheets] Redirect URI for Google Cloud Console:', redirectUri);
@@ -155,8 +155,8 @@ async function requestGoogleSheetsAccessDirect(redirectUri) {
 }
 
 /**
- * List spreadsheets from the user's Google Drive.
- * @param {string} accessToken
+ * Fetches the user's spreadsheets from Google Drive, sorted by most recently touched.
+ * @param {string} accessToken - Google OAuth token with Drive read scope
  * @returns {Promise<{ files: Array<{ id: string, name: string }>, error?: Error }>}
  */
 export async function listSpreadsheets(accessToken) {
@@ -186,10 +186,10 @@ export async function listSpreadsheets(accessToken) {
 }
 
 /**
- * Get values from the first sheet (or specified range).
- * @param {string} accessToken
- * @param {string} spreadsheetId
- * @param {string} [range] - e.g. 'Sheet1' or 'Sheet1!A1:D100'. Defaults to first sheet.
+ * Reads cell values from a sheet — defaults to the first tab but you can specify a range.
+ * @param {string} accessToken - Google OAuth token with Sheets read scope
+ * @param {string} spreadsheetId - the spreadsheet to read from
+ * @param {string} [range] - e.g. 'Sheet1' or 'Sheet1!A1:D100' — defaults to 'Sheet1'
  * @returns {Promise<{ values: string[][], error?: Error }>}
  */
 export async function getSheetValues(accessToken, spreadsheetId, range = 'Sheet1') {

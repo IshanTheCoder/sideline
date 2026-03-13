@@ -73,7 +73,7 @@ export default function SettingsScreen() {
         return;
       }
 
-      // Refresh profile to get updated sport
+      // pull the latest profile so the UI reflects the new sport
       await refreshProfile();
       setSavingSport(false);
       
@@ -114,13 +114,13 @@ export default function SettingsScreen() {
     const results = [];
     const groqKey = process.env.EXPO_PUBLIC_GROQ_API_KEY;
 
-    // 1. Check env key exists
+    // step 1: does the API key even exist?
     if (!groqKey) {
       results.push('EXPO_PUBLIC_GROQ_API_KEY is missing from .env');
     } else {
       results.push(`Groq API key found (${groqKey.substring(0, 8)}...)`);
 
-      // 2. Test chat completions (label generation)
+      // step 2: ping the chat API to see if labels can generate
       try {
         const chatRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
           method: 'POST',
@@ -144,7 +144,7 @@ export default function SettingsScreen() {
         results.push(`Chat API network error: ${e.message}`);
       }
 
-      // 3. Test Whisper endpoint reachability (OPTIONS/HEAD — we can't send audio but can verify auth)
+      // step 3: poke the Whisper endpoint — can't send real audio but we can check auth
       try {
         const whisperRes = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
           method: 'POST',
@@ -163,7 +163,7 @@ export default function SettingsScreen() {
       }
     }
 
-    // 4. Check Supabase connection
+    // step 4: make sure Supabase is alive
     try {
       const { error: sbErr } = await supabase.from('profiles').select('id').limit(1);
       results.push(sbErr ? `Supabase error: ${sbErr.message}` : 'Supabase connection: OK');
@@ -196,7 +196,7 @@ export default function SettingsScreen() {
     return 'U';
   };
 
-  // Volleyball icon using emoji - matches SportButtonSelector implementation
+  // volleyball emoji icon — keeps it consistent with SportButtonSelector
   const VolleyballIcon = ({ size = 24 }) => (
     <View style={{ 
       width: size * 1.5, 
@@ -218,7 +218,7 @@ export default function SettingsScreen() {
 
   return (
     <ThemedView style={styles.container}>
-      {/* Header */}
+      {/* top nav bar */}
       <View style={[styles.header, { paddingTop: Platform.OS === 'ios' ? 60 : Platform.OS === 'web' ? 24 : 40 }]}>
         <TouchableOpacity 
           style={styles.backButton}
@@ -240,13 +240,13 @@ export default function SettingsScreen() {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* Profile Section */}
+        {/* user profile card */}
         <View style={styles.section}>
           <ThemedText style={styles.sectionTitle}>Profile</ThemedText>
           
           <View style={styles.profileContainer}>
             <View style={styles.profilePictureContainer}>
-              {/* Profile Picture / Camera Icon */}
+              {/* profile pic or initials fallback */}
               <View style={styles.profilePictureWrapper}>
               {profileImageUri && !imageError ? (
                 <Image
@@ -268,7 +268,7 @@ export default function SettingsScreen() {
                 )}
               </View>
 
-              {/* Edit Badge - Edit profile name */}
+              {/* pencil badge to edit your profile */}
               <TouchableOpacity 
                 style={[styles.editBadge, {
                   backgroundColor: Colors[colorScheme ?? 'light'].tint,
@@ -291,7 +291,7 @@ export default function SettingsScreen() {
           </View>
         </View>
 
-        {/* Privacy Section */}
+        {/* email & password settings */}
         <View style={styles.section}>
           <ThemedText style={styles.sectionTitle}>Privacy</ThemedText>
           
@@ -350,7 +350,7 @@ export default function SettingsScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* Sport Section */}
+        {/* pick your sport */}
         <View style={styles.section}>
           <ThemedText style={styles.sectionTitle}>Sport</ThemedText>
           
@@ -380,7 +380,7 @@ export default function SettingsScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* Diagnostics Section */}
+        {/* API health check tools */}
         <View style={styles.section}>
           <ThemedText style={styles.sectionTitle}>Diagnostics</ThemedText>
 
@@ -419,7 +419,7 @@ export default function SettingsScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* Account Section */}
+        {/* sign out zone */}
         <View style={styles.section}>
           <ThemedText style={styles.sectionTitle}>Account</ThemedText>
           
@@ -441,7 +441,7 @@ export default function SettingsScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* App Version */}
+        {/* version number footer */}
         <View style={styles.versionContainer}>
           <ThemedText style={styles.versionText}>
             Sideline v1.0.0
@@ -449,9 +449,9 @@ export default function SettingsScreen() {
         </View>
       </ScrollView>
 
-      {/* Profile Edit Modal - Removed as component doesn't exist */}
+      {/* legacy profile edit modal — component was removed */}
 
-      {/* Change Email Modal */}
+      {/* change email modal */}
       {user && (
         <ChangeEmailModal
           visible={showChangeEmailModal}
@@ -460,7 +460,7 @@ export default function SettingsScreen() {
         />
       )}
 
-      {/* Change Password Modal */}
+      {/* change password modal */}
       {user && (
         <ChangePasswordModal
           visible={showChangePasswordModal}
@@ -469,7 +469,7 @@ export default function SettingsScreen() {
         />
       )}
 
-      {/* Profile Edit Modal */}
+      {/* profile edit modal — name + pic */}
       {user && (
         <ProfileEditModal
           visible={showEditModal}
@@ -488,7 +488,7 @@ export default function SettingsScreen() {
         />
       )}
 
-      {/* Sport Selection Modal */}
+      {/* sport picker modal */}
       <SportSelectionModal
         visible={showSportModal}
         onClose={() => setShowSportModal(false)}

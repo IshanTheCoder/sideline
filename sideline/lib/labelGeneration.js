@@ -5,7 +5,7 @@ import {
 } from './volleyballVocabulary';
 import { getVolleyballRulesContext } from './volleyballRules';
 
-// Get Groq API key from environment
+// grab the Groq API key — without this, label generation is basically dead on arrival
 const groqApiKey = process.env.EXPO_PUBLIC_GROQ_API_KEY;
 
 if (!groqApiKey) {
@@ -19,7 +19,7 @@ const SKILL_LIST = getSkillCategoryList().join(', ');
 const POSITION_LIST = getPositionList().join(', ');
 const FEEDBACK_LIST = getFeedbackTypeList().join(', ');
 
-/** Volleyball coaching examples for few-shot context in the prompt */
+/** few-shot examples so the AI knows exactly what kind of labels we're looking for */
 const VOLLEYBALL_LABEL_EXAMPLES = [
   'Sarah needs to improve blocking footwork',
   "Emma's serve receive positioning correction",
@@ -70,8 +70,8 @@ Examples of good labels: ${VOLLEYBALL_LABEL_EXAMPLES.join('; ')}`;
 }
 
 /**
- * Parse AI response into structured result. Handles raw JSON or markdown-wrapped JSON.
- * @param {string} content - Raw message content from API
+ * extracts structured data from the AI's reply — deals with both raw JSON and markdown-wrapped JSON
+ * @param {string} content - the text the AI spit back at us
  * @returns {{ label: string, skillCategory?: string|null, position?: string|null, playPattern?: string|null, feedbackType?: string|null, ruleNote?: string|null }|null}
  */
 function parseStructuredResponse(content) {
@@ -96,9 +96,9 @@ function parseStructuredResponse(content) {
 }
 
 /**
- * Generate a concise label and volleyball metadata for a recording based on its transcription.
- * @param {string} transcriptionText - The full transcription text to summarize
- * @param {{ playerNames?: string[] }} [options] - Optional roster player names for correct spelling in labels
+ * feeds a transcription to the AI and gets back a label + volleyball metadata — auto-summarizer vibes
+ * @param {string} transcriptionText - the full transcription to distill into a label
+ * @param {{ playerNames?: string[] }} [options] - roster names for spelling accuracy
  * @returns {Promise<{label: string|null, skillCategory?: string|null, position?: string|null, playPattern?: string|null, feedbackType?: string|null, error: Error|null}>}
  */
 export async function generateLabel(transcriptionText, options = {}) {
@@ -176,7 +176,7 @@ export async function generateLabel(transcriptionText, options = {}) {
       };
     }
 
-    // Fallback: treat entire content as plain label (backward compatibility)
+    // plan B: AI didn't return proper JSON — use the raw text as a label, it's better than nothing
     const fallbackLabel = content.replace(/^["']|["']$/g, '').trim().slice(0, 80);
     console.log('✅ Label generated (plain fallback):', fallbackLabel);
     return {
@@ -206,9 +206,9 @@ export async function generateLabel(transcriptionText, options = {}) {
 }
 
 /**
- * Test the label generation service with sample transcription
- * @param {string} sampleTranscription - Sample transcription text to test with
- * @returns {Promise<boolean>} True if test passed, false otherwise
+ * smoke test: toss a sample transcription at the label generator and see if it survives
+ * @param {string} sampleTranscription - test text to run through the pipeline
+ * @returns {Promise<boolean>} true if we got a good label back, false if it blew up
  */
 export async function testLabelGeneration(sampleTranscription = 'Great spike by player number 7, the ball went straight down for a kill.') {
   console.log('🧪 Testing label generation service...');

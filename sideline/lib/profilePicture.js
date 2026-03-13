@@ -4,11 +4,11 @@ import { decode } from 'base64-arraybuffer';
 import { Platform } from 'react-native';
 
 /**
- * Upload a profile picture for the current user
- * @param userId - The user's ID
- * @param file - The image file to upload (from image picker)
- * @param fileExtension - The file extension (jpg, png, webp, etc.)
- * @returns The public URL of the uploaded image or error
+ * Sends a profile pic up to Supabase Storage — basically changing your in-game skin
+ * @param userId - who's getting the new look
+ * @param file - the raw image object from the picker (fresh off the camera roll)
+ * @param fileExtension - jpg, png, webp... pick your fighter
+ * @returns the public URL of the uploaded image, or an error if things go sideways
  */
 export const uploadProfilePicture = async (userId, file, fileExtension = 'jpg') => {
   try {
@@ -21,7 +21,7 @@ export const uploadProfilePicture = async (userId, file, fileExtension = 'jpg') 
 
     console.log('Preparing file for upload. URI:', file.uri, 'Type:', contentType);
 
-    // For web: convert data URI or blob URL to ArrayBuffer
+    // Web: convert the URI to an ArrayBuffer — Supabase wants raw binary, not a URL
     if (Platform.OS === 'web' && (file.uri.startsWith('data:') || file.uri.startsWith('http://') || file.uri.startsWith('blob:'))) {
       console.log('Web detected - fetching blob and converting to ArrayBuffer');
       const response = await fetch(file.uri);
@@ -30,8 +30,8 @@ export const uploadProfilePicture = async (userId, file, fileExtension = 'jpg') 
       fileToUpload = await blob.arrayBuffer();
       console.log('ArrayBuffer created. Type:', contentType, 'Size:', fileToUpload.byteLength);
     } else {
-      // For native (React Native): read file as base64, then decode to ArrayBuffer
-      // This is the recommended approach for Supabase Storage in React Native
+      // Native: base64-encode the file, then decode into an ArrayBuffer
+      // this is the Supabase-approved method for React Native uploads
       console.log('Native detected - reading file as base64');
       
       try {
@@ -50,7 +50,7 @@ export const uploadProfilePicture = async (userId, file, fileExtension = 'jpg') 
         
         console.log('Base64 read successfully. Length:', base64.length);
         
-        // Decode base64 to ArrayBuffer
+        // translate base64 → ArrayBuffer (Supabase's preferred dialect for file data)
         fileToUpload = decode(base64);
         console.log('ArrayBuffer created from base64. Size:', fileToUpload.byteLength);
         
@@ -75,12 +75,12 @@ export const uploadProfilePicture = async (userId, file, fileExtension = 'jpg') 
 
     console.log('Uploading to Supabase Storage. FileName:', fileName, 'ContentType:', contentType);
 
-    // Upload to Supabase Storage
+    // yeet the file up to Supabase Storage — godspeed, little image
     const { data, error } = await supabase.storage
       .from('profile-pictures')
       .upload(fileName, fileToUpload, {
         cacheControl: '3600',
-        upsert: true, // Replace existing file
+        upsert: true, // replace existing pic if there is one — glow-up season never stops
         contentType: contentType,
       });
 
@@ -91,7 +91,7 @@ export const uploadProfilePicture = async (userId, file, fileExtension = 'jpg') 
 
     console.log('✅ Upload successful! Storage data:', data);
 
-    // Get public URL
+    // get the public URL so anyone in the app can see this masterpiece
     const { data: urlData } = supabase.storage
       .from('profile-pictures')
       .getPublicUrl(fileName);
@@ -99,7 +99,7 @@ export const uploadProfilePicture = async (userId, file, fileExtension = 'jpg') 
     const publicUrl = urlData.publicUrl;
     console.log('✅ Public URL generated:', publicUrl);
 
-    // Update user profile with the picture URL
+    // persist the URL in the user's profile row so we can find it later
     console.log('Updating profiles table with new picture URL for user:', userId);
     const { error: updateError } = await supabase
       .from('profiles')
@@ -108,7 +108,7 @@ export const uploadProfilePicture = async (userId, file, fileExtension = 'jpg') 
 
     if (updateError) {
       console.log('❌ Error updating profile with picture URL:', updateError);
-      // Return error since the database update failed
+      // pic made it to storage but the profile table update choked — so close yet so far
       return { url: null, error: updateError };
     } else {
       console.log('✅ Profile database updated successfully with picture URL');
@@ -122,17 +122,17 @@ export const uploadProfilePicture = async (userId, file, fileExtension = 'jpg') 
 };
 
 /**
- * Get the profile picture URL for a user
- * @param userId - The user's ID
- * @returns The public URL of the profile picture
+ * Grab the URL for someone's profile pic — like peeking at their Discord avatar
+ * @param userId - whose pic do we want?
+ * @returns the public URL pointing to their profile picture
  */
 export const getProfilePictureUrl = (userId) => {
   if (!userId) return null;
 
-  // Try common extensions
+  // supported formats — if your file type isn't on this list, no entry
   const extensions = ['jpg', 'jpeg', 'png', 'webp'];
   
-  // Return the first one (we use jpg as default, but support others)
+  // default to jpg — the universally accepted image format, never lets you down
   const fileName = `${userId}/profile.jpg`;
   
   const { data } = supabase.storage
@@ -143,9 +143,9 @@ export const getProfilePictureUrl = (userId) => {
 };
 
 /**
- * Download the profile picture for a user
- * @param userId - The user's ID
- * @returns The file blob or error
+ * Pull down a user's profile pic as a blob — for when you need the raw image data
+ * @param userId - whose pic are we downloading?
+ * @returns the image blob, or an error if it's not there
  */
 export const downloadProfilePicture = async (userId) => {
   try {
@@ -166,13 +166,13 @@ export const downloadProfilePicture = async (userId) => {
 };
 
 /**
- * Delete the profile picture for a user
- * @param userId - The user's ID
- * @returns Success or error
+ * Wipe a user's profile pic from storage — complete digital makeover reset
+ * @param userId - whose pic is getting yeeted into the void?
+ * @returns success flag or an error if the deletion failed
  */
 export const deleteProfilePicture = async (userId) => {
   try {
-    // Try to delete all possible extensions
+    // nuke every possible extension variant — leave no survivors
     const extensions = ['jpg', 'jpeg', 'png', 'webp'];
     const filesToDelete = extensions.map(ext => `${userId}/profile.${ext}`);
 
@@ -193,9 +193,9 @@ export const deleteProfilePicture = async (userId) => {
 };
 
 /**
- * Check if a user has a profile picture
- * @param userId - The user's ID
- * @returns True if profile picture exists
+ * Check whether a user actually uploaded a profile pic or is still on default
+ * @param userId - the user in question
+ * @returns true if they've got a custom pic, false if they're still a silhouette
  */
 export const hasProfilePicture = async (userId) => {
   try {

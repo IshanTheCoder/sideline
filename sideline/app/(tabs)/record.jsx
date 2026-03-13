@@ -23,7 +23,7 @@ export default function RecordScreen() {
   const { status, requestPermission, isLoading: isPermissionLoading } = useAudioPermissions();
   const iconColor = useThemeColor({}, 'icon');
   
-  // Recording state
+  // all the state we need to track while recording
   const [isRecording, setIsRecording] = useState(false);
   const [recordingDuration, setRecordingDuration] = useState(0);
   const [currentRecording, setCurrentRecording] = useState(null);
@@ -32,14 +32,14 @@ export default function RecordScreen() {
   const [selectedSet, setSelectedSet] = useState(null);
   const [selectedSetOffsetSeconds, setSelectedSetOffsetSeconds] = useState(null);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [toast, setToast] = useState(null); // { type: 'success'|'error', message: string }
+  const [toast, setToast] = useState(null); // { type: 'success'|'error', message: string } — the little popup banner
   const toastOpacity = useRef(new Animated.Value(0)).current;
   const toastTimer = useRef(null);
 
-  // Audio recording reference
+  // ref to the actual audio recorder object — survives re-renders
   const recordingRef = useRef(null);
 
-  // Set up audio mode on mount
+  // configure the mic settings as soon as this screen loads
   useEffect(() => {
     const setupAudioMode = async () => {
       try {
@@ -55,7 +55,7 @@ export default function RecordScreen() {
 
     setupAudioMode();
 
-    // Cleanup: stop any active recording when component unmounts
+    // when we leave this screen, kill any recording still running
     return () => {
       if (recordingRef.current) {
         recordingRef.current.stopAndUnloadAsync().catch(console.error);
@@ -63,7 +63,7 @@ export default function RecordScreen() {
     };
   }, []);
 
-  // Timer effect - increments every second while recording
+  // ticks up every second while recording — like a stopwatch
   useEffect(() => {
     let interval = null;
     
@@ -72,7 +72,7 @@ export default function RecordScreen() {
         setRecordingDuration((prev) => prev + 1);
       }, 1000);
     } else {
-      // Reset timer when recording stops
+      // reset the clock when we stop
       setRecordingDuration(0);
     }
     
@@ -86,10 +86,10 @@ export default function RecordScreen() {
   const startRecording = async () => {
     try {
       setIsLoading(true);
-      clearError(); // Clear any previous errors
+      clearError(); // wipe old errors before starting fresh
       setSelectedSetOffsetSeconds(null);
       
-      // Request permissions if not already granted
+      // ask for mic access if we don't have it yet
       if (status !== 'granted') {
         const granted = await requestPermission();
         if (!granted) {
@@ -105,7 +105,7 @@ export default function RecordScreen() {
         }
       }
 
-      // Set audio mode for recording
+      // tell the OS we want to use the mic
       try {
         await Audio.setAudioModeAsync({
           allowsRecordingIOS: true,
@@ -125,13 +125,13 @@ export default function RecordScreen() {
         return;
       }
 
-      // Create and start recording
+      // spin up a new recording
       const { recording } = await Audio.Recording.createAsync(
         Audio.RecordingOptionsPresets.HIGH_QUALITY,
         (status) => {
-          // Optional: Handle recording status updates
+          // callback fires while recording is live
           if (status.isRecording) {
-            // Recording is active
+            // yep, we're rolling
           }
         }
       );
@@ -148,7 +148,7 @@ export default function RecordScreen() {
       setIsRecording(true);
       setCurrentRecording(null);
       setIsLoading(false);
-      clearError(); // Clear errors on success
+      clearError(); // all good, clear any old error messages
     } catch (error) {
       console.error('Failed to start recording:', error);
       setIsLoading(false);
@@ -165,7 +165,7 @@ export default function RecordScreen() {
   const stopRecording = async () => {
     try {
       setIsLoading(true);
-      clearError(); // Clear any previous errors
+      clearError(); // wipe old errors before we try to stop
 
       if (!recordingRef.current) {
         setIsLoading(false);
@@ -186,7 +186,7 @@ export default function RecordScreen() {
         return;
       }
 
-      // Stop and unload recording
+      // hit the brakes on the recording and free up resources
       let uri = null;
       try {
         await recordingRef.current.stopAndUnloadAsync();
@@ -220,7 +220,7 @@ export default function RecordScreen() {
         return;
       }
 
-      // Generate unique recording ID (UUID)
+      // mint a fresh UUID to tag this recording
       let recordingId;
       try {
         recordingId = Crypto.randomUUID();
@@ -241,7 +241,7 @@ export default function RecordScreen() {
 
       const timestamp = new Date().toISOString();
 
-      // Upload recording to Supabase Storage
+      // ship the audio file up to Supabase cloud storage
       console.log('Uploading recording to Supabase Storage...');
       const { url: audioUrl, error: uploadError } = await uploadRecording(
         user.id,
@@ -265,13 +265,13 @@ export default function RecordScreen() {
             { text: 'Retry', onPress: () => stopRecording() }
           ]
         );
-        // Don't reset recording state on upload error - allow retry
+        // keep recording state intact so user can retry the upload
         return;
       }
 
       console.log('Recording uploaded successfully. URL:', audioUrl);
 
-      // Create recording record in database
+      // save the recording metadata to the database
       console.log('Creating recording record in database...');
       const { data: recordingRecord, error: dbError } = await createRecordingRecord({
         id: recordingId,
@@ -296,8 +296,8 @@ export default function RecordScreen() {
         console.log('Recording record created successfully:', recordingRecord);
         showToast('success', 'Recording saved');
 
-        // Start transcribing the recording in the background
-        // Labels will be generated when the game ends
+        // kick off transcription in the background — don't block the UI
+        // labels get generated later when the game wraps up
         setIsProcessing(true);
         processRecording(recordingId, user.id)
           .then((result) => {
@@ -320,7 +320,7 @@ export default function RecordScreen() {
           });
       }
 
-      // Create recording object for local state
+      // build a local recording object so the UI can show it immediately
       const newRecording = {
         id: recordingId,
         created_at: timestamp,
@@ -338,13 +338,13 @@ export default function RecordScreen() {
             },
       };
 
-      // Reset recording reference
+      // clean up the recorder ref so we're ready for the next one
       recordingRef.current = null;
       setIsRecording(false);
       setSelectedSetOffsetSeconds(null);
       setCurrentRecording(newRecording);
       setIsLoading(false);
-      clearError(); // Clear errors on success
+      clearError(); // we made it — clear any leftover errors
 
     } catch (error) {
       console.error('Failed to stop recording:', error);
@@ -352,7 +352,7 @@ export default function RecordScreen() {
       const errorMsg = getErrorMessage(error, 'Failed to save recording. Please try again.');
       showToast('error', errorMsg, 8000);
 
-      // Reset state even on error
+      // even if things blew up, reset so the user can try again
       recordingRef.current = null;
       setIsRecording(false);
       setSelectedSetOffsetSeconds(null);
@@ -422,37 +422,37 @@ export default function RecordScreen() {
     );
   };
 
-  // Helper function to format error messages
+  // translates raw errors into human-friendly messages
   const getErrorMessage = (error, defaultMessage) => {
     if (error instanceof Error) {
       const message = error.message.toLowerCase();
       
-      // Permission errors
+      // mic permission issues
       if (message.includes('permission') || message.includes('denied')) {
         return 'Microphone permission is required. Please enable it in Settings.';
       }
       
-      // Network/upload errors
+      // wifi went on vacation
       if (message.includes('network') || message.includes('fetch') || message.includes('upload')) {
         return 'Network error. Please check your connection and try again.';
       }
       
-      // Storage errors
+      // cloud storage hiccup
       if (message.includes('storage') || message.includes('bucket')) {
         return 'Storage error. Please try again or contact support.';
       }
       
-      // Database errors
+      // database said no
       if (message.includes('database') || message.includes('insert') || message.includes('constraint')) {
         return 'Database error. Your recording may have been saved but not registered.';
       }
       
-      // Authentication errors
+      // who are you again?
       if (message.includes('auth') || message.includes('login') || message.includes('session')) {
         return 'Authentication error. Please log in again.';
       }
       
-      // File read errors
+      // can't read the recording file
       if (message.includes('read') || message.includes('file') || message.includes('empty')) {
         return 'Could not read recording file. Please try recording again.';
       }
@@ -463,7 +463,7 @@ export default function RecordScreen() {
     return defaultMessage;
   };
 
-  // Clear error when user starts a new action
+  // reset errors so the user gets a clean slate
   const clearError = () => {
     setError(null);
   };
@@ -480,7 +480,7 @@ export default function RecordScreen() {
   const getStatusText = () => {
     switch (status) {
       case 'granted':
-        return null; // Don't show status when granted
+        return null; // no need to show anything if we have permission
       case 'denied':
         return '❌ Microphone permission denied';
       case 'undetermined':
@@ -508,7 +508,7 @@ export default function RecordScreen() {
 
   return (
     <ThemedView style={styles.container}>
-      {/* Navigation Header */}
+      {/* top nav bar */}
       <View style={styles.header}>
         <TouchableOpacity
           style={styles.navButton}
@@ -527,7 +527,7 @@ export default function RecordScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* Background-task toast banner */}
+      {/* little toast popup for background task updates */}
       {toast && (
         <Animated.View
           style={[
@@ -542,7 +542,7 @@ export default function RecordScreen() {
         </Animated.View>
       )}
 
-      {/* Processing indicator */}
+      {/* transcription-in-progress banner */}
       {isProcessing && (
         <View style={styles.processingBanner}>
           <ActivityIndicator size="small" color="#5BA3F5" />
@@ -550,7 +550,7 @@ export default function RecordScreen() {
         </View>
       )}
 
-      {/* Current Game Session Display */}
+      {/* active game session info */}
       <View style={styles.gameSessionSection}>
         <ThemedText style={styles.sectionLabel}>Current Game Session</ThemedText>
         <ActiveSessionIndicator session={activeSession} />
@@ -584,7 +584,7 @@ export default function RecordScreen() {
         </ThemedText>
       </View>
 
-      {/* Record Button Section - Centered and Large */}
+      {/* the big record button — front and center */}
       <View style={styles.recordSection}>
         {status !== 'granted' && (
           <View style={styles.permissionSection}>
@@ -611,7 +611,7 @@ export default function RecordScreen() {
           </View>
         )}
         
-        {/* Error Message Display */}
+        {/* error banner with dismiss button */}
         {error && (
           <View style={styles.errorContainer}>
             <ThemedText style={styles.errorText}>

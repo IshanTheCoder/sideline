@@ -1,7 +1,7 @@
 import * as FileSystem from 'expo-file-system/legacy';
 import { Platform } from 'react-native';
 
-// Get Groq API key from environment
+// pull the Groq API key from env — no key = no transcription, game over
 const groqApiKey = process.env.EXPO_PUBLIC_GROQ_API_KEY;
 
 if (!groqApiKey) {
@@ -12,9 +12,9 @@ if (!groqApiKey) {
 }
 
 /**
- * Download audio file from URL and convert to format suitable for OpenAI
- * @param audioUrl - URL of the audio file (from Supabase Storage)
- * @returns File object (web) or Blob (native) ready for Whisper API
+ * fetches audio from a URL and preps it for Whisper (download → format → ready to roll)
+ * @param audioUrl - where the audio lives (usually a Supabase Storage URL)
+ * @returns a File on web or {uri, name, type} on native — both ready for the API
  */
 const MIME_TO_EXT = {
   'audio/webm': 'webm',
@@ -37,34 +37,34 @@ function extFromMime(mime) {
 }
 
 /**
- * Detect actual audio format from the first bytes of the file.
- * Supabase may serve an incorrect content-type if the upload used the wrong one
- * (e.g. web recordings stored as .m4a but actually containing webm data).
+ * reads the file's first few bytes to detect the real audio format
+ * content-type headers are known liars (web recordings saved as .m4a but actually webm)
+ * so we check the magic bytes — basically file forensics
  */
 function detectFormatFromBytes(arrayBuffer) {
   const header = new Uint8Array(arrayBuffer.slice(0, 12));
-  // WebM / Matroska EBML header: 1A 45 DF A3
+  // WebM / Matroska magic bytes: 1A 45 DF A3 — the file's fingerprint
   if (header[0] === 0x1A && header[1] === 0x45 && header[2] === 0xDF && header[3] === 0xA3) {
     return { mime: 'audio/webm', ext: 'webm' };
   }
-  // OGG: "OggS"
+  // OGG writes "OggS" at byte 0 — zero subtlety, love it
   if (header[0] === 0x4F && header[1] === 0x67 && header[2] === 0x67 && header[3] === 0x53) {
     return { mime: 'audio/ogg', ext: 'ogg' };
   }
-  // FLAC: "fLaC"
+  // FLAC opens with "fLaC" — the audiophile's calling card
   if (header[0] === 0x66 && header[1] === 0x4C && header[2] === 0x61 && header[3] === 0x43) {
     return { mime: 'audio/flac', ext: 'flac' };
   }
-  // WAV: "RIFF"
+  // WAV starts with "RIFF" — been doing this since before you were born
   if (header[0] === 0x52 && header[1] === 0x49 && header[2] === 0x46 && header[3] === 0x46) {
     return { mime: 'audio/wav', ext: 'wav' };
   }
-  // MP3: ID3 tag or sync word
+  // MP3: either an ID3 tag or a 0xFF sync word — two ways to say "I'm an MP3"
   if ((header[0] === 0x49 && header[1] === 0x44 && header[2] === 0x33) ||
       (header[0] === 0xFF && (header[1] & 0xE0) === 0xE0)) {
     return { mime: 'audio/mpeg', ext: 'mp3' };
   }
-  // ftyp box → MP4/M4A
+  // ftyp box at byte 4 = MP4/M4A container — Apple invented this vibe
   if (header[4] === 0x66 && header[5] === 0x74 && header[6] === 0x79 && header[7] === 0x70) {
     return { mime: 'audio/mp4', ext: 'm4a' };
   }
@@ -80,7 +80,7 @@ async function downloadAudioFile(audioUrl) {
     }
     const blob = await response.blob();
 
-    // Sniff actual format from file bytes (content-type may be wrong for older recordings)
+    // trust the raw bytes over the content-type header (older recordings be lying)
     const buf = await blob.arrayBuffer();
     const detected = detectFormatFromBytes(buf);
     const headerMime = (blob.type || response.headers.get('content-type') || '').split(';')[0].trim().toLowerCase();
@@ -101,7 +101,7 @@ async function downloadAudioFile(audioUrl) {
     const file = new File([buf], `recording.${ext}`, { type: mime });
     return file;
   } else {
-    // Native: download to local file system first
+    // native: download to temp storage first — can't stream like on web
     console.log('Native: Downloading audio file to temporary location');
     const fileUri = `${FileSystem.cacheDirectory}temp_transcription.m4a`;
     
@@ -111,16 +111,16 @@ async function downloadAudioFile(audioUrl) {
       throw new Error(`Failed to download audio file: ${downloadResult.status}`);
     }
     
-    // For React Native, return the file URI
-    // We'll handle the upload manually in transcribeAudio
+    // pass back the file info — transcribeAudio picks it up from here
+    // (RN FormData wants {uri, name, type}, not a browser File object)
     return { uri: fileUri, name: 'recording.m4a', type: 'audio/m4a' };
   }
 }
 
 /**
- * Transcribe an audio recording using Groq Whisper API
+ * pipes audio through Groq's Whisper API — turns sound waves into text like magic
  * @param audioUrl - URL of the audio file to transcribe
- * @returns Transcription text or error
+ * @returns the transcription text, or an error if Whisper struck out
  */
 export async function transcribeAudio(audioUrl) {
   try {
@@ -133,11 +133,11 @@ export async function transcribeAudio(audioUrl) {
 
     console.log('Starting transcription for audio:', audioUrl);
 
-    // Download the audio file
+    // fetch the audio file from its URL
     const audioFile = await downloadAudioFile(audioUrl);
     console.log('Audio file downloaded');
 
-    // For React Native, we need to manually create FormData and use fetch
+    // RN can't just drop a File in FormData — gotta assemble the payload by hand
     if (Platform.OS !== 'web' && audioFile.uri) {
       console.log('Sending to Groq Whisper API (React Native)...');
 
@@ -167,7 +167,7 @@ export async function transcribeAudio(audioUrl) {
       const result = await response.json();
       const transcription = result.text || result;
 
-      // Clean up temporary file
+      // clean up the temp file — we're not digital hoarders
       try {
         await FileSystem.deleteAsync(audioFile.uri);
         console.log('🗑️ Temporary file cleaned up');
@@ -178,7 +178,7 @@ export async function transcribeAudio(audioUrl) {
       console.log('✅ Transcription completed successfully');
       return { transcription, error: null };
     } else {
-      // Web platform - use Groq API with fetch
+      // web path — straightforward fetch, no RN weirdness to worry about
       console.log('Sending to Groq Whisper API (Web)...');
 
       const formData = new FormData();
@@ -209,7 +209,7 @@ export async function transcribeAudio(audioUrl) {
   } catch (error) {
     console.error('Error transcribing audio:', error);
 
-    // Provide more helpful error messages
+    // translate cryptic API errors into something a normal human can read
     let errorMessage = 'Failed to transcribe audio';
     if (error instanceof Error) {
       if (error.message.includes('API key')) {
@@ -231,8 +231,7 @@ export async function transcribeAudio(audioUrl) {
 }
 
 /**
- * Test the transcription service with a sample audio URL
- * This is useful for verifying the API key and setup
+ * smoke test: can we actually transcribe audio? checks the API key and full pipeline
  */
 export async function testTranscription(audioUrl) {
   console.log('🧪 Testing transcription service...');

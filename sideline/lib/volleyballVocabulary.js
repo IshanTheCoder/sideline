@@ -1,10 +1,10 @@
 /**
- * Volleyball-specific vocabulary for AI label generation and categorization.
- * Used by labelGeneration.js to improve recognition of volleyball terms,
- * positions, formations, and coaching language.
+ * The volleyball dictionary — every term, position, and formation the AI
+ * needs so it sounds like it's been to practice. labelGeneration.js depends
+ * on this to know a "kill" is a great spike, not a felony.
  */
 
-/** Volleyball skill categories for classification */
+/** the main skill buckets — think of them like character classes in an RPG */
 export const SKILL_CATEGORIES = {
   SERVING: 'serving',
   PASSING: 'passing',
@@ -18,7 +18,7 @@ export const SKILL_CATEGORIES = {
   STRATEGY: 'strategy',
 };
 
-/** Human-readable labels for skill categories */
+/** pretty-printed names so the UI doesn't scream UPPER_CASE at coaches */
 export const SKILL_CATEGORY_LABELS = {
   [SKILL_CATEGORIES.SERVING]: 'Serving',
   [SKILL_CATEGORIES.PASSING]: 'Passing',
@@ -32,7 +32,7 @@ export const SKILL_CATEGORY_LABELS = {
   [SKILL_CATEGORIES.STRATEGY]: 'Strategy',
 };
 
-/** Player positions */
+/** every court position — the volleyball version of job titles on LinkedIn */
 export const POSITIONS = {
   SETTER: 'setter',
   OUTSIDE_HITTER: 'outside_hitter',
@@ -53,17 +53,17 @@ export const POSITION_LABELS = {
   [POSITIONS.ENTIRE_TEAM]: 'Entire Team',
 };
 
-/** Common formations (offensive systems) */
+/** offensive formations — the playbooks coaches argue about at dinner */
 export const FORMATIONS = {
   SIX_TWO: '6-2',
   FIVE_ONE: '5-1',
   FOUR_TWO: '4-2',
 };
 
-/** Court zones (1–6) */
+/** the six court zones — numbered like a weird clock that only goes to 6 */
 export const COURT_ZONES = ['1', '2', '3', '4', '5', '6'];
 
-/** Volleyball-specific feedback types for coaching */
+/** flavors of coaching critique — like review categories but for athletes */
 export const FEEDBACK_TYPES = {
   TECHNIQUE: 'technique',
   POSITIONING: 'positioning',
@@ -82,7 +82,7 @@ export const FEEDBACK_TYPE_LABELS = {
   [FEEDBACK_TYPES.EFFORT]: 'Effort',
 };
 
-/** Terms that map to skill categories (for prompt and optional local mapping) */
+/** keyword → skill category lookup — so the AI knows "ace" means serving, not poker */
 export const SKILL_TERMS = {
   [SKILL_CATEGORIES.SERVING]: [
     'serve', 'serving', 'float serve', 'jump serve', 'topspin', 'ace',
@@ -126,7 +126,7 @@ export const SKILL_TERMS = {
   ],
 };
 
-/** Position keywords for detection */
+/** aliases for each position — coaches say "OH" and expect everyone to just know */
 export const POSITION_TERMS = {
   [POSITIONS.SETTER]: ['setter', 'setters', 'S', '1'],
   [POSITIONS.OUTSIDE_HITTER]: ['outside', 'OH', 'left side', 'pin hitter', 'outside hitter'],
@@ -137,7 +137,7 @@ export const POSITION_TERMS = {
   [POSITIONS.ENTIRE_TEAM]: ['entire team', 'whole team', 'team', 'everyone', 'all players', 'full team'],
 };
 
-/** Play/formation keywords */
+/** terms that hint at a specific play or formation being called */
 export const PLAY_PATTERN_TERMS = [
   '6-2', '5-1', '4-2', 'six-two', 'five-one', 'four-two',
   'rotation one', 'rotation two', 'rotation three', 'rotation four', 'rotation five', 'rotation six',
@@ -145,18 +145,18 @@ export const PLAY_PATTERN_TERMS = [
 ];
 
 /**
- * Common speech-to-text mishearings of volleyball terms.
- * Each entry: [ regex or string to match (case-insensitive), replacement ].
- * Applied in order so the stored transcription and labels use correct volleyball wording.
+ * Autocorrect for volleyball — speech-to-text loves mangling our jargon.
+ * Each entry is [regex to catch the mistake, what it should actually say].
+ * Applied in order so by the time we store the text, it sounds literate.
  */
 export const TRANSCRIPTION_CORRECTIONS = [
-  // "Server C" / "server C" → serve receive
+  // STT hears "Server C" when the coach says "serve receive" — classic
   [/\bServer\s+C\b/gi, 'serve receive'],
-  [/\bserve\s+receive\b/gi, 'serve receive'], // normalize spacing/caps
-  // Other common STT mishearings
-  [/\bset\s+her\b/gi, 'setter'], // "set her" when meaning the position
+  [/\bserve\s+receive\b/gi, 'serve receive'], // tidy up weird spacing or caps
+  // more greatest hits of "things Siri thinks you said"
+  [/\bset\s+her\b/gi, 'setter'], // "set her" ≠ a command — it's the position
   [/\bfree\s+fall\b/gi, 'free ball'],
-  [/\bdown\s+ball\b/gi, 'down ball'], // normalize
+  [/\bdown\s+ball\b/gi, 'down ball'], // just normalizing spacing
   [/\bout\s+of\s+system\b/gi, 'out of system'],
   [/\bmiddle\s+block\s+her\b/gi, 'middle blocker'],
   [/\boutside\s+hitter\b/gi, 'outside hitter'],
@@ -165,12 +165,12 @@ export const TRANSCRIPTION_CORRECTIONS = [
 ];
 
 /**
- * Apply volleyball-specific corrections to raw transcription text.
- * Fixes common speech-to-text mishearings (e.g. "Server C" → "serve receive").
- * Optionally applies roster name corrections (e.g. "Malikal" → "Maliekal") when provided.
- * @param {string} text - Raw transcription from STT
- * @param {Array<{ from: string, to: string }>} [nameCorrections] - Optional list of { from, to } for player name spelling
- * @returns {string} Corrected transcription
+ * Runs the raw transcription through our volleyball spell-check.
+ * Fixes STT blunders (e.g. "Server C" → "serve receive") and optionally
+ * patches mangled player names ("Malikal" → "Maliekal") if you pass a roster.
+ * @param {string} text - raw transcription straight from the speech engine
+ * @param {Array<{ from: string, to: string }>} [nameCorrections] - optional name fix-ups from the roster
+ * @returns {string} cleaned-up transcription that actually makes sense
  */
 export function applyVolleyballTranscriptionCorrections(text, nameCorrections = []) {
   if (!text || typeof text !== 'string') return text;
@@ -192,7 +192,7 @@ function escapeRegex(s) {
 }
 
 /**
- * Get all skill category values as a list (for prompts).
+ * Dumps all skill categories into a flat array — handy for stuffing into prompts.
  * @returns {string[]}
  */
 export function getSkillCategoryList() {
@@ -200,7 +200,7 @@ export function getSkillCategoryList() {
 }
 
 /**
- * Get all position values as a list (for prompts).
+ * Same deal but for positions — gives the AI a menu of who's who on the court.
  * @returns {string[]}
  */
 export function getPositionList() {
@@ -208,7 +208,7 @@ export function getPositionList() {
 }
 
 /**
- * Get all feedback type values (for prompts).
+ * Every feedback type as a flat list — so prompts know what critique styles exist.
  * @returns {string[]}
  */
 export function getFeedbackTypeList() {
@@ -216,8 +216,9 @@ export function getFeedbackTypeList() {
 }
 
 /**
- * Parse ai_labels from storage: can be legacy plain string or JSON with label + metadata.
- * @param {string|null} aiLabels - Value from recordings.ai_labels
+ * Cracks open the ai_labels field — could be a plain string (old-school) or a JSON
+ * blob packed with metadata. Either way you get a tidy object back, like a loot box.
+ * @param {string|null} aiLabels - whatever's sitting in recordings.ai_labels
  * @returns {{ displayLabel: string, skillCategory?: string, position?: string, playPattern?: string, feedbackType?: string, ruleNote?: string }}
  */
 export function parseAiLabels(aiLabels) {
@@ -246,9 +247,10 @@ export function parseAiLabels(aiLabels) {
 }
 
 /**
- * Serialize label and optional volleyball metadata for storage in ai_labels.
- * @param {string} label - Short display label
- * @param {object} meta - Optional: skillCategory, position, playPattern, feedbackType
+ * Packs a label + any volleyball metadata into a string for storage.
+ * If there's no extra metadata, just returns the plain label — no JSON bloat.
+ * @param {string} label - the short display label coaches see
+ * @param {object} meta - optional extras: skillCategory, position, playPattern, feedbackType
  * @returns {string}
  */
 export function serializeAiLabels(label, meta = {}) {
@@ -274,8 +276,9 @@ export function serializeAiLabels(label, meta = {}) {
 }
 
 /**
- * Aggregate volleyball metadata from an array of recordings for post-game summary.
- * @param {Array<{ ai_labels?: string | null }>} recordings - List of recording objects
+ * Tallies up volleyball metadata across recordings — basically builds the
+ * post-game stat sheet (by skill, by position, by feedback type).
+ * @param {Array<{ ai_labels?: string | null }>} recordings - the full pile of recording objects
  * @returns {{ bySkill: Record<string, number>, byPosition: Record<string, number>, byFeedback: Record<string, number>, totalWithMeta: number }}
  */
 export function aggregateVolleyballStats(recordings) {

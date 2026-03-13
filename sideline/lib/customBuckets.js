@@ -1,6 +1,7 @@
 /**
- * User-defined buckets (categories) for recordings. Stored per-user and passed to
- * label generation so the AI can tag future recordings with these categories.
+ * Custom categories coaches create for sorting their recordings — like making
+ * your own playlists but for coaching notes. Saved per-user and fed to the AI
+ * so it starts tagging new recordings with them automatically.
  */
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -12,7 +13,7 @@ function storageKey(userId) {
 }
 
 /**
- * @param {string} userId
+ * @param {string} userId - whose custom buckets we're loading
  * @returns {Promise<{ name: string, type: 'skill'|'position'|'feedback', description?: string }[]>}
  */
 export async function getCustomBuckets(userId) {
@@ -28,10 +29,10 @@ export async function getCustomBuckets(userId) {
 }
 
 /**
- * @param {string} userId
- * @param {string} name - Bucket name (e.g. "Injury management")
- * @param {'skill'|'position'|'feedback'} type
- * @param {string} [description] - Optional AI-generated description for future prompts
+ * @param {string} userId - the coach's user ID
+ * @param {string} name - what to call this bucket (e.g. "Serve pressure")
+ * @param {'skill'|'position'|'feedback'} type - which category lane it belongs to
+ * @param {string} [description] - optional AI-generated blurb so future prompts know what it means
  */
 export async function addCustomBucket(userId, name, type, description = '') {
   if (!userId || !name?.trim()) return;
@@ -47,8 +48,8 @@ export async function addCustomBucket(userId, name, type, description = '') {
 }
 
 /**
- * Get custom bucket names by type for use in label-generation prompt.
- * @param {string} userId
+ * Groups bucket names by type so we can inject them straight into the label-generation prompt.
+ * @param {string} userId - whose buckets we're grabbing
  * @returns {Promise<{ skill: string[], position: string[], feedback: string[] }>}
  */
 export async function getCustomBucketsForPrompt(userId) {
@@ -62,10 +63,10 @@ export async function getCustomBucketsForPrompt(userId) {
 const groqApiKey = process.env.EXPO_PUBLIC_GROQ_API_KEY;
 
 /**
- * Use AI to describe how this bucket relates to the recording context (for storage and future use).
- * @param {string} bucketName
- * @param {string} [recordingContext] - e.g. label + snippet of transcription
- * @returns {Promise<string>} Short description or empty string
+ * Gets the AI to write a one-liner explaining what this bucket is about — like a tooltip for future you.
+ * @param {string} bucketName - whatever the coach named it
+ * @param {string} [recordingContext] - optional context (label + transcription snippet) so the AI has a clue
+ * @returns {Promise<string>} a short description, or empty string if the AI has nothing to say
  */
 export async function describeBucketWithAI(bucketName, recordingContext = '') {
   if (!groqApiKey || !bucketName?.trim()) return '';

@@ -5,7 +5,7 @@ import { serializeAiLabels, applyVolleyballTranscriptionCorrections } from './vo
 import { getPlayerNamesForGameSession, buildRosterNameCorrections } from './roster';
 import { getCustomBucketsForPrompt } from './customBuckets';
 
-// Helper function to check if error is missing column error
+// catches DB errors about columns that don't exist yet — growing pains of schema changes
 const isMissingColumnError = (error, column) => {
   if (!error || typeof error !== 'object') return false;
   const message = error.message;
@@ -13,16 +13,16 @@ const isMissingColumnError = (error, column) => {
 };
 
 /**
- * Process a recording by transcribing it (labels are generated later in batch)
- * @param {string} recordingId - The ID of the recording to process
- * @param {string} userId - The user ID who owns the recording
+ * the main quest: audio → transcription → AI label, all in one pipeline run
+ * @param {string} recordingId - which recording to process
+ * @param {string} userId - who owns this recording
  * @returns {Promise<{success: boolean, transcription: string|null, error: Error|null}>}
  */
 export async function processRecording(recordingId, userId) {
   try {
     console.log('🔄 Starting recording processing for ID:', recordingId);
 
-    // Step 1: Fetch recording from database
+    // step 1: pull the recording metadata from the database
     console.log('📥 Fetching recording from database...');
     const { data: recording, error: fetchError } = await fetchRecordingForProcessing(
       recordingId,
@@ -39,7 +39,7 @@ export async function processRecording(recordingId, userId) {
       };
     }
 
-    // Step 2: Get audio file URL from recording
+    // step 2: extract the audio URL — can't transcribe silence
     const audioUrl = recording.audio_url;
     if (!audioUrl) {
       console.error('❌ Recording has no audio URL');
@@ -53,9 +53,9 @@ export async function processRecording(recordingId, userId) {
 
     console.log('🎵 Audio URL retrieved:', audioUrl);
 
-    // Step 2.5: Create a signed URL for downloading (bucket is not public)
-    // Extract the file path from the public URL
-    // Format: https://[project].supabase.co/storage/v1/object/public/recordings/[path]
+    // step 2.5: storage is private so we need a signed URL (like a concert wristband)
+    // gotta extract the file path from the public URL format:
+    // https://[project].supabase.co/storage/v1/object/public/recordings/[path]
     let downloadUrl = audioUrl;
     if (audioUrl.includes('/public/recordings/')) {
       const filePath = audioUrl.split('/public/recordings/')[1];
@@ -63,7 +63,7 @@ export async function processRecording(recordingId, userId) {
       
       const { data: signedUrlData, error: signedUrlError } = await supabase.storage
         .from('recordings')
-        .createSignedUrl(filePath, 3600); // 1 hour expiry
+        .createSignedUrl(filePath, 3600); // 1 hour TTL — more than enough
       
       if (signedUrlError || !signedUrlData?.signedUrl) {
         console.error('❌ Failed to create signed URL:', signedUrlError);
@@ -73,13 +73,13 @@ export async function processRecording(recordingId, userId) {
       }
     }
 
-    // Step 3: Call transcribeAudio function
+    // step 3: ship audio to Whisper for transcription
     console.log('🎤 Starting transcription...');
     const { transcription, error: transcriptionError } = await transcribeAudio(downloadUrl);
 
     if (transcriptionError || !transcription) {
       console.error('❌ Transcription failed:', transcriptionError);
-      // Don't update status - keep as 'new'
+      // leave status as 'new' — we can always retry later
       return {
         success: false,
         transcription: null,
@@ -90,7 +90,7 @@ export async function processRecording(recordingId, userId) {
 
     console.log('✅ Transcription completed:', transcription.substring(0, 100) + '...');
 
-    // Step 3.5: Apply volleyball corrections + roster name spelling (e.g. "Malikal" → "Maliekal")
+    // step 3.5: autocorrect volleyball jargon + player names (Whisper butchers names ngl)
     let nameCorrections = [];
     if (recording.game_session_id) {
       const { names: rosterNames } = await getPlayerNamesForGameSession(recording.game_session_id);
@@ -101,7 +101,7 @@ export async function processRecording(recordingId, userId) {
       console.log('🏐 Applied volleyball transcription corrections', nameCorrections.length ? `(${nameCorrections.length} name fixes)` : '');
     }
 
-    // Step 4: Generate AI label with roster context for correct player name spelling
+    // step 4: generate an AI label — roster context helps with name accuracy
     const { names: playerNames } = recording.game_session_id
       ? await getPlayerNamesForGameSession(recording.game_session_id)
       : { names: [] };
@@ -112,7 +112,7 @@ export async function processRecording(recordingId, userId) {
     let aiLabel = null;
     if (labelResult.error || !labelResult.label) {
       console.error('⚠️ Label generation failed:', labelResult.error);
-      // Continue anyway - we still have transcription
+      // no label? not the end of the world — transcription is the MVP here
     } else {
       console.log('✅ Label generated:', labelResult.label);
       aiLabel = serializeAiLabels(labelResult.label, {
@@ -124,7 +124,7 @@ export async function processRecording(recordingId, userId) {
       });
     }
 
-    // Step 5: Update recording with corrected transcription and label
+    // step 5: save transcription + label to the DB — checkpoint reached
     console.log('💾 Updating recording with transcription and label...');
     const { error: updateError } = await updateRecordingData(recordingId, userId, {
       transcription: correctedTranscription,
@@ -160,9 +160,9 @@ export async function processRecording(recordingId, userId) {
 }
 
 /**
- * Fetch a recording from the database for processing
- * @param {string} recordingId - The recording ID
- * @param {string} userId - The user ID
+ * grabs one recording from the DB — just the fields needed for the pipeline
+ * @param {string} recordingId - which recording to fetch
+ * @param {string} userId - the owner's ID (access control)
  * @returns {Promise<{data: object|null, error: Error|null}>}
  */
 async function fetchRecordingForProcessing(recordingId, userId) {
@@ -174,7 +174,7 @@ async function fetchRecordingForProcessing(recordingId, userId) {
       .eq('user_id', userId)
       .single();
 
-    // Backward-compat: if recordings.user_id doesn't exist, retry without it
+    // backward compat — user_id column might not exist in older DBs, try without
     if (error && isMissingColumnError(error, 'user_id')) {
       const retry = await supabase
         .from('recordings')
@@ -193,10 +193,10 @@ async function fetchRecordingForProcessing(recordingId, userId) {
 }
 
 /**
- * Update recording with transcription and ai_labels
- * @param {string} recordingId - The recording ID
- * @param {string} userId - The user ID
- * @param {object} updates - The fields to update (transcription, ai_labels, status)
+ * writes transcription + ai_labels back to the recording row — the save button
+ * @param {string} recordingId - the recording to update
+ * @param {string} userId - owner's ID for access control
+ * @param {object} updates - the fields to overwrite (transcription, ai_labels, status)
  * @returns {Promise<{error: Error|null}>}
  */
 async function updateRecordingData(recordingId, userId, updates) {
@@ -207,7 +207,7 @@ async function updateRecordingData(recordingId, userId, updates) {
       .eq('id', recordingId)
       .eq('user_id', userId);
 
-    // Backward-compat: if recordings.user_id doesn't exist, retry without it
+    // backward compat — if user_id column doesn't exist, retry without it
     if (error && isMissingColumnError(error, 'user_id')) {
       const retry = await supabase
         .from('recordings')
@@ -223,10 +223,10 @@ async function updateRecordingData(recordingId, userId, updates) {
 }
 
 /**
- * Update recording status
- * @param {string} recordingId - The recording ID
- * @param {string} userId - The user ID
- * @param {string} status - The new status
+ * one-liner to toggle a recording's status field (like flipping a light switch)
+ * @param {string} recordingId - the recording to update
+ * @param {string} userId - owner's ID
+ * @param {string} status - new status string to set
  * @returns {Promise<{error: Error|null}>}
  */
 async function updateRecordingStatus(recordingId, userId, status) {
@@ -234,16 +234,16 @@ async function updateRecordingStatus(recordingId, userId, status) {
 }
 
 /**
- * Generate labels for all recordings in a game session
- * @param {string} gameSessionId - The game session ID
- * @param {string} userId - The user ID who owns the recordings
+ * batch-generates AI labels for a game session — assembly line style, label printer go brr
+ * @param {string} gameSessionId - which game session to label up
+ * @param {string} userId - the recordings' owner
  * @returns {Promise<{success: boolean, processedCount: number, failedCount: number, error: Error|null}>}
  */
 export async function generateLabelsForGameSession(gameSessionId, userId) {
   try {
     console.log('🏷️  Starting batch label generation for game session:', gameSessionId);
 
-    // Fetch all recordings for this game session that have transcriptions but no labels
+    // query for recordings that have text but are still label-less
     let { data: recordings, error: fetchError } = await supabase
       .from('recordings')
       .select('id, transcription, ai_labels')
@@ -251,7 +251,7 @@ export async function generateLabelsForGameSession(gameSessionId, userId) {
       .eq('user_id', userId)
       .not('transcription', 'is', null);
 
-    // Backward-compat: if recordings.user_id doesn't exist, retry without it
+    // backward compat — no user_id column? no problem, retry without it
     if (fetchError && isMissingColumnError(fetchError, 'user_id')) {
       const retry = await supabase
         .from('recordings')
@@ -290,9 +290,9 @@ export async function generateLabelsForGameSession(gameSessionId, userId) {
     let processedCount = 0;
     let failedCount = 0;
 
-    // Process each recording
+    // loop through each recording and stamp it with an AI label
     for (const recording of recordings) {
-      // Skip if already has a label
+      // already labeled? skip it — no need to redo homework that's already done
       if (recording.ai_labels) {
         console.log(`⏭️  Skipping recording ${recording.id} - already has label`);
         continue;
@@ -350,16 +350,16 @@ export async function generateLabelsForGameSession(gameSessionId, userId) {
 }
 
 /**
- * Generate labels for ALL recordings in a specific game that have transcriptions
- * @param {string} userId - The user ID
- * @param {string} gameSessionId - The game session ID to filter recordings
+ * regenerates AI labels for every transcribed recording in a game — even if one exists already
+ * @param {string} userId - who owns these recordings
+ * @param {string} gameSessionId - the target game session
  * @returns {Promise<{processedCount: number, failedCount: number, error: Error|null}>}
  */
 export async function generateMissingLabels(userId, gameSessionId) {
   try {
     console.log('🏷️  Finding recordings with transcriptions for game session:', gameSessionId);
 
-    // Fetch ALL recordings for this game session that have transcriptions
+    // find all transcribed recordings in this game session
     let { data: recordings, error: fetchError } = await supabase
       .from('recordings')
       .select('id, transcription, ai_labels')
@@ -367,7 +367,7 @@ export async function generateMissingLabels(userId, gameSessionId) {
       .eq('game_session_id', gameSessionId)
       .not('transcription', 'is', null);
 
-    // Backward-compat: if recordings.user_id doesn't exist, retry without it
+    // backward compat — older schema without user_id? retry the query
     if (fetchError && isMissingColumnError(fetchError, 'user_id')) {
       const retry = await supabase
         .from('recordings')
@@ -404,7 +404,7 @@ export async function generateMissingLabels(userId, gameSessionId) {
     let processedCount = 0;
     let failedCount = 0;
 
-    // Process each recording
+    // run through each recording and give it a brand new label
     for (const recording of recordings) {
       console.log(`🏷️  Generating label for recording ${recording.id}...`);
 
@@ -456,10 +456,10 @@ export async function generateMissingLabels(userId, gameSessionId) {
 }
 
 /**
- * Test the recording processing function with a recording ID
- * @param {string} recordingId - The recording ID to test with
- * @param {string} userId - The user ID
- * @returns {Promise<boolean>} True if test passed, false otherwise
+ * smoke test: runs one recording through the full pipeline to make sure nothing's broken
+ * @param {string} recordingId - a legit recording ID to test with
+ * @param {string} userId - the recording's owner
+ * @returns {Promise<boolean>} true if the pipeline vibed, false if it crashed
  */
 export async function testProcessRecording(recordingId, userId) {
   console.log('🧪 Testing recording processing service...');

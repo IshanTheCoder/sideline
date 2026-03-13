@@ -19,7 +19,7 @@ export default function HomeScreen() {
   const router = useRouter();
   const [menuVisible, setMenuVisible] = useState(false);
   
-  // State for games
+  // recordings + loading/error state for the home screen
   const [recordings, setRecordings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -37,7 +37,7 @@ export default function HomeScreen() {
       const { data, error: fetchError } = await fetchRecordingsForUser(user.id);
 
       if (fetchError) {
-        // If table doesn't exist or schema is incomplete, show empty state gracefully
+        // if the table doesn't exist yet, just show empty — no panic
         if (fetchError.message.includes('does not exist') || 
             fetchError.message.includes('column') ||
             fetchError.code === 'PGRST116') {
@@ -54,7 +54,7 @@ export default function HomeScreen() {
 
       setRecordings(data ?? []);
     } catch (err) {
-      // Don't show error to user for missing table - just show empty state
+      // missing table? no big deal, just show nothing
       setRecordings([]);
       setError(null);
     } finally {
@@ -62,7 +62,7 @@ export default function HomeScreen() {
     }
   }, [user?.id]);
 
-  // Fetch recent recordings on mount
+  // grab recent recordings when this screen first loads
   useEffect(() => {
     if (user?.id) {
       fetchRecentRecordings();
@@ -80,7 +80,7 @@ export default function HomeScreen() {
       }
     };
 
-    // For web, sign out immediately to avoid blocked dialogs
+    // on web we just sign out instantly — no confirm dialog since browsers block those
     if (Platform.OS === 'web') {
       await doSignOut();
       return;
@@ -164,7 +164,7 @@ export default function HomeScreen() {
       .slice(0, 5);
   }, [recordings]);
 
-  // Get a random greeting
+  // pick a random greeting like a fortune cookie
   const getGreeting = () => {
     const greetings = [
       'Welcome back',
@@ -184,9 +184,9 @@ export default function HomeScreen() {
         onSignOut={handleSignOut}
       />
       
-      {/* Header */}
+      {/* top bar — menu + settings */}
       <View style={styles.header}>
-        {/* Hamburger Menu Button */}
+        {/* the triple-line hamburger button */}
         <TouchableOpacity
           style={styles.hamburgerButton}
           onPress={() => setMenuVisible(true)}
@@ -203,7 +203,7 @@ export default function HomeScreen() {
           }]} />
         </TouchableOpacity>
 
-        {/* Settings Button */}
+        {/* gear icon → settings */}
         <TouchableOpacity 
           style={styles.settingsButton}
           onPress={() => router.push('/(tabs)/settings')}
@@ -222,7 +222,7 @@ export default function HomeScreen() {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* Welcome Section */}
+        {/* greeting + user name */}
         <View style={styles.welcomeSection}>
           <ThemedText style={styles.welcomeText}>
             {getGreeting()},
@@ -232,7 +232,7 @@ export default function HomeScreen() {
           </ThemedText>
         </View>
 
-        {/* Start Recording Button */}
+        {/* big "start recording" CTA card */}
         <TouchableOpacity
           style={styles.startRecordingButton}
           onPress={handleStartRecording}
@@ -251,7 +251,7 @@ export default function HomeScreen() {
           </View>
         </TouchableOpacity>
 
-        {/* Recent Games Section */}
+        {/* recent games feed */}
         <View style={styles.recentSection}>
           <View style={styles.sectionHeader}>
             <ThemedText style={styles.sectionTitle}>
@@ -268,7 +268,7 @@ export default function HomeScreen() {
             )}
           </View>
           
-          {/* Loading State */}
+          {/* loading spinner */}
           {loading && (
             <View style={styles.loadingContainer}>
               <ActivityIndicator 
@@ -281,7 +281,7 @@ export default function HomeScreen() {
             </View>
           )}
 
-          {/* Error State */}
+          {/* something broke — show error + retry */}
           {error && !loading && (
             <View style={styles.errorContainer}>
               <ThemedText style={styles.errorText}>
@@ -300,7 +300,7 @@ export default function HomeScreen() {
             </View>
           )}
 
-          {/* Recordings List */}
+          {/* actual game cards (or empty state) */}
           {!loading && !error && (
             <View style={styles.gamesList}>
               {games.length === 0 && (

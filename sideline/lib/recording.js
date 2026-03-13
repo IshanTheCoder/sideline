@@ -3,7 +3,7 @@ import * as FileSystem from 'expo-file-system/legacy';
 import { decode } from 'base64-arraybuffer';
 import { Platform } from 'react-native';
 
-// Helper function to parse recording notes
+// unwraps the raw notes like a mystery loot box — might be JSON, might be plain text
 export const parseRecordingNotes = (raw) => {
   if (!raw) {
     return { notes: '', setMarkers: [] };
@@ -18,13 +18,13 @@ export const parseRecordingNotes = (raw) => {
       };
     }
   } catch {
-    // Fall back to plain text notes
+    // JSON.parse struck out — it's probably just raw text, no biggie
   }
 
   return { notes: raw, setMarkers: [] };
 };
 
-// Helper function to serialize recording notes
+// zips notes + set markers into a single JSON string, like packing a suitcase
 export const serializeRecordingNotes = (notes, setMarkers) => {
   if (!setMarkers.length) {
     return notes;
@@ -39,7 +39,7 @@ export const serializeRecordingNotes = (notes, setMarkers) => {
   return JSON.stringify(payload);
 };
 
-// Helper function to check if error is missing column error
+// sniffs out DB errors about columns that literally aren't in the schema
 const isMissingColumnError = (error, column) => {
   if (!error || typeof error !== 'object') return false;
   const message = error.message;
@@ -47,15 +47,15 @@ const isMissingColumnError = (error, column) => {
 };
 
 /**
- * Upload an audio recording to Supabase Storage
- * @param userId - The user's ID
- * @param recordingId - Unique recording ID (UUID)
- * @param audioUri - Local URI of the audio file
- * @returns The public URL of the uploaded file or error
+ * launches an audio file into Supabase Storage like a volleyball serve to the cloud
+ * @param userId - who's uploading
+ * @param recordingId - this recording's unique ID (basically its SSN)
+ * @param audioUri - where the audio file lives on the device right now
+ * @returns a public URL on success, or an error if the upload bricked
  */
 export const uploadRecording = async (userId, recordingId, audioUri) => {
   try {
-    // On web, Expo records in webm; on native it's m4a (AAC).
+    // web = webm, native = m4a — gotta match the audio format to the platform
     const isWeb = Platform.OS === 'web';
     const ext = isWeb ? 'webm' : 'm4a';
     const contentType = isWeb ? 'audio/webm' : 'audio/m4a';
@@ -65,7 +65,7 @@ export const uploadRecording = async (userId, recordingId, audioUri) => {
 
     let fileToUpload;
 
-    // For web: convert blob URL to ArrayBuffer
+    // web path: turn that blob URL into raw bytes (like melting a popsicle back to juice)
     if (isWeb && (audioUri.startsWith('blob:') || audioUri.startsWith('http://') || audioUri.startsWith('https://'))) {
       console.log('Web detected - fetching blob and converting to ArrayBuffer');
       const response = await fetch(audioUri);
@@ -73,7 +73,7 @@ export const uploadRecording = async (userId, recordingId, audioUri) => {
       fileToUpload = await blob.arrayBuffer();
       console.log('ArrayBuffer created. Size:', fileToUpload.byteLength);
     } else {
-      // For native (React Native): read file as base64, then decode to ArrayBuffer
+      // native path: file → base64 string → raw bytes (the scenic route)
       console.log('Native detected - reading audio file as base64');
       
       try {
@@ -92,7 +92,7 @@ export const uploadRecording = async (userId, recordingId, audioUri) => {
         
         console.log('Base64 read successfully. Length:', base64.length);
         
-        // Decode base64 to ArrayBuffer
+        // decode the base64 cipher back into raw bytes the server can understand
         fileToUpload = decode(base64);
         console.log('ArrayBuffer created from base64. Size:', fileToUpload.byteLength);
         
@@ -117,12 +117,12 @@ export const uploadRecording = async (userId, recordingId, audioUri) => {
 
     console.log('Uploading to Supabase Storage. FileName:', fileName, 'ContentType:', contentType);
 
-    // Upload to Supabase Storage
+    // fire the audio up to Supabase cloud storage — fingers crossed
     const { data, error } = await supabase.storage
       .from('recordings')
       .upload(fileName, fileToUpload, {
         cacheControl: '3600',
-        upsert: false, // Don't overwrite existing recordings
+        upsert: false, // no overwriting allowed — each recording is a one-of-a-kind artifact
         contentType: contentType,
       });
 
@@ -133,7 +133,7 @@ export const uploadRecording = async (userId, recordingId, audioUri) => {
 
     console.log('✅ Upload successful! Storage data:', data);
 
-    // Get public URL
+    // grab the public URL so anyone with the link can play this audio
     const { data: urlData } = supabase.storage
       .from('recordings')
       .getPublicUrl(fileName);
@@ -149,12 +149,12 @@ export const uploadRecording = async (userId, recordingId, audioUri) => {
 };
 
 /**
- * Get or create a default team for the user
- * This ensures recordings can always be saved, even before Phase 6 team management
+ * finds the user's team — or spawns a default one if they're rolling solo
+ * recordings need a team like Pokémon need a trainer, even before Phase 6
  */
 const getOrCreateDefaultTeam = async (userId) => {
   try {
-    // Try to get an existing team for the user
+    // see if this user already has a team on file
     const { data: existingTeam } = await supabase
       .from('teams')
       .select('id')
@@ -166,14 +166,14 @@ const getOrCreateDefaultTeam = async (userId) => {
       return { id: existingTeam.id, error: null };
     }
 
-    // No team exists, create a default one
+    // no team? cool, we'll auto-generate a starter one — think character creation screen
     console.log('No team found, creating default team for user:', userId);
     const { data: newTeam, error: teamError } = await supabase
       .from('teams')
       .insert({
         coach_id: userId,
         name: 'My Team',
-        sport: 'volleyball', // Default sport
+        sport: 'volleyball', // the GOAT sport, no debate
       })
       .select()
       .single();
@@ -198,12 +198,12 @@ const getOrCreateDefaultTeam = async (userId) => {
 };
 
 /**
- * Get or create a default game session for the user
- * This is a temporary solution until Phase 6 game session management is implemented
+ * finds today's game session or creates a fresh one on the fly
+ * placeholder logic until the real game session system drops in Phase 6
  */
 const getOrCreateDefaultGameSession = async (userId) => {
   try {
-    // First, get or create a default team
+    // step 1: secure a team — you can't play a game without one lol
     const { id: teamId, error: teamError } = await getOrCreateDefaultTeam(userId);
     
     if (teamError || !teamId) {
@@ -213,7 +213,7 @@ const getOrCreateDefaultGameSession = async (userId) => {
       };
     }
 
-    // Try to get an existing default game session for today
+    // check if today already has a game session saved
     const today = new Date().toISOString().split('T')[0];
     const { data: existingSession } = await supabase
       .from('game_sessions')
@@ -227,7 +227,7 @@ const getOrCreateDefaultGameSession = async (userId) => {
       return { id: existingSession.id, error: null };
     }
 
-    // Create a new default game session for today
+    // today's empty — spin up a brand new game session
     console.log('Creating default game session for team:', teamId);
     const { data: newSession, error: sessionError } = await supabase
       .from('game_sessions')
@@ -260,15 +260,15 @@ const getOrCreateDefaultGameSession = async (userId) => {
 };
 
 /**
- * Create a recording record in the database
- * @param recordingData - Recording data to save
- * @returns The created recording record or error
+ * saves a new recording to the database — basically its birth certificate
+ * @param recordingData - the full payload of recording info to persist
+ * @returns the created DB row, or an error if the insert face-planted
  */
 export const createRecordingRecord = async (recordingData) => {
   try {
     console.log('Creating recording record in database:', recordingData);
 
-    // Get or create a default game session if none provided
+    // missing a game session? we'll fetch or create a default — improvise, adapt, overcome
     let gameSessionId = recordingData.game_session_id;
 
     if (!gameSessionId) {
@@ -291,7 +291,7 @@ export const createRecordingRecord = async (recordingData) => {
       audio_url: recordingData.audio_url,
       duration: recordingData.duration,
       timestamp: recordingData.timestamp || new Date().toISOString(),
-      status: 'new', // Default status
+      status: 'new', // fresh out of the oven, not processed yet
       manual_notes: recordingData.manual_notes ?? null,
     };
 
@@ -301,7 +301,7 @@ export const createRecordingRecord = async (recordingData) => {
       .select()
       .single();
 
-    // Backward-compat: if recordings.user_id doesn't exist, retry without it
+    // backward compat — older schemas might be missing user_id, so retry without it
     if (error && isMissingColumnError(error, 'user_id')) {
       const { user_id, ...fallbackPayload } = insertPayload;
       const retry = await supabase
@@ -315,7 +315,7 @@ export const createRecordingRecord = async (recordingData) => {
 
     if (error) {
       console.log('Error creating recording record:', error);
-      // Log the full error for debugging
+      // dump the full error object so future-us has something to debug with
       console.log('Full error details:', JSON.stringify(error, null, 2));
       return { data: null, error };
     }
@@ -328,14 +328,14 @@ export const createRecordingRecord = async (recordingData) => {
   }
 };
 
-// Format duration in minutes:seconds
+// converts raw seconds into a nice "3:07" display string (think Spotify track length)
 export function formatDuration(seconds) {
   const mins = Math.floor(seconds / 60);
   const secs = Math.floor(seconds % 60);
   return `${mins}:${secs.toString().padStart(2, '0')}`;
 }
 
-// Fetch all recordings for a user
+// fetches every recording this user has ever made, sorted newest-first
 export async function fetchRecordingsForUser(userId) {
   try {
     let { data, error } = await supabase
@@ -362,7 +362,7 @@ export async function fetchRecordingsForUser(userId) {
       .order('created_at', { ascending: false });
 
     if (error && isMissingColumnError(error, 'user_id')) {
-      // Fallback to team ownership via game_sessions -> teams -> coach_id
+      // fallback: find recordings via the team → coach ownership chain
       const retry = await supabase
         .from('recordings')
         .select(
@@ -399,7 +399,7 @@ export async function fetchRecordingsForUser(userId) {
   }
 }
 
-// Fetch recordings for a specific game session
+// pull every recording tied to one specific game session
 export async function fetchRecordingsForGame(userId, gameSessionId) {
   try {
     const isUnassigned = gameSessionId === 'unassigned';
@@ -473,7 +473,7 @@ export async function fetchRecordingsForGame(userId, gameSessionId) {
   }
 }
 
-// Fetch a single recording by ID
+// grab exactly one recording by ID — surgical precision, no extras
 export async function fetchRecordingById(userId, recordingId) {
   try {
     let { data, error } = await supabase
@@ -538,7 +538,7 @@ export async function fetchRecordingById(userId, recordingId) {
   }
 }
 
-// Save notes for a recording
+// persist the user's handwritten notes to a specific recording in the DB
 export async function saveRecordingNotes(userId, recordingId, manualNotes) {
   try {
     let { error } = await supabase
@@ -562,10 +562,10 @@ export async function saveRecordingNotes(userId, recordingId, manualNotes) {
 }
 
 /**
- * Update recording fields (transcription, ai_labels, status).
- * @param {string} userId
- * @param {string} recordingId
- * @param {{ transcription?: string, ai_labels?: string, status?: string }} updates
+ * patches specific fields on a recording — like editing your Instagram bio but for data
+ * @param {string} userId - the recording's owner
+ * @param {string} recordingId - which recording to update
+ * @param {{ transcription?: string, ai_labels?: string, status?: string }} updates - only the fields you wanna change
  */
 export async function updateRecording(userId, recordingId, updates) {
   try {
@@ -595,10 +595,10 @@ export async function updateRecording(userId, recordingId, updates) {
   }
 }
 
-// Helper to extract storage path from public URL
+// extracts the storage path from a Supabase public URL (URL archaeology)
 function getStoragePathFromPublicUrl(publicUrl) {
-  // Expected format:
-  // https://<project>.supabase.co/storage/v1/object/public/<bucket>/<path>
+  // URL shape: https://<project>.supabase.co/storage/v1/object/public/<bucket>/<path>
+  // we chop the URL after "public/" to extract the bucket + file path
   try {
     const url = new URL(publicUrl);
     const parts = url.pathname.split('/');
@@ -608,34 +608,34 @@ function getStoragePathFromPublicUrl(publicUrl) {
     if (!bucket) return null;
     const objectPath = parts.slice(publicIdx + 2).join('/');
     if (!objectPath) return null;
-    // We return "<bucket>/<objectPath>" so callers can validate bucket if needed.
+    // hands back "bucket/path" so the caller knows exactly where the file lives
     return `${bucket}/${objectPath}`;
   } catch {
     return null;
   }
 }
 
-// Create a signed URL for private audio playback
+// mints a temporary signed URL — like a backstage pass that expires after a while
 export async function createSignedRecordingUrl(audioUrl, expiresInSeconds = 3600) {
   try {
-    // Try to parse as a public URL first
+    // first, see if this is a full public URL we can break apart
     const parsed = getStoragePathFromPublicUrl(audioUrl);
     
-    let bucket = 'recordings'; // Default bucket
-    let path = audioUrl; // Assume it's already a path
+    let bucket = 'recordings'; // default bucket until we figure out the real one
+    let path = audioUrl; // assume it's a raw path unless the URL tells us otherwise
     
     if (parsed) {
-      // If we successfully parsed a public URL, extract bucket and path
+      // URL parsed — now split out the bucket name and file path
       const [parsedBucket, ...rest] = parsed.split('/');
       if (parsedBucket && rest.length > 0) {
         bucket = parsedBucket;
         path = rest.join('/');
       }
     } else if (audioUrl.startsWith('http://') || audioUrl.startsWith('https://')) {
-      // It's a URL but couldn't be parsed - return as-is
+      // unrecognized URL format — return as-is and pray it's playable
       return { url: audioUrl, error: null };
     }
-    // else: it's already a storage path, use it directly with default bucket
+    // else: already a clean storage path, good to go
     
     console.log('Creating signed URL - bucket:', bucket, 'path:', path);
     const { data, error } = await supabase.storage
@@ -660,10 +660,10 @@ export async function createSignedRecordingUrl(audioUrl, expiresInSeconds = 3600
   }
 }
 
-// Delete a recording (both database and storage)
+// wipes a recording from the DB and cloud storage — delete means delete
 export async function deleteRecordingForUser(userId, recordingId, audioUrl = null) {
   try {
-    // Best-effort storage delete first (so an orphaned DB row doesn't block cleanup)
+    // kill the storage file first — worst case the DB row is orphaned, not the file
     const defaultPath = `${userId}/${recordingId}.m4a`;
 
     let storageBucket = 'recordings';
@@ -684,7 +684,7 @@ export async function deleteRecordingForUser(userId, recordingId, audioUrl = nul
       .from(storageBucket)
       .remove([storagePath]);
 
-    // Proceed with DB delete even if storage delete fails (user asked to delete)
+    // remove the DB row even if storage cleanup flopped — user's word is law
     let { error: dbError } = await supabase
       .from('recordings')
       .delete()
@@ -707,7 +707,7 @@ export async function deleteRecordingForUser(userId, recordingId, audioUrl = nul
   }
 }
 
-// Delete all recordings for a game session
+// scorched earth: nukes ALL recordings in a game session, one by one
 export async function deleteGameForUser(userId, gameSessionId) {
   try {
     const { data, error } = await fetchRecordingsForGame(userId, gameSessionId);

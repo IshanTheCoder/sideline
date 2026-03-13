@@ -1,7 +1,7 @@
 /**
- * AI synthesis for Post-Game Summary: overarching themes (What You Noticed Most)
- * and narrative match flow (Match Flow). Uses Groq to transform raw recording
- * labels into coach-friendly, non-redundant wording.
+ * The post-game storyteller — takes a pile of raw recording labels and asks
+ * Groq to distill them into "What You Noticed Most" themes and a smooth
+ * "Match Flow" narrative. Basically turns coach brain-dump into readable prose.
  */
 
 const groqApiKey = process.env.EXPO_PUBLIC_GROQ_API_KEY;
@@ -31,7 +31,7 @@ Rules:
 - Output a JSON array of strings only, one string per bullet. No other text.`;
 
 /**
- * @param {{ displayLabel: string, transcription?: string }[]} items - Labels and optional transcriptions
+ * @param {{ displayLabel: string, transcription?: string }[]} items - labels + optional raw transcriptions from the game
  * @returns {Promise<{ themes: string[], error: Error|null }>}
  */
 export async function synthesizeNoticedMost(items) {
@@ -91,7 +91,7 @@ export async function synthesizeNoticedMost(items) {
 }
 
 /**
- * @param {string[]} labels - Chronological list of recording labels
+ * @param {string[]} labels - recording labels in chronological order, like a git log for the game
  * @returns {Promise<{ bullets: string[], error: Error|null }>}
  */
 export async function synthesizeMatchFlow(labels) {

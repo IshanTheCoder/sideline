@@ -1,12 +1,12 @@
 import { Alert, Platform } from 'react-native';
 
 /**
- * Cross-platform alert that works on iOS, Android, AND web.
- * On native it delegates to React Native's Alert.alert.
- * On web it falls back to window.confirm / window.alert.
+ * Universal alert that works everywhere — iOS, Android, AND web, no sweat.
+ * On native we use React Native's built-in Alert (the easy W).
+ * On web we fall back to window.confirm / window.alert (not pretty, but it gets the job done).
  *
- * Because window.confirm only shows generic "OK"/"Cancel" labels, we append
- * the intended button text to the message so users know what each choice does.
+ * Fun catch: window.confirm only gives you "OK" and "Cancel" — zero customization.
+ * So we sneak the intended button names into the message body. Janky? Sure. Ships? Absolutely.
  */
 export function showAlert(title, message, buttons) {
   if (Platform.OS !== 'web') {
@@ -34,7 +34,7 @@ export function showAlert(title, message, buttons) {
   const actionLabel = (primary ?? destructive)?.text;
   const cancelLabel = cancel?.text ?? 'Cancel';
 
-  // Append a hint mapping browser buttons → intended labels
+  // sneak in a cheat sheet so web users know what OK/Cancel actually mean
   let prompt = body;
   if (actionLabel && actionLabel !== 'OK') {
     prompt += `\n\nOK = "${actionLabel}"  ·  Cancel = "${cancelLabel}"`;

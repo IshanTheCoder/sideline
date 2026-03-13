@@ -24,7 +24,7 @@ export default function TabLayout() {
           borderTopColor: colorScheme === 'dark' ? '#2A2A2A' : '#E8E8E8',
         } : undefined,
       }}>
-      {/* Home tab - Main navigation hub */}
+      {/* home sweet home — the main landing tab */}
       <Tabs.Screen
         name="index"
         options={{
@@ -32,19 +32,19 @@ export default function TabLayout() {
           tabBarIcon: ({ color }) => <IconSymbol size={28} name="house.fill" color={color} />,
         }}
       />
-      {/* Hidden screens - accessed via hamburger menu */}
+      {/* hidden screens — reach these from the hamburger menu, not the tab bar */}
       <Tabs.Screen
         name="record"
         options={{
           title: 'Record',
-          href: null, // Hide from tab bar
+          href: null, // not shown in the tab bar
         }}
       />
       <Tabs.Screen
         name="record-details"
         options={{
           title: 'Record Details',
-          href: null, // Hide from tab bar
+          href: null, // not shown in the tab bar
         }}
       />
       <Tabs.Screen
@@ -58,17 +58,17 @@ export default function TabLayout() {
         name="settings"
         options={{
           title: 'Settings',
-          href: null, // Hide from tab bar
+          href: null, // not shown in the tab bar
         }}
       />
       <Tabs.Screen
         name="roster"
         options={{
           title: 'Roster',
-          href: null, // Hide from tab bar - access via hamburger menu
+          href: null, // tucked away — get here through the hamburger menu
         }}
       />
-      {/* Explore tab - Temporary demo content (will be replaced with app features) */}
+      {/* explore tab — placeholder demo stuff, will swap in real features later */}
       <Tabs.Screen
         name="explore"
         options={{

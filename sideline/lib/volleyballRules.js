@@ -1,9 +1,9 @@
 /**
- * Volleyball rules context for AI knowledge and rule-violation detection.
- * Used to improve label generation and flag possible incorrect technique/rule mentions.
+ * Volleyball rulebook cheat sheet — gives the AI enough rules knowledge to
+ * spot when a coach is talking about a violation and not embarrass itself.
  */
 
-/** Concise rules context for inclusion in AI system prompts */
+/** cliff notes of volleyball rules — just enough for the AI to not sound clueless */
 export const VOLLEYBALL_RULES_CONTEXT = `
 Volleyball rules (indoor, standard):
 - Contact: Maximum 3 team contacts per side; double contact (two contacts by same player in one attempt) is a fault except on first team contact (hard-driven attack, or simultaneous contact). Lift/carry (catching or throwing the ball) is a fault.
@@ -15,7 +15,7 @@ Volleyball rules (indoor, standard):
 - Attack: Back-row player may not attack from front zone if contact is above net height (attack from behind the 10-foot line is allowed).
 `.trim();
 
-/** Keywords that suggest a possible rule or technique topic (for detection) */
+/** red-flag keywords — if the coach says any of these, there's probably a rule discussion happening */
 const RULE_VIOLATION_PATTERNS = [
   {
     id: 'double_contact',
@@ -68,9 +68,10 @@ const RULE_VIOLATION_PATTERNS = [
 ];
 
 /**
- * Detect possible rule/technique mentions in transcription and return suggestions.
- * Does not verify whether a violation actually occurred—only flags likely rule-related discussion.
- * @param {string} transcription - Full transcription text
+ * Scans the transcription for rule-related chatter and returns helpful context.
+ * Think of it like a "did someone mention a foul?" detector — doesn't call the ref,
+ * just flags stuff that smells like a rule discussion.
+ * @param {string} transcription - the full transcription text to scan
  * @returns {Array<{ rule: string, snippet: string, suggestion: string }>}
  */
 export function detectPossibleRuleViolations(transcription) {
@@ -91,7 +92,7 @@ export function detectPossibleRuleViolations(transcription) {
           snippet: snippet.length > 80 ? snippet.slice(0, 77) + '...' : snippet,
           suggestion,
         });
-        break; // one match per rule type
+        break; // one match per rule — no need to spam duplicates
       }
     }
   }
@@ -100,7 +101,7 @@ export function detectPossibleRuleViolations(transcription) {
 }
 
 /**
- * Get rules context string for injection into prompts.
+ * Returns the rules cheat sheet string, ready to paste straight into a prompt.
  * @returns {string}
  */
 export function getVolleyballRulesContext() {

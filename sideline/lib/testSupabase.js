@@ -1,20 +1,20 @@
 import { supabase } from './supabase';
 
 /**
- * Test Supabase connection and basic operations
+ * quick health check — is Supabase alive and responding to us?
  */
 export async function testSupabaseConnection() {
   try {
     console.log('🧪 Testing Supabase connection...');
     
-    // Test 1: Check if client is initialized
+    // Test 1: is the Supabase client even initialized? (basic sanity check)
     if (!supabase) {
       console.error('❌ Supabase client is not initialized');
       return false;
     }
     console.log('✅ Supabase client initialized');
     
-    // Test 2: Try to get session
+    // Test 2: check for an active session (is anyone home?)
     const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
     if (sessionError) {
       console.log('⚠️  Session check failed:', sessionError.message);
@@ -23,7 +23,7 @@ export async function testSupabaseConnection() {
       console.log('   User:', sessionData.session?.user?.email || 'No user');
     }
     
-    // Test 3: Try to query a table (will fail if table doesn't exist, but connection works)
+    // Test 3: hit the database with a real query — the ultimate connectivity proof
     const { error: queryError } = await supabase
       .from('profiles')
       .select('id')
@@ -45,13 +45,13 @@ export async function testSupabaseConnection() {
 }
 
 /**
- * Test Supabase Storage
+ * verify Supabase Storage is online — can we access our file buckets?
  */
 export async function testSupabaseStorage() {
   try {
     console.log('🧪 Testing Supabase Storage...');
     
-    // List buckets
+    // ask Storage "what buckets you got?" — like checking what's in the fridge
     const { data: buckets, error: bucketsError } = await supabase.storage.listBuckets();
     
     if (bucketsError) {
@@ -70,7 +70,7 @@ export async function testSupabaseStorage() {
 }
 
 /**
- * Run all Supabase tests
+ * run the whole test suite — connection + storage, the full diagnostic sweep
  */
 export async function runAllSupabaseTests() {
   console.log('🚀 Running all Supabase tests...\n');

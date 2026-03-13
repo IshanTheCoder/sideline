@@ -1,6 +1,6 @@
 import { supabase } from './supabase';
 
-// Helper to get or create default team (exported for roster, etc.)
+// grab the user's team, or spawn a new one if they're fresh — the roster screen needs this
 export const getOrCreateDefaultTeam = async (userId) => {
   try {
     const { data: existingTeam } = await supabase
@@ -40,7 +40,7 @@ export const getOrCreateDefaultTeam = async (userId) => {
   }
 };
 
-// Create a new game session
+// set up a fresh game session — time to ball out, it's game day
 export const createGameSession = async ({ userId, opponentName, date, location }) => {
   try {
     const { id: teamId, error: teamError } = await getOrCreateDefaultTeam(userId);
