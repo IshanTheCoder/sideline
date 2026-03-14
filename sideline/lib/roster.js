@@ -253,6 +253,83 @@ function levenshtein(a, b) {
 }
 
 /**
+ * Converts a spoken or written number (word or digit) to a normalized digit string.
+ * Handles single words ("four" → "4"), plain digits ("4" → "4"), and two-word
+ * compounds ("twenty two" → "22", "twenty-two" → "22").
+ * Returns null if the input can't be parsed as a 0–99 number.
+ * @param {string} str
+ * @returns {string|null}
+ */
+function wordsToDigit(str) {
+  const NUMBER_WORDS = {
+    'zero': 0, 'one': 1, 'two': 2, 'three': 3, 'four': 4,
+    'five': 5, 'six': 6, 'seven': 7, 'eight': 8, 'nine': 9,
+    'ten': 10, 'eleven': 11, 'twelve': 12, 'thirteen': 13, 'fourteen': 14,
+    'fifteen': 15, 'sixteen': 16, 'seventeen': 17, 'eighteen': 18, 'nineteen': 19,
+    'twenty': 20, 'thirty': 30, 'forty': 40, 'fifty': 50,
+    'sixty': 60, 'seventy': 70, 'eighty': 80, 'ninety': 90,
+  };
+  const lower = str.toLowerCase().trim();
+  if (/^\d{1,2}$/.test(lower)) return lower;
+  if (NUMBER_WORDS[lower] !== undefined) return String(NUMBER_WORDS[lower]);
+  const parts = lower.split(/[\s-]+/);
+  if (parts.length === 2) {
+    const tens = NUMBER_WORDS[parts[0]];
+    const ones = NUMBER_WORDS[parts[1]];
+    if (tens !== undefined && ones !== undefined && tens >= 20 && ones >= 1 && ones <= 9) {
+      return String(tens + ones);
+    }
+  }
+  return null;
+}
+
+/**
+ * Detects jersey-number references in the transcription and maps them to the
+ * matching player's name. Handles spoken forms like "number four", "number 4",
+ * "player twelve", "player 22", and two-word compounds like "number twenty two".
+ *
+ * Returns find-and-replace pairs that are compatible with
+ * applyVolleyballTranscriptionCorrections — so "number four" gets swapped for
+ * the actual player name before the transcription ever reaches the AI.
+ *
+ * @param {string} transcription - raw transcription text
+ * @param {Array<{ name: string, number: string|null }>} players - roster with jersey numbers
+ * @returns {Array<{ from: string, to: string }>}
+ */
+export function buildRosterNumberCorrections(transcription, players) {
+  if (!transcription || !players?.length) return [];
+
+  // only bother with players who actually have a jersey number
+  const numberMap = {};
+  for (const p of players) {
+    if (p.number && p.name) numberMap[p.number.trim()] = p.name.trim();
+  }
+  if (!Object.keys(numberMap).length) return [];
+
+  const corrections = [];
+  const seen = new Set();
+
+  // matches "number X" or "player X" where X is:
+  //   a 1–2 digit number:         "number 4", "player 12"
+  //   a single number word:       "number four", "player twelve"
+  //   a two-word compound:        "number twenty two", "player twenty-two"
+  const pattern = /\b(number|player)\s+(\d{1,2}|\w+(?:[\s-]\w+)?)/gi;
+  let match;
+  while ((match = pattern.exec(transcription)) !== null) {
+    const full = match[0];
+    const numStr = match[2];
+    const digit = wordsToDigit(numStr);
+    if (!digit || !numberMap[digit]) continue;
+    const key = full.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    corrections.push({ from: full, to: numberMap[digit] });
+  }
+
+  return corrections;
+}
+
+/**
  * Fuzzy-matches words in the transcription against the roster to catch likely
  * name typos (similar length, edit distance 1–2). Returns find-and-replace pairs.
  * @param {string} transcription - the raw transcription where names might be mangled

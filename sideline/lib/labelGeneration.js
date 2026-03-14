@@ -31,11 +31,23 @@ const VOLLEYBALL_LABEL_EXAMPLES = [
   'Double block hand penetration',
 ];
 
-function buildVolleyballSystemPrompt(isLongRecording, playerNames = [], customBuckets = {}) {
-  const namesHint =
-    playerNames.length > 0
-      ? `\nKnown player names on this team (use EXACT spelling when mentioned): ${playerNames.join(', ')}.\n`
-      : '';
+function buildVolleyballSystemPrompt(isLongRecording, players = [], customBuckets = {}) {
+  // Build a roster hint that covers both name spelling and jersey-number → name resolution.
+  // If any players have numbers, show the full "#N = Name" table so the AI can map
+  // references like "number 4" or "player four" to the right person.
+  let namesHint = '';
+  if (players.length > 0) {
+    const withNumbers = players.filter((p) => p.number);
+    const withoutNumbers = players.filter((p) => !p.number);
+    if (withNumbers.length > 0) {
+      const rows = withNumbers.map((p) => `#${p.number} = ${p.name}`).join(', ');
+      const extras = withoutNumbers.length > 0 ? ` Also: ${withoutNumbers.map((p) => p.name).join(', ')}.` : '';
+      namesHint = `\nRoster (use EXACT spelling; if coach says "number X" or "player X", resolve to the name): ${rows}.${extras}\n`;
+    } else {
+      const names = players.map((p) => p.name).join(', ');
+      namesHint = `\nKnown player names on this team (use EXACT spelling when mentioned): ${names}.\n`;
+    }
+  }
   const lengthGuidance = isLongRecording
     ? 'For LONGER recordings with multiple topics, create a GENERAL summary of the main themes (e.g., "Halftime adjustments and team strategy", "Multiple player technique corrections", "Set review and tactical changes"). Maximum 8 words.'
     : 'For SHORT, focused recordings: ALWAYS include player names when mentioned. Be as specific as possible about the exact technique or feedback. Maximum 8 words. Prioritize: 1) Player name (if mentioned), 2) Volleyball skill/technique, 3) What needs improvement.';
@@ -117,7 +129,12 @@ export async function generateLabel(transcriptionText, options = {}) {
       };
     }
 
-    const playerNames = options.playerNames && Array.isArray(options.playerNames) ? options.playerNames : [];
+    // prefer the richer players array (name+number); fall back to plain names for compat
+    const players = options.players && Array.isArray(options.players)
+      ? options.players
+      : (options.playerNames && Array.isArray(options.playerNames)
+          ? options.playerNames.map((name) => ({ name, number: null }))
+          : []);
     const customBuckets = options.customBuckets && typeof options.customBuckets === 'object' ? options.customBuckets : {};
 
     console.log('Generating label for transcription:', transcriptionText.substring(0, 100) + '...');
@@ -125,7 +142,7 @@ export async function generateLabel(transcriptionText, options = {}) {
     const wordCount = transcriptionText.trim().split(/\s+/).length;
     const isLongRecording = wordCount > 50;
 
-    const systemPrompt = buildVolleyballSystemPrompt(isLongRecording, playerNames, customBuckets);
+    const systemPrompt = buildVolleyballSystemPrompt(isLongRecording, players, customBuckets);
     const userPrompt = isLongRecording
       ? `Create a general summary label and metadata for this longer coaching recording. Reply with JSON only:\n\n${transcriptionText}`
       : `Create a specific coaching label and metadata for this recording. Include any player names. Reply with JSON only:\n\n${transcriptionText}`;

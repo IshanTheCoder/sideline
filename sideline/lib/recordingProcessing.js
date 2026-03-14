@@ -2,7 +2,7 @@ import { supabase } from './supabase';
 import { transcribeAudio } from './transcription';
 import { generateLabel } from './labelGeneration';
 import { serializeAiLabels, applyVolleyballTranscriptionCorrections } from './volleyballVocabulary';
-import { getPlayerNamesForGameSession, buildRosterNameCorrections } from './roster';
+import { getPlayersForGameSession, buildRosterNameCorrections, buildRosterNumberCorrections } from './roster';
 import { getCustomBucketsForPrompt } from './customBuckets';
 
 // catches DB errors about columns that don't exist yet — growing pains of schema changes
@@ -90,24 +90,31 @@ export async function processRecording(recordingId, userId) {
 
     console.log('✅ Transcription completed:', transcription.substring(0, 100) + '...');
 
-    // step 3.5: autocorrect volleyball jargon + player names (Whisper butchers names ngl)
-    let nameCorrections = [];
+    // step 3.5: autocorrect volleyball jargon, jersey-number references, and name typos.
+    // fetch the full roster (name + number) so we can resolve "number four" → actual player name.
+    let rosterPlayers = [];
     if (recording.game_session_id) {
-      const { names: rosterNames } = await getPlayerNamesForGameSession(recording.game_session_id);
-      nameCorrections = buildRosterNameCorrections(transcription, rosterNames);
+      const { players } = await getPlayersForGameSession(recording.game_session_id);
+      rosterPlayers = players;
     }
-    const correctedTranscription = applyVolleyballTranscriptionCorrections(transcription, nameCorrections);
-    if (correctedTranscription !== transcription || nameCorrections.length > 0) {
-      console.log('🏐 Applied volleyball transcription corrections', nameCorrections.length ? `(${nameCorrections.length} name fixes)` : '');
+    const numberCorrections = buildRosterNumberCorrections(transcription, rosterPlayers);
+    const nameCorrections = buildRosterNameCorrections(transcription, rosterPlayers.map((p) => p.name));
+    // apply number substitutions first so "number four" → "Sarah" before name fuzzy-match runs
+    const correctedTranscription = applyVolleyballTranscriptionCorrections(
+      transcription,
+      [...numberCorrections, ...nameCorrections]
+    );
+    if (correctedTranscription !== transcription || numberCorrections.length > 0 || nameCorrections.length > 0) {
+      console.log('🏐 Applied volleyball transcription corrections',
+        [numberCorrections.length && `${numberCorrections.length} number→name`, nameCorrections.length && `${nameCorrections.length} name fixes`].filter(Boolean).join(', ') || ''
+      );
     }
 
-    // step 4: generate an AI label — roster context helps with name accuracy
-    const { names: playerNames } = recording.game_session_id
-      ? await getPlayerNamesForGameSession(recording.game_session_id)
-      : { names: [] };
+    // step 4: generate an AI label — pass full roster so the AI can resolve any remaining
+    // "number X" references it sees in the (already-corrected) transcription
     const customBuckets = await getCustomBucketsForPrompt(userId);
     console.log('🏷️  Generating AI label (volleyball)...');
-    const labelResult = await generateLabel(correctedTranscription, { playerNames, customBuckets });
+    const labelResult = await generateLabel(correctedTranscription, { players: rosterPlayers, customBuckets });
 
     let aiLabel = null;
     if (labelResult.error || !labelResult.label) {
@@ -169,7 +176,7 @@ async function fetchRecordingForProcessing(recordingId, userId) {
   try {
     let { data, error } = await supabase
       .from('recordings')
-      .select('id, audio_url, status, transcription, ai_labels')
+      .select('id, audio_url, status, transcription, ai_labels, game_session_id')
       .eq('id', recordingId)
       .eq('user_id', userId)
       .single();
@@ -178,7 +185,7 @@ async function fetchRecordingForProcessing(recordingId, userId) {
     if (error && isMissingColumnError(error, 'user_id')) {
       const retry = await supabase
         .from('recordings')
-        .select('id, audio_url, status, transcription, ai_labels')
+        .select('id, audio_url, status, transcription, ai_labels, game_session_id')
         .eq('id', recordingId)
         .single();
       data = retry.data;
@@ -284,7 +291,7 @@ export async function generateLabelsForGameSession(gameSessionId, userId) {
 
     console.log(`📋 Found ${recordings.length} recordings to process`);
 
-    const { names: playerNames } = await getPlayerNamesForGameSession(gameSessionId);
+    const { players: rosterPlayers } = await getPlayersForGameSession(gameSessionId);
     const customBuckets = await getCustomBucketsForPrompt(userId);
 
     let processedCount = 0;
@@ -300,7 +307,7 @@ export async function generateLabelsForGameSession(gameSessionId, userId) {
 
       console.log(`🏷️  Generating label for recording ${recording.id}...`);
 
-      const labelResult = await generateLabel(recording.transcription, { playerNames, customBuckets });
+      const labelResult = await generateLabel(recording.transcription, { players: rosterPlayers, customBuckets });
 
       if (labelResult.error || !labelResult.label) {
         console.error(`❌ Label generation failed for ${recording.id}:`, labelResult.error);
@@ -398,7 +405,7 @@ export async function generateMissingLabels(userId, gameSessionId) {
 
     console.log(`📋 Found ${recordings.length} recordings to generate labels for`);
 
-    const { names: playerNames } = await getPlayerNamesForGameSession(gameSessionId);
+    const { players: rosterPlayers } = await getPlayersForGameSession(gameSessionId);
     const customBuckets = await getCustomBucketsForPrompt(userId);
 
     let processedCount = 0;
@@ -408,7 +415,7 @@ export async function generateMissingLabels(userId, gameSessionId) {
     for (const recording of recordings) {
       console.log(`🏷️  Generating label for recording ${recording.id}...`);
 
-      const labelResult = await generateLabel(recording.transcription, { playerNames, customBuckets });
+      const labelResult = await generateLabel(recording.transcription, { players: rosterPlayers, customBuckets });
 
       if (labelResult.error || !labelResult.label) {
         console.error(`❌ Label generation failed for ${recording.id}:`, labelResult.error);
