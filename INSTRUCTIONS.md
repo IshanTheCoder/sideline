@@ -450,13 +450,27 @@ These should live in a test file, not in production modules.
 - If it doesn't, add the column and backfill it, then remove the fallbacks
 - This removes ~100 lines of dead code and simplifies every database query
 
-### 6.4 Add TypeScript
+### 6.4 Add JSDoc Type Annotations
 
 **Instructions:**
-- Rename `.jsx` files to `.tsx` and `.js` to `.ts` incrementally
-- Start with `lib/` files (data layer) where type safety provides the most value
-- Define interfaces for `Recording`, `GameSession`, `Player`, `Profile`, `AiLabels`
-- This prevents the class of bugs where fields are misspelled or missing
+- Add JSDoc `@typedef` blocks in `lib/` files for core data shapes (`Recording`, `GameSession`, `Player`, `Profile`, `AiLabels`)
+- Use `@param` and `@returns` annotations on exported functions for editor autocomplete and inline documentation
+- This provides type safety benefits without leaving JavaScript
+- Example:
+  ```js
+  /**
+   * @typedef {Object} Recording
+   * @property {string} id
+   * @property {string} user_id
+   * @property {string} game_session_id
+   * @property {string} audio_url
+   * @property {number} duration
+   * @property {string} status - 'new' | 'processing' | 'complete'
+   * @property {string|null} transcription
+   * @property {string|null} ai_labels
+   * @property {string|null} manual_notes
+   */
+  ```
 
 ---
 
@@ -478,7 +492,7 @@ These should live in a test file, not in production modules.
 | 3 | 4.2 | Strip console logs | Performance + security |
 | 4 | 4.1 | Offline recording queue | Reliability |
 | 4 | 5.1-5.6 | Polish & accessibility | App Store readiness |
-| 5 | 6.1-6.4 | Cleanup & TypeScript | Long-term health |
+| 5 | 6.1-6.3 | Cleanup & JSDoc types | Long-term health |
 
 ---
 
