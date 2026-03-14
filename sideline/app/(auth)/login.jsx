@@ -14,7 +14,7 @@ import { ThemedView } from '@/components/themed-view';
 import { supabase } from '@/lib/supabase';
 import { showAlert } from '@/lib/alert';
 import { signInWithGoogle } from '@/lib/googleAuth';
-import { Ionicons } from '@expo/vector-icons';
+import { FontAwesome, Ionicons } from '@expo/vector-icons';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Colors } from '@/constants/theme';
 
@@ -228,7 +228,7 @@ export default function LoginScreen() {
             <ActivityIndicator color="#FFFFFF" />
           ) : (
             <>
-              <Ionicons name="logo-google" size={20} color="#FFFFFF" />
+              <FontAwesome name="google" size={20} color="#FFFFFF" />
               <ThemedText style={styles.googleButtonText}>
                 Sign in with Google
               </ThemedText>
