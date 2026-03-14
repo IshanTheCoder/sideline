@@ -14,9 +14,10 @@ import { ThemedView } from '@/components/themed-view';
 import { supabase } from '@/lib/supabase';
 import { showAlert } from '@/lib/alert';
 import { signInWithGoogle } from '@/lib/googleAuth';
-import { FontAwesome, Ionicons } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Colors } from '@/constants/theme';
+import { EyeIcon, EyeOffIcon, GoogleLogoIcon } from '@/components/icons/AuthIcons';
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -228,7 +229,7 @@ export default function LoginScreen() {
             <ActivityIndicator color="#FFFFFF" />
           ) : (
             <>
-              <FontAwesome name="google" size={20} color="#FFFFFF" />
+              <GoogleLogoIcon size={20} />
               <ThemedText style={styles.googleButtonText}>
                 Sign in with Google
               </ThemedText>
@@ -293,11 +294,11 @@ export default function LoginScreen() {
               style={styles.eyeIcon}
               onPress={() => setShowPassword(!showPassword)}
             >
-              <Ionicons
-                name={showPassword ? 'eye-off-outline' : 'eye-outline'}
-                size={24}
-                color={colors.icon}
-              />
+              {showPassword ? (
+                <EyeOffIcon size={24} color={colors.icon} />
+              ) : (
+                <EyeIcon size={24} color={colors.icon} />
+              )}
             </TouchableOpacity>
           </View>
           {errors.password && (
