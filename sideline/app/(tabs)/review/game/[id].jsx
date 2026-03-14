@@ -866,6 +866,7 @@ export default function GameRecordingsScreen() {
     recordings[0]?.game_sessions?.opponent_name
       ? `vs. ${recordings[0]?.game_sessions?.opponent_name}`
       : 'Game Recordings';
+  const headerMatchType = recordings[0]?.game_sessions?.match_type ?? null;
 
   const openMatchReflection = () => {
     router.push({ pathname: '/(tabs)/review/game/summary/[id]', params: { id: gameId } });
@@ -885,9 +886,16 @@ export default function GameRecordingsScreen() {
             color={Colors[colorScheme ?? 'light'].text}
           />
         </TouchableOpacity>
-        <ThemedText type="title" style={styles.title} numberOfLines={1}>
-          {headerTitle}
-        </ThemedText>
+        <View style={styles.titleContainer}>
+          <ThemedText type="title" style={styles.title} numberOfLines={1}>
+            {headerTitle}
+          </ThemedText>
+          {headerMatchType ? (
+            <ThemedText style={styles.matchTypeText} numberOfLines={1}>
+              {headerMatchType}
+            </ThemedText>
+          ) : null}
+        </View>
         <TouchableOpacity
           style={styles.headerRightButton}
           onPress={openMatchReflection}
@@ -1210,8 +1218,17 @@ const styles = StyleSheet.create({
   title: {
     flex: 1,
     fontSize: 24,
-    marginHorizontal: 8,
     textAlign: 'center',
+  },
+  titleContainer: {
+    flex: 1,
+    marginHorizontal: 8,
+    alignItems: 'center',
+  },
+  matchTypeText: {
+    marginTop: 2,
+    fontSize: 12,
+    opacity: 0.7,
   },
   headerRightButton: {
     padding: 10,

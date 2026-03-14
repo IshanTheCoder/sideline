@@ -12,7 +12,7 @@ import { supabase } from '@/lib/supabase';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Platform, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Platform, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { showAlert } from '@/lib/alert';
 
 export default function SettingsScreen() {
@@ -28,7 +28,6 @@ export default function SettingsScreen() {
   const [showChangePasswordModal, setShowChangePasswordModal] = useState(false);
   const [showSportModal, setShowSportModal] = useState(false);
   const [savingSport, setSavingSport] = useState(false);
-  const [diagRunning, setDiagRunning] = useState(false);
   const prevPictureUrl = useRef(profile?.profile_picture_url || null);
   const cacheBusterRef = useRef(Date.now());
 
@@ -107,72 +106,6 @@ export default function SettingsScreen() {
         },
       ]
     );
-  };
-
-  const runDiagnostics = async () => {
-    setDiagRunning(true);
-    const results = [];
-    const groqKey = process.env.EXPO_PUBLIC_GROQ_API_KEY;
-
-    // step 1: does the API key even exist?
-    if (!groqKey) {
-      results.push('EXPO_PUBLIC_GROQ_API_KEY is missing from .env');
-    } else {
-      results.push(`Groq API key found (${groqKey.substring(0, 8)}...)`);
-
-      // step 2: ping the chat API to see if labels can generate
-      try {
-        const chatRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${groqKey}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            model: 'llama-3.3-70b-versatile',
-            messages: [{ role: 'user', content: 'Say OK' }],
-            max_tokens: 5,
-          }),
-        });
-        if (chatRes.ok) {
-          results.push('Chat completions API (labels): OK');
-        } else {
-          const errText = await chatRes.text();
-          results.push(`Chat API error ${chatRes.status}: ${errText.substring(0, 120)}`);
-        }
-      } catch (e) {
-        results.push(`Chat API network error: ${e.message}`);
-      }
-
-      // step 3: poke the Whisper endpoint — can't send real audio but we can check auth
-      try {
-        const whisperRes = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
-          method: 'POST',
-          headers: { Authorization: `Bearer ${groqKey}` },
-          body: new FormData(),
-        });
-        if (whisperRes.status === 400) {
-          results.push('Whisper API (transcription): reachable (auth OK)');
-        } else if (whisperRes.status === 401 || whisperRes.status === 403) {
-          results.push(`Whisper API auth failed: ${whisperRes.status}`);
-        } else {
-          results.push(`Whisper API response: ${whisperRes.status}`);
-        }
-      } catch (e) {
-        results.push(`Whisper API network error: ${e.message}`);
-      }
-    }
-
-    // step 4: make sure Supabase is alive
-    try {
-      const { error: sbErr } = await supabase.from('profiles').select('id').limit(1);
-      results.push(sbErr ? `Supabase error: ${sbErr.message}` : 'Supabase connection: OK');
-    } catch (e) {
-      results.push(`Supabase network error: ${e.message}`);
-    }
-
-    setDiagRunning(false);
-    showAlert('Diagnostics', results.join('\n\n'));
   };
 
   const getInitials = () => {
@@ -369,45 +302,6 @@ export default function SettingsScreen() {
                 <ThemedText style={styles.settingTitle}>Current Sport</ThemedText>
                 <ThemedText style={styles.settingSubtitle}>
                   {profile?.sport || 'Not set'}
-                </ThemedText>
-              </View>
-            </View>
-            <IconSymbol
-              name="chevron.right"
-              size={20}
-              color={Colors[colorScheme].icon}
-            />
-          </TouchableOpacity>
-        </View>
-
-        {/* API health check tools */}
-        <View style={styles.section}>
-          <ThemedText style={styles.sectionTitle}>Diagnostics</ThemedText>
-
-          <TouchableOpacity
-            style={[styles.settingItem, {
-              backgroundColor: Colors[colorScheme].cardBackground,
-            }]}
-            onPress={runDiagnostics}
-            disabled={diagRunning}
-            activeOpacity={0.7}
-          >
-            <View style={styles.settingLeft}>
-              {diagRunning ? (
-                <ActivityIndicator size="small" color={Colors[colorScheme ?? 'light'].tint} />
-              ) : (
-                <IconSymbol
-                  name="stethoscope"
-                  size={24}
-                  color={Colors[colorScheme ?? 'light'].text}
-                />
-              )}
-              <View style={styles.settingTextContainer}>
-                <ThemedText style={styles.settingTitle}>
-                  {diagRunning ? 'Running...' : 'Test API Connection'}
-                </ThemedText>
-                <ThemedText style={styles.settingSubtitle}>
-                  Check Groq AI and Supabase
                 </ThemedText>
               </View>
             </View>

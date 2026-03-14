@@ -70,9 +70,13 @@ CREATE TABLE IF NOT EXISTS public.game_sessions (
   opponent_name TEXT NOT NULL,
   date DATE NOT NULL,
   location TEXT,
+  match_type TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+ALTER TABLE public.game_sessions
+ADD COLUMN IF NOT EXISTS match_type TEXT;
 
 ALTER TABLE public.game_sessions ENABLE ROW LEVEL SECURITY;
 
