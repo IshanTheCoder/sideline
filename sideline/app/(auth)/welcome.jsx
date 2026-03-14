@@ -83,7 +83,7 @@ const styles = StyleSheet.create({
   whistleLogo: {
     width: 360,
     height: 360,
-    marginBottom: 32,
+    marginBottom: -70,
   },
   logoText: {
     fontSize: 68,
@@ -97,8 +97,8 @@ const styles = StyleSheet.create({
     textAlignVertical: 'center',
   },
   textContainer: {
-    marginTop: 24,
-    marginBottom: 32,
+    marginTop: -10,
+    marginBottom: 30,
     alignItems: 'center',
   },
   title: {
