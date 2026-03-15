@@ -23,7 +23,6 @@ const WEB_MAX_WIDTH = 440;
 function RootLayoutNav() {
   const [fontsLoaded] = useFonts(MaterialIcons.font);
   const { user, loading } = useAuth();
-  const { user, loading } = useAuth();
   const segments = useSegments();
   const router = useRouter();
   const colorScheme = useColorScheme();
