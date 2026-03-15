@@ -1,11 +1,12 @@
 import { DarkTheme, DefaultTheme, ThemeProvider as NavigationThemeProvider } from '@react-navigation/native';
 import { Slot, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { useFonts } from 'expo-font';
 import { useEffect } from 'react';
 import { View, ActivityIndicator, StyleSheet, Platform } from 'react-native';
 import 'react-native-reanimated';
-import { useFonts } from 'expo-font';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 
 import { ThemeProvider, useTheme } from '@/contexts/ThemeContext';
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
@@ -21,7 +22,10 @@ export const unstable_settings = {
 const WEB_MAX_WIDTH = 440;
 
 function RootLayoutNav() {
-  const [fontsLoaded] = useFonts(MaterialIcons.font);
+  const [fontsLoaded] = useFonts({
+    ...MaterialIcons.font,
+    ...Ionicons.font,
+  });
   const { user, loading } = useAuth();
   const segments = useSegments();
   const router = useRouter();
