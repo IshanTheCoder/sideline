@@ -43,8 +43,20 @@ export const serializeRecordingNotes = (notes, setMarkers) => {
 // sniffs out DB errors about columns that literally aren't in the schema
 const isMissingColumnError = (error, column) => {
   if (!error || typeof error !== 'object') return false;
-  const message = error.message;
-  return typeof message === 'string' && message.includes(`'${column}'`);
+  const message = String(error.message ?? '').toLowerCase();
+  const detail = String(error.details ?? '').toLowerCase();
+  const hint = String(error.hint ?? '').toLowerCase();
+  const haystack = `${message} ${detail} ${hint}`;
+  const normalizedColumn = String(column).toLowerCase();
+
+  return (
+    haystack.includes(`'${normalizedColumn}'`) ||
+    haystack.includes(`"${normalizedColumn}"`) ||
+    haystack.includes(` ${normalizedColumn} `) ||
+    haystack.includes(`.${normalizedColumn}`) ||
+    haystack.includes(`${normalizedColumn} column`) ||
+    haystack.includes(`column ${normalizedColumn}`)
+  );
 };
 
 /**
@@ -290,60 +302,113 @@ export function formatDuration(seconds) {
 // fetches every recording this user has ever made, sorted newest-first
 export async function fetchRecordingsForUser(userId) {
   try {
+    const selectWithMatchType = `
+      id,
+      created_at,
+      duration,
+      audio_url,
+      user_id,
+      game_session_id,
+      manual_notes,
+      transcription,
+      ai_labels,
+      status,
+      game_sessions (
+        opponent_name,
+        date,
+        match_type
+      )
+    `;
+    const selectWithoutMatchType = `
+      id,
+      created_at,
+      duration,
+      audio_url,
+      user_id,
+      game_session_id,
+      manual_notes,
+      transcription,
+      ai_labels,
+      status,
+      game_sessions (
+        opponent_name,
+        date
+      )
+    `;
+    const fallbackSelectWithMatchType = `
+      id,
+      created_at,
+      duration,
+      audio_url,
+      game_session_id,
+      manual_notes,
+      transcription,
+      ai_labels,
+      status,
+      game_sessions!inner (
+        opponent_name,
+        date,
+        match_type,
+        teams!inner (
+          coach_id
+        )
+      )
+    `;
+    const fallbackSelectWithoutMatchType = `
+      id,
+      created_at,
+      duration,
+      audio_url,
+      game_session_id,
+      manual_notes,
+      transcription,
+      ai_labels,
+      status,
+      game_sessions!inner (
+        opponent_name,
+        date,
+        teams!inner (
+          coach_id
+        )
+      )
+    `;
+
     let { data, error } = await supabase
       .from('recordings')
-      .select(
-        `
-        id,
-        created_at,
-        duration,
-        audio_url,
-        user_id,
-        game_session_id,
-        manual_notes,
-        transcription,
-        ai_labels,
-        status,
-        game_sessions (
-          opponent_name,
-          date,
-          match_type
-        )
-      `
-      )
+      .select(selectWithMatchType)
       .eq('user_id', userId)
       .order('created_at', { ascending: false });
+
+    if (error && isMissingColumnError(error, 'match_type')) {
+      const retryNoMatchType = await supabase
+        .from('recordings')
+        .select(selectWithoutMatchType)
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false });
+      data = retryNoMatchType.data;
+      error = retryNoMatchType.error;
+    }
 
     if (error && isMissingColumnError(error, 'user_id')) {
       // fallback: find recordings via the team → coach ownership chain
       const retry = await supabase
         .from('recordings')
-        .select(
-          `
-          id,
-          created_at,
-          duration,
-          audio_url,
-          game_session_id,
-          manual_notes,
-          transcription,
-          ai_labels,
-          status,
-          game_sessions!inner (
-            opponent_name,
-            date,
-            match_type,
-            teams!inner (
-              coach_id
-            )
-          )
-        `
-        )
+        .select(fallbackSelectWithMatchType)
         .eq('game_sessions.teams.coach_id', userId)
         .order('created_at', { ascending: false });
 
       data = retry.data;
       error = retry.error;
+
+      if (error && isMissingColumnError(error, 'match_type')) {
+        const retryNoMatchType = await supabase
+          .from('recordings')
+          .select(fallbackSelectWithoutMatchType)
+          .eq('game_sessions.teams.coach_id', userId)
+          .order('created_at', { ascending: false });
+        data = retryNoMatchType.data;
+        error = retryNoMatchType.error;
+      }
     }
 
     if (error) return { data: null, error };
@@ -357,27 +422,80 @@ export async function fetchRecordingsForUser(userId) {
 export async function fetchRecordingsForGame(userId, gameSessionId) {
   try {
     const isUnassigned = gameSessionId === 'unassigned';
+    const selectWithMatchType = `
+      id,
+      created_at,
+      duration,
+      audio_url,
+      user_id,
+      game_session_id,
+      manual_notes,
+      transcription,
+      ai_labels,
+      status,
+      game_sessions (
+        opponent_name,
+        date,
+        match_type
+      )
+    `;
+    const selectWithoutMatchType = `
+      id,
+      created_at,
+      duration,
+      audio_url,
+      user_id,
+      game_session_id,
+      manual_notes,
+      transcription,
+      ai_labels,
+      status,
+      game_sessions (
+        opponent_name,
+        date
+      )
+    `;
+    const fallbackSelectWithMatchType = `
+      id,
+      created_at,
+      duration,
+      audio_url,
+      game_session_id,
+      manual_notes,
+      transcription,
+      ai_labels,
+      status,
+      game_sessions!inner (
+        opponent_name,
+        date,
+        match_type,
+        teams!inner (
+          coach_id
+        )
+      )
+    `;
+    const fallbackSelectWithoutMatchType = `
+      id,
+      created_at,
+      duration,
+      audio_url,
+      game_session_id,
+      manual_notes,
+      transcription,
+      ai_labels,
+      status,
+      game_sessions!inner (
+        opponent_name,
+        date,
+        teams!inner (
+          coach_id
+        )
+      )
+    `;
+
     let query = supabase
       .from('recordings')
-      .select(
-        `
-        id,
-        created_at,
-        duration,
-        audio_url,
-        user_id,
-        game_session_id,
-        manual_notes,
-        transcription,
-        ai_labels,
-        status,
-        game_sessions (
-          opponent_name,
-          date,
-          match_type
-        )
-      `
-      )
+      .select(selectWithMatchType)
       .eq('user_id', userId);
 
     query = isUnassigned
@@ -386,30 +504,24 @@ export async function fetchRecordingsForGame(userId, gameSessionId) {
 
     let { data, error } = await query.order('created_at', { ascending: false });
 
+    if (error && isMissingColumnError(error, 'match_type')) {
+      let retryQueryNoMatchType = supabase
+        .from('recordings')
+        .select(selectWithoutMatchType)
+        .eq('user_id', userId);
+      retryQueryNoMatchType = isUnassigned
+        ? retryQueryNoMatchType.is('game_session_id', null)
+        : retryQueryNoMatchType.eq('game_session_id', gameSessionId);
+
+      const retryNoMatchType = await retryQueryNoMatchType.order('created_at', { ascending: false });
+      data = retryNoMatchType.data;
+      error = retryNoMatchType.error;
+    }
+
     if (error && isMissingColumnError(error, 'user_id')) {
       let retryQuery = supabase
         .from('recordings')
-        .select(
-          `
-          id,
-          created_at,
-          duration,
-          audio_url,
-          game_session_id,
-          manual_notes,
-          transcription,
-          ai_labels,
-          status,
-          game_sessions!inner (
-            opponent_name,
-            date,
-            match_type,
-            teams!inner (
-              coach_id
-            )
-          )
-        `
-        )
+        .select(fallbackSelectWithMatchType)
         .eq('game_sessions.teams.coach_id', userId);
 
       retryQuery = isUnassigned
@@ -420,6 +532,20 @@ export async function fetchRecordingsForGame(userId, gameSessionId) {
 
       data = retry.data;
       error = retry.error;
+
+      if (error && isMissingColumnError(error, 'match_type')) {
+        let retryQueryNoMatchType = supabase
+          .from('recordings')
+          .select(fallbackSelectWithoutMatchType)
+          .eq('game_sessions.teams.coach_id', userId);
+        retryQueryNoMatchType = isUnassigned
+          ? retryQueryNoMatchType.is('game_session_id', null)
+          : retryQueryNoMatchType.eq('game_session_id', gameSessionId);
+
+        const retryNoMatchType = await retryQueryNoMatchType.order('created_at', { ascending: false });
+        data = retryNoMatchType.data;
+        error = retryNoMatchType.error;
+      }
     }
 
     if (error) return { data: null, error };
@@ -432,61 +558,116 @@ export async function fetchRecordingsForGame(userId, gameSessionId) {
 // grab exactly one recording by ID — surgical precision, no extras
 export async function fetchRecordingById(userId, recordingId) {
   try {
+    const selectWithMatchType = `
+      id,
+      created_at,
+      duration,
+      audio_url,
+      user_id,
+      game_session_id,
+      manual_notes,
+      transcription,
+      ai_labels,
+      status,
+      game_sessions (
+        opponent_name,
+        date,
+        match_type
+      )
+    `;
+    const selectWithoutMatchType = `
+      id,
+      created_at,
+      duration,
+      audio_url,
+      user_id,
+      game_session_id,
+      manual_notes,
+      transcription,
+      ai_labels,
+      status,
+      game_sessions (
+        opponent_name,
+        date
+      )
+    `;
+    const fallbackSelectWithMatchType = `
+      id,
+      created_at,
+      duration,
+      audio_url,
+      game_session_id,
+      manual_notes,
+      transcription,
+      ai_labels,
+      status,
+      game_sessions!inner (
+        opponent_name,
+        date,
+        match_type,
+        teams!inner (
+          coach_id
+        )
+      )
+    `;
+    const fallbackSelectWithoutMatchType = `
+      id,
+      created_at,
+      duration,
+      audio_url,
+      game_session_id,
+      manual_notes,
+      transcription,
+      ai_labels,
+      status,
+      game_sessions!inner (
+        opponent_name,
+        date,
+        teams!inner (
+          coach_id
+        )
+      )
+    `;
+
     let { data, error } = await supabase
       .from('recordings')
-      .select(
-        `
-        id,
-        created_at,
-        duration,
-        audio_url,
-        user_id,
-        game_session_id,
-        manual_notes,
-        transcription,
-        ai_labels,
-        status,
-        game_sessions (
-          opponent_name,
-          date,
-          match_type
-        )
-      `
-      )
+      .select(selectWithMatchType)
       .eq('id', recordingId)
       .eq('user_id', userId)
       .single();
 
+    if (error && isMissingColumnError(error, 'match_type')) {
+      const retryNoMatchType = await supabase
+        .from('recordings')
+        .select(selectWithoutMatchType)
+        .eq('id', recordingId)
+        .eq('user_id', userId)
+        .single();
+      data = retryNoMatchType.data;
+      error = retryNoMatchType.error;
+    }
+
     if (error && isMissingColumnError(error, 'user_id')) {
       const retry = await supabase
         .from('recordings')
-        .select(
-          `
-          id,
-          created_at,
-          duration,
-          audio_url,
-          game_session_id,
-          manual_notes,
-          transcription,
-          ai_labels,
-          status,
-          game_sessions!inner (
-            opponent_name,
-            date,
-            match_type,
-            teams!inner (
-              coach_id
-            )
-          )
-        `
-        )
+        .select(fallbackSelectWithMatchType)
         .eq('id', recordingId)
         .eq('game_sessions.teams.coach_id', userId)
         .single();
 
       data = retry.data;
       error = retry.error;
+
+      if (error && isMissingColumnError(error, 'match_type')) {
+        const retryNoMatchType = await supabase
+          .from('recordings')
+          .select(fallbackSelectWithoutMatchType)
+          .eq('id', recordingId)
+          .eq('game_sessions.teams.coach_id', userId)
+          .single();
+        data = retryNoMatchType.data;
+        error = retryNoMatchType.error;
+      }
     }
 
     if (error) return { data: null, error };

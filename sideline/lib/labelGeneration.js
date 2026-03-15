@@ -31,6 +31,80 @@ const VOLLEYBALL_LABEL_EXAMPLES = [
   'Double block hand penetration',
 ];
 
+function levenshtein(a, b) {
+  if (!a.length) return b.length;
+  if (!b.length) return a.length;
+  const matrix = [];
+  for (let i = 0; i <= b.length; i++) matrix[i] = [i];
+  for (let j = 0; j <= a.length; j++) matrix[0][j] = j;
+  for (let i = 1; i <= b.length; i++) {
+    for (let j = 1; j <= a.length; j++) {
+      const cost = a[j - 1] === b[i - 1] ? 0 : 1;
+      matrix[i][j] = Math.min(
+        matrix[i - 1][j] + 1,
+        matrix[i][j - 1] + 1,
+        matrix[i - 1][j - 1] + cost
+      );
+    }
+  }
+  return matrix[b.length][a.length];
+}
+
+function escapeRegex(s) {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function correctLabelPlayerNames(label, players = []) {
+  if (!label || !Array.isArray(players) || players.length === 0) return label;
+
+  const rosterTokens = [];
+  players.forEach((p) => {
+    const name = typeof p?.name === 'string' ? p.name.trim() : '';
+    if (!name) return;
+    name
+      .split(/\s+/)
+      .map((token) => token.replace(/[^a-zA-Z'-]/g, '').trim())
+      .filter((token) => token.length >= 5)
+      .forEach((token) => rosterTokens.push(token));
+  });
+
+  if (!rosterTokens.length) return label;
+
+  let corrected = label;
+  const words = corrected.match(/\b[A-Za-z][A-Za-z'-]+\b/g) ?? [];
+  const seen = new Set();
+
+  words.forEach((word) => {
+    const cleanWord = word.replace(/[^a-zA-Z'-]/g, '').trim();
+    const lowerWord = cleanWord.toLowerCase();
+    if (!cleanWord || seen.has(lowerWord)) return;
+    seen.add(lowerWord);
+
+    let bestMatch = null;
+    let bestDistance = Number.POSITIVE_INFINITY;
+
+    rosterTokens.forEach((token) => {
+      const lowerToken = token.toLowerCase();
+      if (lowerToken === lowerWord) return;
+      if (lowerToken[0] !== lowerWord[0]) return;
+      const lenDiff = Math.abs(lowerToken.length - lowerWord.length);
+      if (lenDiff > 2) return;
+      const distance = levenshtein(lowerWord, lowerToken);
+      if (distance >= 1 && distance <= 2 && distance < bestDistance) {
+        bestDistance = distance;
+        bestMatch = token;
+      }
+    });
+
+    if (bestMatch) {
+      const re = new RegExp(`\\b${escapeRegex(cleanWord)}\\b`, 'gi');
+      corrected = corrected.replace(re, bestMatch);
+    }
+  });
+
+  return corrected;
+}
+
 function buildVolleyballSystemPrompt(isLongRecording, players = [], customBuckets = {}) {
   // Build a roster hint that covers both name spelling and jersey-number → name resolution.
   // If any players have numbers, show the full "#N = Name" table so the AI can map
@@ -181,9 +255,10 @@ export async function generateLabel(transcriptionText, options = {}) {
 
     const structured = parseStructuredResponse(content);
     if (structured) {
-      console.log('✅ Label generated (volleyball):', structured.label, structured.skillCategory ?? '', structured.position ?? '');
+      const correctedLabel = correctLabelPlayerNames(structured.label, players);
+      console.log('✅ Label generated (volleyball):', correctedLabel, structured.skillCategory ?? '', structured.position ?? '');
       return {
-        label: structured.label,
+        label: correctedLabel,
         skillCategory: structured.skillCategory ?? null,
         position: structured.position ?? null,
         playPattern: structured.playPattern ?? null,
@@ -195,9 +270,10 @@ export async function generateLabel(transcriptionText, options = {}) {
 
     // plan B: AI didn't return proper JSON — use the raw text as a label, it's better than nothing
     const fallbackLabel = content.replace(/^["']|["']$/g, '').trim().slice(0, 80);
-    console.log('✅ Label generated (plain fallback):', fallbackLabel);
+    const correctedFallbackLabel = correctLabelPlayerNames(fallbackLabel, players);
+    console.log('✅ Label generated (plain fallback):', correctedFallbackLabel);
     return {
-      label: fallbackLabel,
+      label: correctedFallbackLabel,
       skillCategory: null,
       position: null,
       playPattern: null,

@@ -240,7 +240,14 @@ export default function PostGameSummaryScreen() {
     backgroundColor: isDark ? '#2A2A2A' : '#F5F5F5',
     backgroundGradientFrom: isDark ? '#2A2A2A' : '#F5F5F5',
     backgroundGradientTo: isDark ? '#2A2A2A' : '#F5F5F5',
-    color: (opacity = 0.3) => (isDark ? `rgba(255, 255, 255, ${opacity})` : `rgba(0, 0, 0, ${opacity})`),
+    // Use a vivid orange to match the desired style consistently.
+    color: () => 'rgb(229, 105, 71)',
+    fillShadowGradient: '#E56947',
+    fillShadowGradientFrom: '#E56947',
+    fillShadowGradientTo: '#E56947',
+    fillShadowGradientFromOpacity: 1,
+    fillShadowGradientToOpacity: 1,
+    fillShadowGradientOpacity: 1,
     labelColor: () => (isDark ? '#B0B0B0' : '#666666'),
     strokeWidth: 1,
     barPercentage: 0.7,
@@ -257,9 +264,6 @@ export default function PostGameSummaryScreen() {
 
   const PIE_COLORS = ['#4A90D9', '#7B68EE', '#50C878', '#F4A460', '#E74C3C', '#9B59B6', '#1ABC9C', '#F39C12'];
 
-  // Vibrant bar colors (inspired by modern chart aesthetic: coral, purple, yellow, green, blue + other)
-  const FEEDBACK_BAR_COLORS = ['#E07A5F', '#9B59B6', '#F2CC8F', '#81B29A', '#81B5D8', '#95A5A6'];
-
   const pieChartData = useMemo(() => {
     const entries = Object.entries(volleyballStats.bySkill)
       .sort((a, b) => b[1] - a[1])
@@ -275,11 +279,24 @@ export default function PostGameSummaryScreen() {
 
   const barChartData = useMemo(() => {
     if (mentionedPlayers.length === 0) return null;
+    const data = mentionedPlayers.slice(0, 6).map(([, count]) => count);
     return {
       labels: mentionedPlayers.slice(0, 6).map(([name]) => name.length > 8 ? name.slice(0, 7) + '…' : name),
-      datasets: [{ data: mentionedPlayers.slice(0, 6).map(([, count]) => count) }],
+      datasets: [{
+        data,
+        // Force a vivid solid orange for each bar across native + web.
+        colors: data.map(() => () => '#E56947'),
+      }],
     };
   }, [mentionedPlayers]);
+
+  const playerBarYAxisMax = useMemo(() => {
+    if (!barChartData?.datasets?.[0]?.data?.length) return 1;
+    const data = barChartData.datasets[0].data;
+    const max = Math.max(...data);
+    if (max <= 0) return 1;
+    return Math.max(1, max);
+  }, [barChartData]);
 
   // Feedback (recordings) per set: x = set number, y = count of recordings for that set
   const feedbackPerSetData = useMemo(() => {
@@ -304,14 +321,14 @@ export default function PostGameSummaryScreen() {
     }
     const hasAny = data.some((n) => n > 0);
     if (!hasAny) return null;
-    const colors = labels.map((_, i) => (opacity = 1) => {
-      const hex = FEEDBACK_BAR_COLORS[i % FEEDBACK_BAR_COLORS.length].replace('#', '');
-      const r = parseInt(hex.slice(0, 2), 16);
-      const g = parseInt(hex.slice(2, 4), 16);
-      const b = parseInt(hex.slice(4, 6), 16);
-      return `rgba(${r},${g},${b},${opacity})`;
-    });
-    return { labels, datasets: [{ data, colors }] };
+    return {
+      labels,
+      datasets: [{
+        data,
+        // Force a vivid solid orange for each bar across native + web.
+        colors: data.map(() => () => '#E56947'),
+      }],
+    };
   }, [recordings]);
 
   // Alias for backward compatibility (replaced "FEEDBACK OVER TIME" line chart with "FEEDBACK BY SET" bar chart)
@@ -400,17 +417,21 @@ export default function PostGameSummaryScreen() {
               <ThemedText style={[styles.sectionHeading, { opacity: 0.7 }]}>
                 PLAYER MENTIONS
               </ThemedText>
-              <View style={[styles.chartWrapper, { backgroundColor: isDark ? '#2A2A2A' : '#F5F5F5' }]}>
+              <View style={[styles.chartWrapper, styles.feedbackChartWrapper, { backgroundColor: isDark ? '#2A2A2A' : '#F5F5F5' }]}>
                 <BarChart
                   data={barChartData}
                   width={screenWidth}
-                  height={220}
-                  chartConfig={{ ...chartConfig, color: () => tintColor }}
+                  height={240}
+                  chartConfig={feedbackBarChartConfig}
                   yAxisLabel=""
                   yAxisSuffix=""
                   fromZero
+                  fromNumber={playerBarYAxisMax}
+                  segments={playerBarYAxisMax}
+                  withCustomBarColorFromData
+                  flatColor
                   showBarTops={false}
-                  style={styles.chartStyle}
+                  style={styles.feedbackChartStyle}
                 />
               </View>
             </View>
@@ -432,9 +453,9 @@ export default function PostGameSummaryScreen() {
                   fromZero
                   fromNumber={feedbackBarYAxisMax}
                   segments={feedbackBarYAxisMax}
-                  showBarTops={false}
                   withCustomBarColorFromData
                   flatColor
+                  showBarTops={false}
                   style={styles.feedbackChartStyle}
                 />
               </View>

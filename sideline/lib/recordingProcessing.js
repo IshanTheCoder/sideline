@@ -8,8 +8,20 @@ import { getCustomBucketsForPrompt } from './customBuckets';
 // catches DB errors about columns that don't exist yet — growing pains of schema changes
 const isMissingColumnError = (error, column) => {
   if (!error || typeof error !== 'object') return false;
-  const message = error.message;
-  return typeof message === 'string' && message.includes(`'${column}'`);
+  const message = String(error.message ?? '').toLowerCase();
+  const detail = String(error.details ?? '').toLowerCase();
+  const hint = String(error.hint ?? '').toLowerCase();
+  const haystack = `${message} ${detail} ${hint}`;
+  const normalizedColumn = String(column).toLowerCase();
+
+  return (
+    haystack.includes(`'${normalizedColumn}'`) ||
+    haystack.includes(`"${normalizedColumn}"`) ||
+    haystack.includes(` ${normalizedColumn} `) ||
+    haystack.includes(`.${normalizedColumn}`) ||
+    haystack.includes(`${normalizedColumn} column`) ||
+    haystack.includes(`column ${normalizedColumn}`)
+  );
 };
 
 /**
@@ -73,20 +85,12 @@ export async function processRecording(recordingId, userId) {
       }
     }
 
-    // mark the recording as actively processing so the UI can show progress
-    const { error: statusError } = await updateRecordingStatus(recordingId, userId, 'processing');
-    if (statusError) {
-      console.warn('⚠️ Failed to set recording status to processing:', statusError);
-    }
-
     // step 3: ship audio to Whisper for transcription
     console.log('🎤 Starting transcription...');
     const { transcription, error: transcriptionError } = await transcribeAudio(downloadUrl);
 
     if (transcriptionError || !transcription) {
       console.error('❌ Transcription failed:', transcriptionError);
-      // reset back to 'new' so retry flows can pick this up
-      await updateRecordingStatus(recordingId, userId, 'new');
       return {
         success: false,
         transcription: null,
@@ -143,7 +147,6 @@ export async function processRecording(recordingId, userId) {
     const { error: updateError } = await updateRecordingData(recordingId, userId, {
       transcription: correctedTranscription,
       ai_labels: aiLabel,
-      status: 'complete',
     });
 
     if (updateError) {
@@ -235,17 +238,6 @@ async function updateRecordingData(recordingId, userId, updates) {
   } catch (e) {
     return { error: e };
   }
-}
-
-/**
- * one-liner to toggle a recording's status field (like flipping a light switch)
- * @param {string} recordingId - the recording to update
- * @param {string} userId - owner's ID
- * @param {string} status - new status string to set
- * @returns {Promise<{error: Error|null}>}
- */
-async function updateRecordingStatus(recordingId, userId, status) {
-  return updateRecordingData(recordingId, userId, { status });
 }
 
 /**

@@ -6,9 +6,9 @@ const DateTimePicker = Platform.OS !== 'web'
   ? require('@react-native-community/datetimepicker').default
   : null;
 import { useRouter } from 'expo-router';
-import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useThemeColor } from '@/hooks/use-theme-color';
 import { useAuth } from '@/contexts/AuthContext';
 import { useActiveSession } from '@/contexts/ActiveSessionContext';
@@ -126,7 +126,7 @@ export default function RecordDetailsScreen() {
           onPress={handleCancel}
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
         >
-          <MaterialIcons name="chevron-left" size={32} color={iconColor} />
+          <IconSymbol name="chevron.left" size={32} color={iconColor} />
         </TouchableOpacity>
         <ThemedText style={styles.headerTitle}>Game Details</ThemedText>
         <View style={styles.navButton} />

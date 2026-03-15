@@ -4,16 +4,21 @@ import { showAlert } from '@/lib/alert';
 import { Audio } from 'expo-av';
 import { useRouter } from 'expo-router';
 import * as Crypto from 'expo-crypto';
-import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { IconSymbol } from '@/components/ui/icon-symbol';
 import { RecordButton } from '@/components/RecordButton';
 import { ActiveSessionIndicator } from '@/components/ActiveSessionIndicator';
 import { useAudioPermissions } from '@/hooks/use-audio-permissions';
 import { useThemeColor } from '@/hooks/use-theme-color';
 import { useAuth } from '@/contexts/AuthContext';
 import { useActiveSession } from '@/contexts/ActiveSessionContext';
-import { uploadRecording, createRecordingRecord, serializeRecordingNotes } from '@/lib/recording';
+import {
+  uploadRecording,
+  createRecordingRecord,
+  deleteGameForUser,
+  serializeRecordingNotes,
+} from '@/lib/recording';
 import { processRecording } from '@/lib/recordingProcessing';
 
 export default function RecordScreen() {
@@ -31,10 +36,11 @@ export default function RecordScreen() {
   const [error, setError] = useState(null);
   const [selectedSet, setSelectedSet] = useState(null);
   const [selectedSetOffsetSeconds, setSelectedSetOffsetSeconds] = useState(null);
-  const [isProcessing, setIsProcessing] = useState(false);
+  const [processingCount, setProcessingCount] = useState(0);
   const [toast, setToast] = useState(null); // { type: 'success'|'error', message: string } — the little popup banner
   const toastOpacity = useRef(new Animated.Value(0)).current;
   const toastTimer = useRef(null);
+  const isProcessing = processingCount > 0;
 
   // ref to the actual audio recorder object — survives re-renders
   const recordingRef = useRef(null);
@@ -296,12 +302,10 @@ export default function RecordScreen() {
         console.log('Recording record created successfully:', recordingRecord);
         showToast('success', 'Recording saved');
 
-        // kick off transcription in the background — don't block the UI
-        // labels get generated later when the game wraps up
-        setIsProcessing(true);
+        // kick off transcription in the background without blocking new recordings
+        setProcessingCount((count) => count + 1);
         processRecording(recordingId, user.id)
           .then((result) => {
-            setIsProcessing(false);
             if (result.success) {
               console.log('✅ Recording transcribed successfully!');
               console.log('Transcription:', result.transcription?.substring(0, 100));
@@ -313,10 +317,12 @@ export default function RecordScreen() {
             }
           })
           .catch((err) => {
-            setIsProcessing(false);
             const msg = err?.message || 'Unknown error';
             console.error('❌ Unexpected error during transcription:', msg);
             showToast('error', `Transcription error: ${msg}`, 8000);
+          })
+          .finally(() => {
+            setProcessingCount((count) => Math.max(0, count - 1));
           });
       }
 
@@ -389,6 +395,62 @@ export default function RecordScreen() {
     showToast('success', 'Processing recordings in background...');
     resetSessionDetails();
     router.push('/(tabs)/review');
+  };
+
+  const discardCurrentGameAndGoToDetails = async () => {
+    try {
+      setIsLoading(true);
+      clearError();
+
+      if (recordingRef.current) {
+        await recordingRef.current.stopAndUnloadAsync().catch(() => undefined);
+        recordingRef.current = null;
+      }
+
+      setIsRecording(false);
+      setSelectedSet(null);
+      setSelectedSetOffsetSeconds(null);
+      setCurrentRecording(null);
+
+      if (activeSession?.id && user?.id) {
+        const { error: deleteError } = await deleteGameForUser(user.id, activeSession.id);
+        if (deleteError) {
+          console.error('Failed to delete discarded game session:', deleteError);
+          showToast('error', 'Could not fully delete game session. It may still appear in Games.', 7000);
+        }
+      }
+
+      clearActiveSession();
+      router.replace('/(tabs)/record-details');
+    } catch (error) {
+      console.error('Failed to discard current game:', error);
+      clearActiveSession();
+      router.replace('/(tabs)/record-details');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleBackPress = () => {
+    if (isLoading) return;
+
+    if (isRecording || activeSession?.id) {
+      showAlert(
+        'Discard this game?',
+        'This will stop recording and delete this game session and any recordings from it.',
+        [
+          { text: 'Keep Game', style: 'cancel' },
+          {
+            text: 'Discard Game',
+            style: 'destructive',
+            onPress: discardCurrentGameAndGoToDetails,
+          },
+        ]
+      );
+      return;
+    }
+
+    router.replace('/(tabs)/record-details');
   };
 
   const handleDonePress = () => {
@@ -497,10 +559,10 @@ export default function RecordScreen() {
       <View style={styles.header}>
         <TouchableOpacity
           style={styles.navButton}
-          onPress={() => router.back()}
+          onPress={handleBackPress}
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
         >
-          <MaterialIcons name="chevron-left" size={32} color={iconColor} />
+          <IconSymbol name="chevron.left" size={32} color={iconColor} />
         </TouchableOpacity>
         
         <TouchableOpacity
@@ -606,7 +668,7 @@ export default function RecordScreen() {
               onPress={clearError}
               style={styles.errorDismissButton}
             >
-              <MaterialIcons name="close" size={20} color={iconColor} />
+              <IconSymbol name="xmark" size={20} color={iconColor} />
             </TouchableOpacity>
           </View>
         )}

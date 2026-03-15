@@ -1,5 +1,23 @@
 import { supabase } from './supabase';
 
+const isMissingColumnError = (error, column) => {
+  if (!error || typeof error !== 'object') return false;
+  const message = String(error.message ?? '').toLowerCase();
+  const detail = String(error.details ?? '').toLowerCase();
+  const hint = String(error.hint ?? '').toLowerCase();
+  const haystack = `${message} ${detail} ${hint}`;
+  const normalizedColumn = String(column).toLowerCase();
+
+  return (
+    haystack.includes(`'${normalizedColumn}'`) ||
+    haystack.includes(`"${normalizedColumn}"`) ||
+    haystack.includes(` ${normalizedColumn} `) ||
+    haystack.includes(`.${normalizedColumn}`) ||
+    haystack.includes(`${normalizedColumn} column`) ||
+    haystack.includes(`column ${normalizedColumn}`)
+  );
+};
+
 // grab the user's team, or spawn a new one if they're fresh — the roster screen needs this
 export const getOrCreateDefaultTeam = async (userId) => {
   try {
@@ -51,7 +69,7 @@ export const createGameSession = async ({ userId, opponentName, date, location, 
       };
     }
 
-    const { data, error } = await supabase
+    let { data, error } = await supabase
       .from('game_sessions')
       .insert({
         team_id: teamId,
@@ -62,6 +80,22 @@ export const createGameSession = async ({ userId, opponentName, date, location, 
       })
       .select('id')
       .single();
+
+    // backward compat: if DB hasn't added match_type yet, retry without it
+    if (error && isMissingColumnError(error, 'match_type')) {
+      const retry = await supabase
+        .from('game_sessions')
+        .insert({
+          team_id: teamId,
+          opponent_name: opponentName,
+          date: date.toISOString().split('T')[0],
+          location: location ?? null,
+        })
+        .select('id')
+        .single();
+      data = retry.data;
+      error = retry.error;
+    }
 
     if (error || !data) {
       return {
