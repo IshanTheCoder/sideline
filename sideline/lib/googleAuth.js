@@ -39,7 +39,7 @@ export async function signInWithGoogle() {
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          // web doesn't need redirectTo — Supabase already knows the way home
+          redirectTo: redirectUri,
           skipBrowserRedirect: false,
         },
       });

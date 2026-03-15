@@ -21,52 +21,54 @@ export default function CallbackScreen() {
       console.log('📱 Platform:', Platform.OS);
 
       if (Platform.OS === 'web') {
-        // On web, Supabase automatically handles the OAuth callback
-        // We just need to wait for the auth state to update
         console.log('⏳ Waiting for Supabase to process OAuth callback...');
-        
-        // Check if there's a hash in the URL (OAuth response)
-        if (typeof window !== 'undefined' && window.location.hash) {
-          console.log('🔍 Hash detected in URL:', window.location.hash.substring(0, 50) + '...');
-          
-          // Wait for Supabase to process the hash automatically
-          // The detectSessionInUrl setting will handle this
-          await new Promise(resolve => setTimeout(resolve, 2000));
-          
-          // Check if session was established
-          const { data: { session } } = await supabase.auth.getSession();
-          
-          if (session) {
-            console.log('✅ Session established for user:', session.user.email);
-            // Redirect to home - AuthContext will handle the rest
-            router.replace('/(tabs)');
-            return;
-          } else {
-            console.error('❌ No session after OAuth callback');
-            router.replace({
-              pathname: '/(auth)/login',
-              params: { error: 'Failed to establish session' },
-            });
-            return;
-          }
-        } else {
-          // No hash, might be an error or direct access
-          console.log('⚠️ No hash in URL, checking query params...');
-          
+
+        if (typeof window !== 'undefined') {
           const urlParams = new URLSearchParams(window.location.search);
-          const error = urlParams.get('error');
-          const errorDescription = urlParams.get('error_description');
-          
-          if (error) {
-            console.error('OAuth error:', error, errorDescription);
+          const oauthError = urlParams.get('error');
+          const oauthErrorDescription = urlParams.get('error_description');
+
+          if (oauthError) {
+            console.error('OAuth error:', oauthError, oauthErrorDescription);
             router.replace({
               pathname: '/(auth)/login',
-              params: { error: errorDescription || error },
+              params: { error: oauthErrorDescription || oauthError },
             });
             return;
           }
-          
-          // No error, just redirect back to login
+
+          const hasCode = urlParams.has('code'); // PKCE flow
+          const hasHash = !!window.location.hash;  // implicit flow
+
+          if (hasCode || hasHash) {
+            console.log('🔍 Auth data detected — code:', hasCode, 'hash:', hasHash);
+
+            // Poll for session — Supabase processes the code/hash asynchronously
+            let session = null;
+            for (let i = 0; i < 20; i++) {
+              await new Promise(resolve => setTimeout(resolve, 500));
+              const { data } = await supabase.auth.getSession();
+              if (data?.session) {
+                session = data.session;
+                break;
+              }
+            }
+
+            if (session) {
+              console.log('✅ Session established for user:', session.user.email);
+              router.replace('/(tabs)');
+              return;
+            } else {
+              console.error('❌ No session after OAuth callback');
+              router.replace({
+                pathname: '/(auth)/login',
+                params: { error: 'Failed to establish session' },
+              });
+              return;
+            }
+          }
+
+          // No auth data — redirect to login
           console.log('ℹ️ No OAuth data found, redirecting to login');
           router.replace('/(auth)/login');
         }
