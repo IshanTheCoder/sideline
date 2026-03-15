@@ -113,6 +113,10 @@ export default function PostGameSummaryScreen() {
     () => recordings[0]?.game_sessions?.opponent_name ?? null,
     [recordings]
   );
+  const matchType = useMemo(
+    () => recordings[0]?.game_sessions?.match_type ?? null,
+    [recordings]
+  );
 
   const volleyballStats = useMemo(() => aggregateVolleyballStats(recordings), [recordings]);
 
@@ -365,7 +369,9 @@ export default function PostGameSummaryScreen() {
         >
           <ThemedText style={styles.pageTitle} numberOfLines={2}>Post-Game Summary</ThemedText>
           {opponentName ? (
-            <ThemedText style={[styles.subtitle, { opacity: 0.7 }]}>vs. {opponentName}</ThemedText>
+            <ThemedText style={[styles.subtitle, { opacity: 0.7 }]}>
+              {`vs. ${opponentName}${matchType ? ` · ${matchType}` : ''}`}
+            </ThemedText>
           ) : null}
 
           {/* Analytics charts */}
