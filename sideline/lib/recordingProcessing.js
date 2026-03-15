@@ -73,20 +73,13 @@ export async function processRecording(recordingId, userId) {
       }
     }
 
-    // mark the recording as actively processing so the UI can show progress
-    const { error: statusError } = await updateRecordingStatus(recordingId, userId, 'processing');
-    if (statusError) {
-      console.warn('⚠️ Failed to set recording status to processing:', statusError);
-    }
-
     // step 3: ship audio to Whisper for transcription
     console.log('🎤 Starting transcription...');
     const { transcription, error: transcriptionError } = await transcribeAudio(downloadUrl);
 
     if (transcriptionError || !transcription) {
       console.error('❌ Transcription failed:', transcriptionError);
-      // reset back to 'new' so retry flows can pick this up
-      await updateRecordingStatus(recordingId, userId, 'new');
+      // leave status as 'new' — we can always retry later
       return {
         success: false,
         transcription: null,
@@ -143,7 +136,6 @@ export async function processRecording(recordingId, userId) {
     const { error: updateError } = await updateRecordingData(recordingId, userId, {
       transcription: correctedTranscription,
       ai_labels: aiLabel,
-      status: 'complete',
     });
 
     if (updateError) {

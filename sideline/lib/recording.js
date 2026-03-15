@@ -2,7 +2,6 @@ import { supabase } from './supabase';
 import * as FileSystem from 'expo-file-system/legacy';
 import { decode } from 'base64-arraybuffer';
 import { Platform } from 'react-native';
-import { getOrCreateDefaultTeam } from './gameSessions';
 
 // unwraps the raw notes like a mystery loot box — might be JSON, might be plain text
 export const parseRecordingNotes = (raw) => {
@@ -146,6 +145,55 @@ export const uploadRecording = async (userId, recordingId, audioUri) => {
   } catch (error) {
     console.log('Unexpected error uploading recording:', error);
     return { url: null, error: error };
+  }
+};
+
+/**
+ * finds the user's team — or spawns a default one if they're rolling solo
+ * recordings need a team like Pokémon need a trainer, even before Phase 6
+ */
+const getOrCreateDefaultTeam = async (userId) => {
+  try {
+    // see if this user already has a team on file
+    const { data: existingTeam } = await supabase
+      .from('teams')
+      .select('id')
+      .eq('coach_id', userId)
+      .limit(1)
+      .single();
+
+    if (existingTeam) {
+      return { id: existingTeam.id, error: null };
+    }
+
+    // no team? cool, we'll auto-generate a starter one — think character creation screen
+    console.log('No team found, creating default team for user:', userId);
+    const { data: newTeam, error: teamError } = await supabase
+      .from('teams')
+      .insert({
+        coach_id: userId,
+        name: 'My Team',
+        sport: 'volleyball', // the GOAT sport, no debate
+      })
+      .select()
+      .single();
+
+    if (teamError || !newTeam) {
+      console.error('Failed to create default team:', teamError);
+      return {
+        id: '',
+        error: new Error('Failed to create team. Please try again.'),
+      };
+    }
+
+    console.log('Created default team:', newTeam.id);
+    return { id: newTeam.id, error: null };
+  } catch (error) {
+    console.error('Error in getOrCreateDefaultTeam:', error);
+    return {
+      id: '',
+      error: error,
+    };
   }
 };
 
@@ -306,8 +354,7 @@ export async function fetchRecordingsForUser(userId) {
         status,
         game_sessions (
           opponent_name,
-          date,
-          match_type
+          date
         )
       `
       )
@@ -332,7 +379,6 @@ export async function fetchRecordingsForUser(userId) {
           game_sessions!inner (
             opponent_name,
             date,
-            match_type,
             teams!inner (
               coach_id
             )
@@ -373,8 +419,7 @@ export async function fetchRecordingsForGame(userId, gameSessionId) {
         status,
         game_sessions (
           opponent_name,
-          date,
-          match_type
+          date
         )
       `
       )
@@ -403,7 +448,6 @@ export async function fetchRecordingsForGame(userId, gameSessionId) {
           game_sessions!inner (
             opponent_name,
             date,
-            match_type,
             teams!inner (
               coach_id
             )
@@ -448,8 +492,7 @@ export async function fetchRecordingById(userId, recordingId) {
         status,
         game_sessions (
           opponent_name,
-          date,
-          match_type
+          date
         )
       `
       )
@@ -474,7 +517,6 @@ export async function fetchRecordingById(userId, recordingId) {
           game_sessions!inner (
             opponent_name,
             date,
-            match_type,
             teams!inner (
               coach_id
             )
@@ -680,17 +722,6 @@ export async function deleteGameForUser(userId, gameSessionId) {
       );
       if (deleteError) {
         return { error: deleteError };
-      }
-    }
-
-    if (gameSessionId !== 'unassigned') {
-      const { error: deleteSessionError } = await supabase
-        .from('game_sessions')
-        .delete()
-        .eq('id', gameSessionId);
-
-      if (deleteSessionError) {
-        return { error: deleteSessionError };
       }
     }
 

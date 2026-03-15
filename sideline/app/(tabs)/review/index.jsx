@@ -105,14 +105,12 @@ export default function ReviewScreen() {
       const dateLabel = rec.game_sessions?.date
         ? formatDate(rec.game_sessions.date)
         : formatDate(rec.created_at);
-      const matchType = rec.game_sessions?.match_type ?? null;
 
       if (!map.has(gameId)) {
         map.set(gameId, {
           id: gameId,
           title,
           dateLabel,
-          matchType,
           recordings: [],
         });
       }
@@ -193,14 +191,6 @@ export default function ReviewScreen() {
             <ThemedText style={styles.metaText}>
               {item.dateLabel}
             </ThemedText>
-            {item.matchType ? (
-              <>
-                <View style={styles.metaSeparator} />
-                <ThemedText style={styles.metaText}>
-                  {item.matchType}
-                </ThemedText>
-              </>
-            ) : null}
             <View style={styles.metaSeparator} />
             <ThemedText style={styles.metaText}>
               {item.recordings.length} recordings

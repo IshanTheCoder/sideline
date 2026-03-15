@@ -17,7 +17,6 @@ import { signInWithGoogle } from '@/lib/googleAuth';
 import { Ionicons } from '@expo/vector-icons';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Colors } from '@/constants/theme';
-import { EyeIcon, EyeOffIcon, GoogleLogoIcon } from '@/components/icons/AuthIcons';
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -229,7 +228,7 @@ export default function LoginScreen() {
             <ActivityIndicator color="#FFFFFF" />
           ) : (
             <>
-              <GoogleLogoIcon size={20} />
+              <Ionicons name="logo-google" size={20} color="#FFFFFF" />
               <ThemedText style={styles.googleButtonText}>
                 Sign in with Google
               </ThemedText>
@@ -294,11 +293,11 @@ export default function LoginScreen() {
               style={styles.eyeIcon}
               onPress={() => setShowPassword(!showPassword)}
             >
-              {showPassword ? (
-                <EyeOffIcon size={24} color={colors.icon} />
-              ) : (
-                <EyeIcon size={24} color={colors.icon} />
-              )}
+              <Ionicons
+                name={showPassword ? 'eye-off-outline' : 'eye-outline'}
+                size={24}
+                color={colors.icon}
+              />
             </TouchableOpacity>
           </View>
           {errors.password && (

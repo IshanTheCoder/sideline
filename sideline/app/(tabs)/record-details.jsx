@@ -79,7 +79,6 @@ export default function RecordDetailsScreen() {
       userId: user.id,
       opponentName: trimmedOpponent,
       date: gameDate,
-      matchType,
     });
 
     if (error || !id) {
