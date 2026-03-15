@@ -4,6 +4,8 @@ import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 import { View, ActivityIndicator, StyleSheet, Platform } from 'react-native';
 import 'react-native-reanimated';
+import { useFonts } from 'expo-font';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 
 import { ThemeProvider, useTheme } from '@/contexts/ThemeContext';
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
@@ -19,6 +21,8 @@ export const unstable_settings = {
 const WEB_MAX_WIDTH = 440;
 
 function RootLayoutNav() {
+  const [fontsLoaded] = useFonts(MaterialIcons.font);
+  const { user, loading } = useAuth();
   const { user, loading } = useAuth();
   const segments = useSegments();
   const router = useRouter();
@@ -50,7 +54,7 @@ function RootLayoutNav() {
   }, [user, loading, segments]);
 
   // Show loading screen while checking auth state
-  if (loading) {
+  if (loading || !fontsLoaded) {
     const loadingView = (
       <View style={[styles.loadingContainer, { backgroundColor: backgroundColor || '#000000' }]}>
         <ActivityIndicator size="large" color="#5BA3F5" />
