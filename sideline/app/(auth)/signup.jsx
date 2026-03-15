@@ -19,6 +19,7 @@ import { signInWithGoogle } from '@/lib/googleAuth';
 import { Ionicons } from '@expo/vector-icons';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Colors } from '@/constants/theme';
+import { EyeIcon, EyeOffIcon, GoogleLogoIcon } from '@/components/icons/AuthIcons';
 
 export default function SignupScreen() {
   const router = useRouter();
@@ -314,7 +315,7 @@ export default function SignupScreen() {
             <ActivityIndicator color="#FFFFFF" />
           ) : (
             <>
-              <Ionicons name="logo-google" size={20} color="#FFFFFF" />
+              <GoogleLogoIcon size={20} />
               <ThemedText style={styles.googleButtonText}>
                 Sign up with Google
               </ThemedText>
@@ -403,11 +404,11 @@ export default function SignupScreen() {
               style={styles.eyeIcon}
               onPress={() => setShowPassword(!showPassword)}
             >
-              <Ionicons
-                name={showPassword ? 'eye-off-outline' : 'eye-outline'}
-                size={24}
-                color={colors.icon}
-              />
+              {showPassword ? (
+                <EyeOffIcon size={24} color={colors.icon} />
+              ) : (
+                <EyeIcon size={24} color={colors.icon} />
+              )}
             </TouchableOpacity>
           </View>
           {errors.password && (
@@ -440,11 +441,11 @@ export default function SignupScreen() {
               style={styles.eyeIcon}
               onPress={() => setShowConfirmPassword(!showConfirmPassword)}
             >
-              <Ionicons
-                name={showConfirmPassword ? 'eye-off-outline' : 'eye-outline'}
-                size={24}
-                color={colors.icon}
-              />
+              {showConfirmPassword ? (
+                <EyeOffIcon size={24} color={colors.icon} />
+              ) : (
+                <EyeIcon size={24} color={colors.icon} />
+              )}
             </TouchableOpacity>
           </View>
           {errors.confirmPassword && (

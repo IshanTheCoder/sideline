@@ -74,6 +74,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   logoContainer: {
+    marginTop: -100,
     marginBottom: 36,
     alignItems: 'center',
     justifyContent: 'center',
@@ -86,6 +87,8 @@ const styles = StyleSheet.create({
     marginBottom: -70,
   },
   logoText: {
+    marginTop: 0,
+    transform: [{ translateY: 28 }],
     fontSize: 68,
     fontWeight: '900',
     color: '#5A8A6D',

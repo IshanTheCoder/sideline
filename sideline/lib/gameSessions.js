@@ -41,7 +41,7 @@ export const getOrCreateDefaultTeam = async (userId) => {
 };
 
 // set up a fresh game session — time to ball out, it's game day
-export const createGameSession = async ({ userId, opponentName, date, location }) => {
+export const createGameSession = async ({ userId, opponentName, date, location, matchType }) => {
   try {
     const { id: teamId, error: teamError } = await getOrCreateDefaultTeam(userId);
     if (teamError || !teamId) {
@@ -58,6 +58,7 @@ export const createGameSession = async ({ userId, opponentName, date, location }
         opponent_name: opponentName,
         date: date.toISOString().split('T')[0],
         location: location ?? null,
+        match_type: matchType ?? null,
       })
       .select('id')
       .single();

@@ -14,7 +14,7 @@ import { useThemeColor } from '@/hooks/use-theme-color';
 import { useAuth } from '@/contexts/AuthContext';
 import { useActiveSession } from '@/contexts/ActiveSessionContext';
 import { uploadRecording, createRecordingRecord, serializeRecordingNotes } from '@/lib/recording';
-import { processRecording, generateLabelsForGameSession } from '@/lib/recordingProcessing';
+import { processRecording } from '@/lib/recordingProcessing';
 
 export default function RecordScreen() {
   const router = useRouter();
@@ -385,23 +385,8 @@ export default function RecordScreen() {
     if (isRecording) {
       await stopRecording();
     }
-    
-    if (activeSession?.id && user?.id) {
-      setTimeout(() => {
-        generateLabelsForGameSession(activeSession.id, user.id)
-          .then((result) => {
-            if (result.success && result.processedCount > 0) {
-              showAlert(
-                'Labels Generated',
-                `Successfully generated labels for ${result.processedCount} recording${result.processedCount !== 1 ? 's' : ''}!`,
-                [{ text: 'OK' }]
-              );
-            }
-          })
-          .catch(() => {});
-      }, 10000);
-    }
-    
+
+    showToast('success', 'Processing recordings in background...');
     resetSessionDetails();
     router.push('/(tabs)/review');
   };
