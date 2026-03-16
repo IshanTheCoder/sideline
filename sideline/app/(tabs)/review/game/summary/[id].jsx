@@ -234,12 +234,14 @@ export default function PostGameSummaryScreen() {
     strokeWidth: 2,
     barPercentage: 0.6,
     decimalPlaces: 0,
+    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
   }), [isDark]);
 
   const feedbackBarChartConfig = useMemo(() => ({
     backgroundColor: isDark ? '#2A2A2A' : '#F5F5F5',
     backgroundGradientFrom: isDark ? '#2A2A2A' : '#F5F5F5',
     backgroundGradientTo: isDark ? '#2A2A2A' : '#F5F5F5',
+    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
     // Use a vivid orange to match the desired style consistently.
     color: () => 'rgb(229, 105, 71)',
     fillShadowGradient: '#E56947',
@@ -274,6 +276,7 @@ export default function PostGameSummaryScreen() {
       population: value,
       color: PIE_COLORS[i % PIE_COLORS.length],
       legendFontColor: isDark ? '#E0E0E0' : '#333333',
+      legendFontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
     }));
   }, [volleyballStats.bySkill, isDark]);
 
@@ -282,6 +285,7 @@ export default function PostGameSummaryScreen() {
     const data = mentionedPlayers.slice(0, 6).map(([, count]) => count);
     return {
       labels: mentionedPlayers.slice(0, 6).map(([name]) => name.length > 8 ? name.slice(0, 7) + '…' : name),
+      legendFontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
       datasets: [{
         data,
         // Force a vivid solid orange for each bar across native + web.
@@ -322,6 +326,7 @@ export default function PostGameSummaryScreen() {
     const hasAny = data.some((n) => n > 0);
     if (!hasAny) return null;
     return {
+      legendFontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
       labels,
       datasets: [{
         data,
