@@ -21,9 +21,9 @@ const FEEDBACK_LIST = getFeedbackTypeList().join(', ');
 
 /** few-shot examples so the AI knows exactly what kind of labels we're looking for */
 const VOLLEYBALL_LABEL_EXAMPLES = [
-  'Sarah needs to improve blocking footwork',
-  "Emma's serve receive positioning correction",
-  "John's arm swing follow-through on spikes",
+  'Sarah N. improve blocking footwork',
+  "Emma K. serve receive positioning correction",
+  "John R. arm swing follow-through on spikes",
   'Setter tempo with middles - quick sets',
   'Libero digging angle and platform',
   'Rotation 5 serve receive adjustment',
@@ -64,7 +64,7 @@ function correctLabelPlayerNames(label, players = []) {
     name
       .split(/\s+/)
       .map((token) => token.replace(/[^a-zA-Z'-]/g, '').trim())
-      .filter((token) => token.length >= 5)
+      .filter((token) => token.length >= 3)
       .forEach((token) => rosterTokens.push(token));
   });
 
@@ -105,6 +105,27 @@ function correctLabelPlayerNames(label, players = []) {
   return corrected;
 }
 
+function abbreviatePlayerNames(label, players = []) {
+  if (!label || !Array.isArray(players) || players.length === 0) return label;
+
+  let result = label;
+  const sorted = [...players]
+    .map((p) => (typeof p?.name === 'string' ? p.name.trim() : ''))
+    .filter((n) => n.includes(' '))
+    .sort((a, b) => b.length - a.length);
+
+  for (const fullName of sorted) {
+    const parts = fullName.split(/\s+/);
+    const firstName = parts[0];
+    const lastInitial = parts[parts.length - 1][0].toUpperCase() + '.';
+    const abbreviated = `${firstName} ${lastInitial}`;
+    const re = new RegExp(`\\b${escapeRegex(fullName)}\\b`, 'gi');
+    result = result.replace(re, abbreviated);
+  }
+
+  return result;
+}
+
 function buildVolleyballSystemPrompt(isLongRecording, players = [], customBuckets = {}) {
   // Build a roster hint that covers both name spelling and jersey-number → name resolution.
   // If any players have numbers, show the full "#N = Name" table so the AI can map
@@ -116,11 +137,14 @@ function buildVolleyballSystemPrompt(isLongRecording, players = [], customBucket
     if (withNumbers.length > 0) {
       const rows = withNumbers.map((p) => `#${p.number} = ${p.name}`).join(', ');
       const extras = withoutNumbers.length > 0 ? ` Also: ${withoutNumbers.map((p) => p.name).join(', ')}.` : '';
-      namesHint = `\nRoster (use EXACT spelling; if coach says "number X" or "player X", resolve to the name): ${rows}.${extras}\n`;
+      namesHint = `\nRoster (if coach says "number X" or "player X", resolve to the name): ${rows}.${extras}`;
     } else {
       const names = players.map((p) => p.name).join(', ');
-      namesHint = `\nKnown player names on this team (use EXACT spelling when mentioned): ${names}.\n`;
+      namesHint = `\nKnown player names on this team: ${names}.`;
     }
+    namesHint += `\nIMPORTANT NAME RULES:
+- Only use a player name if their name is CLEARLY spoken in the transcription. Do NOT guess or assume a player based on context alone.
+- In the label, use FIRST NAME + LAST INITIAL only (e.g., "Sarah N.", "Arha J."). Never use full last names.\n`;
   }
   const lengthGuidance = isLongRecording
     ? 'For LONGER recordings with multiple topics, create a GENERAL summary of the main themes (e.g., "Halftime adjustments and team strategy", "Multiple player technique corrections", "Set review and tactical changes"). Maximum 8 words.'
@@ -234,7 +258,7 @@ export async function generateLabel(transcriptionText, options = {}) {
           { role: 'user', content: userPrompt },
         ],
         max_tokens: 120,
-        temperature: 0.5,
+        temperature: 0.3,
       }),
     });
 
@@ -255,7 +279,10 @@ export async function generateLabel(transcriptionText, options = {}) {
 
     const structured = parseStructuredResponse(content);
     if (structured) {
-      const correctedLabel = correctLabelPlayerNames(structured.label, players);
+      const correctedLabel = abbreviatePlayerNames(
+        correctLabelPlayerNames(structured.label, players),
+        players
+      );
       console.log('✅ Label generated (volleyball):', correctedLabel, structured.skillCategory ?? '', structured.position ?? '');
       return {
         label: correctedLabel,
@@ -270,7 +297,10 @@ export async function generateLabel(transcriptionText, options = {}) {
 
     // plan B: AI didn't return proper JSON — use the raw text as a label, it's better than nothing
     const fallbackLabel = content.replace(/^["']|["']$/g, '').trim().slice(0, 80);
-    const correctedFallbackLabel = correctLabelPlayerNames(fallbackLabel, players);
+    const correctedFallbackLabel = abbreviatePlayerNames(
+      correctLabelPlayerNames(fallbackLabel, players),
+      players
+    );
     console.log('✅ Label generated (plain fallback):', correctedFallbackLabel);
     return {
       label: correctedFallbackLabel,

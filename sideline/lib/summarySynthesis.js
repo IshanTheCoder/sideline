@@ -6,28 +6,29 @@
 
 const groqApiKey = process.env.EXPO_PUBLIC_GROQ_API_KEY;
 
-const NOTICED_MOST_SYSTEM = `You are a volleyball coach assistant. Given a list of in-game feedback labels and optional transcriptions from a single match, synthesize 3–6 OVERARCHING themes or problems the coach noticed—not the raw labels.
+const NOTICED_MOST_SYSTEM = `You are a volleyball coach assistant. Given a list of in-game feedback labels and optional transcriptions from a single match, synthesize 3–6 OVERARCHING themes the coach explicitly talked about.
 
-CRITICAL: Include ONLY what is implied or stated in the coach's recordings. Do NOT add any observation, theme, or problem that was not said or clearly implied by the coach. Every theme must be directly supported by at least one label or transcription.
-
-Rules:
-- Write as high-level observations (e.g. "Liberos struggle to move to the ball quickly", "Outside hitters need cleaner approach timing") but only if the recordings support that theme.
+CRITICAL RULES — READ CAREFULLY:
+- ONLY include themes the coach EXPLICITLY SAID. If the coach did not say it, do NOT include it.
+- Do NOT infer, imply, guess, or extrapolate anything beyond the exact words in the labels and transcriptions.
+- Do NOT add conclusions like "team improved", "skills developing", "confidence grew" unless the coach literally said those words.
 - Do NOT repeat specific player names or copy the exact wording of the labels.
 - Do NOT list each recording; group similar feedback into broader themes.
-- Do NOT invent or extrapolate beyond what the coach said or implied.
 - Use clear, concise phrasing. Each item should be a short phrase or sentence (under 12 words).
+- When in doubt, LEAVE IT OUT.
 - Output a JSON array of strings only, no other text. Example: ["Theme one", "Theme two", "Theme three"]`;
 
-const MATCH_FLOW_SYSTEM = `You are a volleyball coach assistant. Given a chronological list of in-game feedback labels from one match, write 5–10 bullet points that read as a smooth MATCH FLOW—a progression of what the coach noticed over the course of the game.
+const MATCH_FLOW_SYSTEM = `You are a volleyball coach assistant. Given a chronological list of in-game feedback labels from one match, write bullet points that summarize what the coach said, in order.
 
-CRITICAL: Include ONLY what is implied or stated in the coach's recordings. Each bullet must reflect one or more of the provided labels. Do NOT add observations, outcomes, or narrative (e.g. "teamwork strengthened", "skills lifted the team") that the coach did not say or imply. Stick strictly to the sequence and content of the labels.
-
-Rules:
-- Write each bullet as a full sentence in your own words. Do NOT copy the raw labels verbatim.
-- The bullets should feel like a narrative progression but must be grounded only in the given labels (e.g. "Early in the match, receive technique was a focus" "As the set developed, blocking footwork came up").
-- Do NOT end any bullet with a period. No periods at the end of strings.
-- Vary sentence structure. Use transitions where natural (e.g. "Later, ...", "Throughout, ...").
-- Keep each sentence under 20 words. No numbering or bullets in the text.
+CRITICAL RULES — READ CAREFULLY:
+- Each bullet must come DIRECTLY from the provided labels. Do NOT add anything the coach did not say.
+- Do NOT infer outcomes, emotions, improvements, or narrative (e.g. "teamwork strengthened", "skills lifted the team", "confidence grew"). If the coach didn't say it, don't write it.
+- Do NOT fabricate player names. Only mention a player if their name appears in the labels.
+- Use "First L." format for player names (e.g. "Arha J." not "Arha Jadhav").
+- Write each bullet as a simple sentence restating what the coach said. Keep it factual and grounded.
+- Do NOT end any bullet with a period.
+- Keep each sentence under 20 words.
+- When in doubt, LEAVE IT OUT.
 - Output a JSON array of strings only, one string per bullet. No other text.`;
 
 /**
@@ -47,7 +48,7 @@ export async function synthesizeNoticedMost(items) {
     .map((i) => (i.transcription ? `Label: ${i.displayLabel}\nTranscription: ${i.transcription}` : i.displayLabel))
     .join('\n---\n');
 
-  const userPrompt = `Synthesize overarching coaching themes from these in-game notes. Include ONLY themes directly supported by what the coach said or implied. Reply with ONLY a JSON array of 3–6 theme strings.\n\n${input}`;
+  const userPrompt = `Synthesize overarching coaching themes from these in-game notes. Include ONLY themes the coach EXPLICITLY SAID — nothing inferred or implied. Reply with ONLY a JSON array of 3–6 theme strings.\n\n${input}`;
 
   try {
     const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
@@ -63,7 +64,7 @@ export async function synthesizeNoticedMost(items) {
           { role: 'user', content: userPrompt },
         ],
         max_tokens: 320,
-        temperature: 0.4,
+        temperature: 0.2,
       }),
     });
 
@@ -104,7 +105,7 @@ export async function synthesizeMatchFlow(labels) {
 
   const input = labels.slice(0, 20).join('\n');
 
-  const userPrompt = `Turn this chronological list of in-game feedback labels into a smooth match flow. Use ONLY the content in these labels; do not add anything the coach did not say or imply. Do not end any bullet with a period. Reply with ONLY a JSON array of 5–10 full-sentence bullets in your own words.\n\n${input}`;
+  const userPrompt = `Summarize what the coach said based on these labels, in chronological order. Use ONLY the content in these labels — do NOT add, infer, or imply anything the coach did not explicitly say. Do not end any bullet with a period. Reply with ONLY a JSON array of bullet strings.\n\n${input}`;
 
   try {
     const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
@@ -120,7 +121,7 @@ export async function synthesizeMatchFlow(labels) {
           { role: 'user', content: userPrompt },
         ],
         max_tokens: 480,
-        temperature: 0.4,
+        temperature: 0.2,
       }),
     });
 

@@ -14,7 +14,7 @@ import { ThemedView } from '@/components/themed-view';
 import { supabase } from '@/lib/supabase';
 import { showAlert } from '@/lib/alert';
 import { signInWithGoogle } from '@/lib/googleAuth';
-import { Ionicons } from '@expo/vector-icons';
+import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Colors } from '@/constants/theme';
 import { EyeIcon, EyeOffIcon, GoogleLogoIcon } from '@/components/icons/AuthIcons';
@@ -211,7 +211,7 @@ export default function LoginScreen() {
             style={styles.backButton}
             onPress={() => router.back()}
           >
-            <Ionicons name="arrow-back" size={24} color="#3B6FA8" />
+            <IconSymbol name="xmark" size={22} color="#3B6FA8" />
           </TouchableOpacity>
           <ThemedText type="title" style={styles.title}>
             Welcome Back
