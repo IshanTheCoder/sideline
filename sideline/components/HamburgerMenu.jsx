@@ -42,11 +42,16 @@ export default function HamburgerMenu({ visible, onClose, onSignOut }) {
     }
   }, [visible]);
 
-  const handleNavigation = (route) => {
+  const handleNavigation = (route, options = {}) => {
+    const { replace = false } = options;
     onClose();
     // Small delay to allow menu to close before navigation
     setTimeout(() => {
-      router.push(route);
+      if (replace) {
+        router.replace(route);
+      } else {
+        router.push(route);
+      }
     }, 300);
   };
 
@@ -63,7 +68,7 @@ export default function HamburgerMenu({ visible, onClose, onSignOut }) {
       id: 'home',
       label: 'Home',
       icon: 'house.fill',
-      onPress: () => handleNavigation('/(tabs)/'),
+      onPress: () => handleNavigation('/(tabs)/', { replace: true }),
       color: Colors[colorScheme ?? 'light'].tint,
     },
     {
@@ -77,7 +82,7 @@ export default function HamburgerMenu({ visible, onClose, onSignOut }) {
       id: 'games',
       label: 'View Games',
       icon: 'list.bullet',
-      onPress: () => handleNavigation('/(tabs)/review'),
+      onPress: () => handleNavigation('/(tabs)/review', { replace: true }),
       color: Colors[colorScheme ?? 'light'].tint,
     },
     {

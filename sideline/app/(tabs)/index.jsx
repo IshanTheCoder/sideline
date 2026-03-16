@@ -13,6 +13,23 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useRouter } from 'expo-router';
 import { fetchRecordingsForUser, formatDuration } from '@/lib/recording';
 
+const GREETINGS = [
+  'Welcome back',
+  'Hey there',
+  'Good to see you',
+  'Ready to record',
+  'Let\'s go',
+];
+
+let sessionGreeting = null;
+
+function getSessionGreeting() {
+  if (!sessionGreeting) {
+    sessionGreeting = GREETINGS[Math.floor(Math.random() * GREETINGS.length)];
+  }
+  return sessionGreeting;
+}
+
 export default function HomeScreen() {
   const { user, profile, signOut } = useAuth();
   const colorScheme = useColorScheme();
@@ -105,7 +122,8 @@ export default function HomeScreen() {
   };
 
   const handleViewAllRecordings = () => {
-    router.push('/(tabs)/review');
+    // Keep navigation deterministic: "View All" should behave like a root transition.
+    router.replace('/(tabs)/review');
   };
   const formatDate = (dateString) => {
     const date = new Date(dateString);
@@ -164,17 +182,7 @@ export default function HomeScreen() {
       .slice(0, 5);
   }, [recordings]);
 
-  // pick a random greeting like a fortune cookie
-  const getGreeting = () => {
-    const greetings = [
-      'Welcome back',
-      'Hey there',
-      'Good to see you',
-      'Ready to record',
-      'Let\'s go',
-    ];
-    return greetings[Math.floor(Math.random() * greetings.length)];
-  };
+  const greeting = useMemo(() => getSessionGreeting(), []);
 
   return (
     <ThemedView style={styles.container}>
@@ -225,7 +233,7 @@ export default function HomeScreen() {
         {/* greeting + user name */}
         <View style={styles.welcomeSection}>
           <ThemedText style={styles.welcomeText}>
-            {getGreeting()},
+            {greeting},
           </ThemedText>
           <ThemedText style={styles.userName}>
             {profile?.name || 'Coach'}

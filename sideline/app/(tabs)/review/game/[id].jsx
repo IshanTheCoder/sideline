@@ -483,8 +483,8 @@ export default function GameRecordingsScreen() {
       await stopAndUnloadAudio();
       setPlayingRecordingId(null);
     }
-    // Navigate to home screen instead of just going back
-    router.push('/(tabs)');
+    // Return to the games list from game details.
+    router.replace('/(tabs)/review');
   };
 
   const handleSaveNotes = async () => {

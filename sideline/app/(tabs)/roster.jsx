@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Keyboard,
   KeyboardAvoidingView,
+  Linking,
   Modal,
   Platform,
   Pressable,
@@ -13,6 +14,7 @@ import {
   View,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import * as ImagePicker from 'expo-image-picker';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { IconSymbol } from '@/components/ui/icon-symbol';
@@ -26,9 +28,63 @@ import {
   updatePlayer,
   deletePlayer,
   getTeamIdForUser,
+  importRosterPlayers,
 } from '@/lib/roster';
+import { parseRosterFromScreenshot } from '@/lib/rosterScreenshotImport';
 
-const POSITION_OPTIONS = ['', 'Setter', 'Outside Hitter', 'Middle Blocker', 'Opposite', 'Libero', 'Defensive Specialist'];
+const POSITION_OPTIONS = ['Setter', 'Outside Hitter', 'Middle Blocker', 'Opposite', 'Libero', 'Defensive Specialist'];
+const POSITION_LABEL_TO_INITIAL = {
+  Setter: 'S',
+  'Outside Hitter': 'OH',
+  'Middle Blocker': 'MB',
+  Opposite: 'O',
+  Libero: 'L',
+  'Defensive Specialist': 'DS',
+};
+
+const POSITION_ALIAS_TO_LABEL = {
+  setter: 'Setter',
+  s: 'Setter',
+  'outside hitter': 'Outside Hitter',
+  outside: 'Outside Hitter',
+  oh: 'Outside Hitter',
+  'middle blocker': 'Middle Blocker',
+  middle: 'Middle Blocker',
+  mb: 'Middle Blocker',
+  opposite: 'Opposite',
+  o: 'Opposite',
+  libero: 'Libero',
+  l: 'Libero',
+  'defensive specialist': 'Defensive Specialist',
+  ds: 'Defensive Specialist',
+};
+
+function normalizePositionToken(token) {
+  const cleaned = String(token ?? '').trim().replace(/\./g, '').toLowerCase();
+  return POSITION_ALIAS_TO_LABEL[cleaned] ?? String(token ?? '').trim();
+}
+
+function parsePositionList(value) {
+  if (!value || !String(value).trim()) return [];
+  const tokens = String(value)
+    .split(',')
+    .map((t) => normalizePositionToken(t))
+    .filter(Boolean);
+  return Array.from(new Set(tokens));
+}
+
+function formatPositionListForStorage(positions) {
+  if (!Array.isArray(positions) || positions.length === 0) return null;
+  return positions.join(', ');
+}
+
+function formatPositionListForTable(value) {
+  const positions = parsePositionList(value);
+  if (positions.length === 0) return '—';
+  return positions
+    .map((pos) => POSITION_LABEL_TO_INITIAL[pos] ?? pos)
+    .join(', ');
+}
 
 export default function RosterScreen() {
   const router = useRouter();
@@ -41,9 +97,10 @@ export default function RosterScreen() {
   const [editingPlayer, setEditingPlayer] = useState(null);
   const [formName, setFormName] = useState('');
   const [formNumber, setFormNumber] = useState('');
-  const [formPosition, setFormPosition] = useState('');
+  const [formPositions, setFormPositions] = useState([]);
   const [formGrade, setFormGrade] = useState('');
   const [saving, setSaving] = useState(false);
+  const [importing, setImporting] = useState(false);
 
   const loadRoster = useCallback(async () => {
     if (!user?.id) {
@@ -75,7 +132,7 @@ export default function RosterScreen() {
     setEditingPlayer(null);
     setFormName('');
     setFormNumber('');
-    setFormPosition('');
+    setFormPositions([]);
     setFormGrade('');
     setModalVisible(true);
   };
@@ -84,7 +141,7 @@ export default function RosterScreen() {
     setEditingPlayer(p);
     setFormName(p.name || '');
     setFormNumber(p.number || '');
-    setFormPosition(p.position || '');
+    setFormPositions(parsePositionList(p.position));
     setFormGrade(p.grade || '');
     setModalVisible(true);
   };
@@ -111,11 +168,12 @@ export default function RosterScreen() {
         setSaving(false);
         return;
       }
+      const positionValue = formatPositionListForStorage(formPositions);
       if (editingPlayer) {
         const { error: updateError } = await updatePlayer(editingPlayer.id, {
           name,
           number: formNumber.trim() || null,
-          position: formPosition.trim() || null,
+          position: positionValue,
           grade: formGrade.trim() || null,
         });
         if (updateError) showError('Error', updateError.message);
@@ -127,7 +185,7 @@ export default function RosterScreen() {
         const { error: insertError } = await addPlayer(teamId, {
           name,
           number: formNumber.trim() || undefined,
-          position: formPosition.trim() || undefined,
+          position: positionValue || undefined,
           grade: formGrade.trim() || undefined,
         });
         if (insertError) showError('Error', insertError.message);
@@ -141,6 +199,14 @@ export default function RosterScreen() {
     } finally {
       setSaving(false);
     }
+  };
+
+  const toggleFormPosition = (position) => {
+    setFormPositions((prev) =>
+      prev.includes(position)
+        ? prev.filter((p) => p !== position)
+        : [...prev, position]
+    );
   };
 
   const handleDelete = (p) => {
@@ -173,17 +239,160 @@ export default function RosterScreen() {
     );
   };
 
+  const confirmParsedImport = (parsedPlayers, sourceLabel = 'import source') =>
+    new Promise((resolve) => {
+      const preview = parsedPlayers.slice(0, 5).map((p) => {
+        const num = p.number ? `#${p.number}` : '#—';
+        const pos = p.position ? ` · ${p.position}` : '';
+        const grade = p.grade ? ` · ${p.grade}` : '';
+        return `${num} ${p.name}${pos}${grade}`;
+      }).join('\n');
+
+      const message = `${parsedPlayers.length} players found from ${sourceLabel}.\n\n${preview}${parsedPlayers.length > 5 ? '\n...' : ''}\n\nImport these players?`;
+
+      if (Platform.OS === 'web') {
+        resolve(window.confirm(message));
+        return;
+      }
+
+      showAlert('Import roster', message, [
+        { text: 'Cancel', style: 'cancel', onPress: () => resolve(false) },
+        { text: 'Import', onPress: () => resolve(true) },
+      ]);
+    });
+
+  const executeRosterImport = async (parsedPlayers, sourceLabel) => {
+    const confirmed = await confirmParsedImport(parsedPlayers, sourceLabel);
+    if (!confirmed) return;
+
+    const { teamId, error: teamError } = await getTeamIdForUser(user.id);
+    if (teamError || !teamId) {
+      showError('Error', 'Could not load team.');
+      return;
+    }
+
+    const { added, errors } = await importRosterPlayers(teamId, parsedPlayers);
+    if (added > 0) {
+      await loadRoster();
+    }
+
+    if (errors.length > 0) {
+      showError(
+        'Import completed with issues',
+        `Added ${added} players.\n${errors.slice(0, 3).join('\n')}${errors.length > 3 ? '\n...' : ''}`
+      );
+    } else {
+      showError('Import complete', `Added ${added} players from ${sourceLabel}.`);
+    }
+  };
+
+  const ensureMediaLibraryAccess = async () => {
+    if (Platform.OS === 'web') return true;
+
+    const current = await ImagePicker.getMediaLibraryPermissionsAsync();
+    if (current.status === 'granted') return true;
+
+    const requested = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (requested.status === 'granted') return true;
+
+    showAlert(
+      'Photo access needed',
+      'Please allow Photos access to import roster screenshots.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Open Settings',
+          onPress: () => {
+            Linking.openSettings().catch(() => {
+              // no-op fallback
+            });
+          },
+        },
+      ]
+    );
+    return false;
+  };
+
+  const handleImportScreenshot = async () => {
+    if (!user?.id || importing || saving) return;
+    try {
+      setImporting(true);
+      if (!process.env.EXPO_PUBLIC_GROQ_API_KEY) {
+        showError(
+          'AI key not configured',
+          'Screenshot parsing needs EXPO_PUBLIC_GROQ_API_KEY.'
+        );
+        setImporting(false);
+        return;
+      }
+
+      const hasAccess = await ensureMediaLibraryAccess();
+      if (!hasAccess) {
+        setImporting(false);
+        return;
+      }
+
+      const picked = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: false,
+        quality: 1,
+      });
+
+      if (picked.canceled || !picked.assets?.[0]) {
+        setImporting(false);
+        return;
+      }
+
+      const asset = picked.assets[0];
+      const { players: parsedPlayers, error: parseError } = await parseRosterFromScreenshot({
+        uri: asset.uri,
+        mimeType: asset.mimeType || undefined,
+      });
+
+      if (parseError) {
+        showError('Import failed', parseError.message);
+        setImporting(false);
+        return;
+      }
+
+      if (!parsedPlayers.length) {
+        showError('No players found', 'Could not detect player rows in that screenshot. Try a clearer image.');
+        setImporting(false);
+        return;
+      }
+
+      await executeRosterImport(parsedPlayers, 'screenshot');
+    } catch (e) {
+      showError('Import failed', e?.message || 'Unexpected error during screenshot import.');
+    } finally {
+      setImporting(false);
+    }
+  };
+
   const tint = Colors[colorScheme ?? 'light'].tint;
   const isDark = colorScheme === 'dark';
   const tableBg = isDark ? '#1E1E1E' : '#FFF';
   const headerBg = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)';
   const rowBg = (i) => (i % 2 === 0 ? (isDark ? '#252525' : '#FAFAFA') : (isDark ? '#1E1E1E' : '#FFF'));
   const borderColor = isDark ? '#333' : '#E8E8E8';
+  const sortedPlayers = useMemo(() => {
+    return [...players].sort((a, b) => {
+      const aNum = Number.parseInt(String(a?.number ?? ''), 10);
+      const bNum = Number.parseInt(String(b?.number ?? ''), 10);
+      const aValid = Number.isFinite(aNum);
+      const bValid = Number.isFinite(bNum);
+
+      if (aValid && bValid && aNum !== bNum) return aNum - bNum;
+      if (aValid !== bValid) return aValid ? -1 : 1;
+
+      return String(a?.name ?? '').localeCompare(String(b?.name ?? ''), undefined, { sensitivity: 'base' });
+    });
+  }, [players]);
 
   return (
     <ThemedView style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity style={styles.backButton} onPress={() => router.back()} activeOpacity={0.7} accessibilityLabel="Back">
+        <TouchableOpacity style={styles.backButton} onPress={() => router.replace('/(tabs)')} activeOpacity={0.7} accessibilityLabel="Back">
           <IconSymbol name="chevron.left" size={28} color={Colors[colorScheme ?? 'light'].text} />
         </TouchableOpacity>
         <ThemedText type="title" style={styles.title}>
@@ -199,9 +408,31 @@ export default function RosterScreen() {
         style={[styles.addButton, { backgroundColor: tint }]}
         onPress={openAdd}
         activeOpacity={0.8}
+        disabled={importing}
       >
         <IconSymbol name="plus" size={22} color="#FFF" />
         <ThemedText style={styles.addButtonText}>Add player</ThemedText>
+      </TouchableOpacity>
+      <TouchableOpacity
+        style={[
+          styles.importButton,
+          {
+            borderColor: tint,
+            opacity: importing ? 0.7 : 1,
+          },
+        ]}
+        onPress={handleImportScreenshot}
+        activeOpacity={0.8}
+        disabled={importing || saving}
+      >
+        {importing ? (
+          <ActivityIndicator size="small" color={tint} />
+        ) : (
+          <>
+            <IconSymbol name="camera" size={20} color={tint} />
+            <ThemedText style={[styles.importButtonText, { color: tint }]}>Import from screenshot</ThemedText>
+          </>
+        )}
       </TouchableOpacity>
 
       {loading && (
@@ -246,18 +477,18 @@ export default function RosterScreen() {
             showsVerticalScrollIndicator={true}
             contentContainerStyle={styles.tableBodyContent}
           >
-            {players.map((p, i) => (
+            {sortedPlayers.map((p, i) => (
               <View
                 key={p.id}
                 style={[
                   styles.tableRow,
                   { backgroundColor: rowBg(i), borderBottomColor: borderColor },
-                  i === players.length - 1 && styles.tableRowLast,
+                  i === sortedPlayers.length - 1 && styles.tableRowLast,
                 ]}
               >
                 <ThemedText style={styles.tdName} numberOfLines={1}>{p.name || '—'}</ThemedText>
                 <ThemedText style={styles.tdNum} numberOfLines={1}>{p.number || '—'}</ThemedText>
-                <ThemedText style={styles.tdPos} numberOfLines={1}>{p.position || '—'}</ThemedText>
+                <ThemedText style={styles.tdPos} numberOfLines={1}>{formatPositionListForTable(p.position)}</ThemedText>
                 <ThemedText style={styles.tdGrade} numberOfLines={1}>{p.grade || '—'}</ThemedText>
                 <View style={styles.tdActions}>
                   <TouchableOpacity onPress={() => openEdit(p)} hitSlop={8} style={styles.actionBtn}>
@@ -315,14 +546,23 @@ export default function RosterScreen() {
                 />
                 <ThemedText style={styles.positionLabel}>Position</ThemedText>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.positionChipScroll} contentContainerStyle={styles.positionChipRow}>
+                  <TouchableOpacity
+                    key="_none"
+                    style={[styles.positionChip, formPositions.length === 0 && { backgroundColor: tint }]}
+                    onPress={() => setFormPositions([])}
+                  >
+                    <ThemedText style={[styles.positionChipText, formPositions.length === 0 && { color: '#FFF' }]}>
+                      None
+                    </ThemedText>
+                  </TouchableOpacity>
                   {POSITION_OPTIONS.map((pos) => (
                     <TouchableOpacity
-                      key={pos || '_none'}
-                      style={[styles.positionChip, formPosition === pos && { backgroundColor: tint }]}
-                      onPress={() => setFormPosition(pos)}
+                      key={pos}
+                      style={[styles.positionChip, formPositions.includes(pos) && { backgroundColor: tint }]}
+                      onPress={() => toggleFormPosition(pos)}
                     >
-                      <ThemedText style={[styles.positionChipText, formPosition === pos && { color: '#FFF' }]}>
-                        {pos || 'None'}
+                      <ThemedText style={[styles.positionChipText, formPositions.includes(pos) && { color: '#FFF' }]}>
+                        {pos}
                       </ThemedText>
                     </TouchableOpacity>
                   ))}
@@ -350,6 +590,7 @@ export default function RosterScreen() {
           </View>
         </KeyboardAvoidingView>
       </Modal>
+
     </ThemedView>
   );
 }
@@ -397,6 +638,23 @@ const styles = StyleSheet.create({
   addButtonText: {
     color: '#FFF',
     fontSize: 16,
+    fontWeight: '600',
+  },
+  importButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    marginHorizontal: 20,
+    marginBottom: 20,
+    backgroundColor: 'transparent',
+  },
+  importButtonText: {
+    fontSize: 15,
     fontWeight: '600',
   },
   tableWrap: {
