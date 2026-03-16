@@ -23,45 +23,12 @@ import {
   aggregateVolleyballStats,
   SKILL_CATEGORY_LABELS,
 } from '@/lib/volleyballVocabulary';
-import { getPlayersForGameSession } from '@/lib/roster';
-import { synthesizeNoticedMost, synthesizeMatchFlow } from '@/lib/summarySynthesis';
+import { fetchRosterForUser } from '@/lib/roster';
+import { synthesizeNoticedMost, synthesizePostGameSummary, synthesizePlayerSummaries } from '@/lib/summarySynthesis';
 
 function normalizeLabel(s) {
   if (!s || typeof s !== 'string') return '';
   return s.trim().replace(/\s+/g, ' ').slice(0, 80);
-}
-
-/** Rephrase a label for Match Flow so it reads differently from "What You Noticed Most". */
-function rephraseForMatchFlow(label, players) {
-  if (!label || !players?.length) return label;
-  const names = players
-    .map((p) => (p && p.name) ? p.name.trim() : '')
-    .filter(Boolean)
-    .sort((a, b) => b.length - a.length); // longer names first (e.g. "John Maliacal" before "John")
-  const lower = label.trim().toLowerCase();
-  // If label starts with a player name, move name to end: "Edward split step receiving" → "Split step receiving (Edward)"
-  for (const name of names) {
-    const n = name.toLowerCase();
-    if (lower.startsWith(n)) {
-      const rest = label.slice(name.length).trim();
-      if (rest) return `${rest} (${name})`;
-      return label;
-    }
-  }
-  // If label contains a player name, move it to end: "X John Maliacal Y" → "X Y (John Maliacal)"
-  for (const name of names) {
-    const n = name.toLowerCase();
-    const idx = lower.indexOf(n);
-    if (idx !== -1) {
-      const before = label.slice(0, idx).trim();
-      const after = label.slice(idx + name.length).trim();
-      const rest = [before, after].filter(Boolean).join(' ').trim();
-      if (rest) return `${rest} (${name})`;
-      return label;
-    }
-  }
-  // Fallback: frame as a moment so wording differs
-  return label.startsWith('Noted: ') ? label : `Noted: ${label}`;
 }
 
 export default function PostGameSummaryScreen() {
@@ -70,11 +37,11 @@ export default function PostGameSummaryScreen() {
   const colorScheme = useColorScheme();
   const { user } = useAuth();
   const [recordings, setRecordings] = useState([]);
-  const [players, setPlayers] = useState([]);
+  const [rosterNames, setRosterNames] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [synthesizedThemes, setSynthesizedThemes] = useState([]);
-  const [synthesizedMatchFlowBullets, setSynthesizedMatchFlowBullets] = useState([]);
+  const [postGameSummary, setPostGameSummary] = useState('');
   const [synthesisLoading, setSynthesisLoading] = useState(false);
 
   const gameId = useMemo(() => (Array.isArray(id) ? id[0] : id), [id]);
@@ -86,9 +53,9 @@ export default function PostGameSummaryScreen() {
     }
     setLoading(true);
     setError(null);
-    const [recResult, playersResult] = await Promise.all([
+    const [recResult, rosterResult] = await Promise.all([
       fetchRecordingsForGame(user.id, gameId),
-      getPlayersForGameSession(gameId),
+      fetchRosterForUser(user.id),
     ]);
     if (recResult.error) {
       setError(recResult.error.message);
@@ -99,7 +66,10 @@ export default function PostGameSummaryScreen() {
       );
       setRecordings(sorted);
     }
-    setPlayers(playersResult.players ?? []);
+    const names = (rosterResult.data ?? [])
+      .map((p) => p.name?.split(' ')[0]?.trim())
+      .filter(Boolean);
+    setRosterNames(names);
     setLoading(false);
   }, [user?.id, gameId]);
 
@@ -120,19 +90,6 @@ export default function PostGameSummaryScreen() {
 
   const volleyballStats = useMemo(() => aggregateVolleyballStats(recordings), [recordings]);
 
-  const mentionedPlayers = useMemo(() => {
-    const names = players.map((p) => p.name).filter(Boolean);
-    const count = {};
-    names.forEach((name) => { count[name] = 0; });
-    recordings.forEach((rec) => {
-      const text = [rec.transcription, parseAiLabels(rec.ai_labels ?? null).displayLabel].filter(Boolean).join(' ').toLowerCase();
-      names.forEach((name) => {
-        if (name && text.includes(name.toLowerCase())) count[name]++;
-      });
-    });
-    return Object.entries(count).filter(([, n]) => n > 0).sort((a, b) => b[1] - a[1]).slice(0, 8);
-  }, [recordings, players]);
-
   const noticedMost = useMemo(() => {
     const count = {};
     for (const rec of recordings) {
@@ -147,29 +104,19 @@ export default function PostGameSummaryScreen() {
       .map(([text, count]) => ({ text, count }));
   }, [recordings]);
 
-  const nameToNumber = useMemo(() => {
-    const map = {};
-    players.forEach((p) => {
-      if (p.name) map[p.name.toLowerCase().trim()] = p.number || p.name;
-    });
-    return map;
-  }, [players]);
-
-  const playerNotes = useMemo(() => {
-    const list = [];
+  const playerNotesInput = useMemo(() => {
+    const items = [];
     for (const rec of recordings) {
       const parsed = parseAiLabels(rec.ai_labels ?? null);
-      const tagged = parsed.taggedPlayers;
       const label = normalizeLabel(parsed.displayLabel);
-      if (!Array.isArray(tagged) || tagged.length === 0 || !label) continue;
-      for (const name of tagged) {
-        const num = nameToNumber[(name || '').toLowerCase().trim()];
-        const displayNum = num != null ? String(num) : (name || '?');
-        list.push({ number: displayNum, label });
-      }
+      const transcription = (rec.transcription || '').trim();
+      if (label) items.push(label);
+      if (transcription && transcription !== label) items.push(transcription);
     }
-    return list;
-  }, [recordings, nameToNumber]);
+    return [...new Set(items)];
+  }, [recordings]);
+
+  const [playerSummaries, setPlayerSummaries] = useState([]);
 
   const matchFlow = useMemo(() => {
     return recordings
@@ -194,24 +141,29 @@ export default function PostGameSummaryScreen() {
 
   useEffect(() => {
     setSynthesizedThemes([]);
-    setSynthesizedMatchFlowBullets([]);
+    setPostGameSummary('');
+    setPlayerSummaries([]);
   }, [gameId]);
 
   useEffect(() => {
-    if (!noticedMostInput.length && !matchFlow.length) {
+    if (!noticedMostInput.length && !matchFlow.length && !playerNotesInput.length) {
       setSynthesisLoading(false);
       return;
     }
     let cancelled = false;
     setSynthesisLoading(true);
     const run = async () => {
-      const [themesRes, flowRes] = await Promise.all([
+      const [themesRes, summaryRes, playerRes] = await Promise.all([
         noticedMostInput.length > 0 ? synthesizeNoticedMost(noticedMostInput) : Promise.resolve({ themes: [], error: null }),
-        matchFlow.length > 0 ? synthesizeMatchFlow(matchFlow) : Promise.resolve({ bullets: [], error: null }),
+        matchFlow.length > 0 ? synthesizePostGameSummary(matchFlow) : Promise.resolve({ summary: '', error: null }),
+        playerNotesInput.length > 0 && rosterNames.length > 0
+          ? synthesizePlayerSummaries(playerNotesInput, rosterNames)
+          : Promise.resolve({ summaries: [], error: null }),
       ]);
       if (cancelled) return;
       setSynthesizedThemes(themesRes.themes ?? []);
-      setSynthesizedMatchFlowBullets(flowRes.bullets ?? []);
+      setPostGameSummary(summaryRes.summary ?? '');
+      setPlayerSummaries(playerRes.summaries ?? []);
       setSynthesisLoading(false);
     };
     run();
@@ -279,28 +231,6 @@ export default function PostGameSummaryScreen() {
       legendFontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
     }));
   }, [volleyballStats.bySkill, isDark]);
-
-  const barChartData = useMemo(() => {
-    if (mentionedPlayers.length === 0) return null;
-    const data = mentionedPlayers.slice(0, 6).map(([, count]) => count);
-    return {
-      labels: mentionedPlayers.slice(0, 6).map(([name]) => name.length > 8 ? name.slice(0, 7) + '…' : name),
-      legendFontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-      datasets: [{
-        data,
-        // Force a vivid solid orange for each bar across native + web.
-        colors: data.map(() => () => '#E56947'),
-      }],
-    };
-  }, [mentionedPlayers]);
-
-  const playerBarYAxisMax = useMemo(() => {
-    if (!barChartData?.datasets?.[0]?.data?.length) return 1;
-    const data = barChartData.datasets[0].data;
-    const max = Math.max(...data);
-    if (max <= 0) return 1;
-    return Math.max(1, max);
-  }, [barChartData]);
 
   // Feedback (recordings) per set: x = set number, y = count of recordings for that set
   const feedbackPerSetData = useMemo(() => {
@@ -424,36 +354,6 @@ export default function PostGameSummaryScreen() {
 
           <View style={styles.section}>
             <ThemedText style={[styles.sectionHeading, { opacity: 0.7 }]}>
-              PLAYER MENTIONS
-            </ThemedText>
-            {barChartData && barChartData.labels.length > 0 ? (
-              <View style={[styles.chartWrapper, styles.feedbackChartWrapper, { backgroundColor: isDark ? '#2A2A2A' : '#F5F5F5' }]}>
-                <BarChart
-                  data={barChartData}
-                  width={screenWidth}
-                  height={240}
-                  chartConfig={feedbackBarChartConfig}
-                  yAxisLabel=""
-                  yAxisSuffix=""
-                  fromZero
-                  fromNumber={playerBarYAxisMax}
-                  segments={playerBarYAxisMax}
-                  withCustomBarColorFromData
-                  flatColor
-                  showBarTops={false}
-                  style={styles.feedbackChartStyle}
-                />
-              </View>
-            ) : (
-              <View style={[styles.insufficientData, { backgroundColor: isDark ? '#2A2A2A' : '#F5F5F5' }]}>
-                <IconSymbol name="person.2" size={24} color={isDark ? '#666' : '#999'} />
-                <ThemedText style={styles.insufficientDataText}>Not enough information</ThemedText>
-              </View>
-            )}
-          </View>
-
-          <View style={styles.section}>
-            <ThemedText style={[styles.sectionHeading, { opacity: 0.7 }]}>
               FEEDBACK BY SET
             </ThemedText>
             {feedbackPerSetData && feedbackPerSetData.datasets[0].data.some((n) => n > 0) ? (
@@ -494,7 +394,7 @@ export default function PostGameSummaryScreen() {
           {!synthesisLoading && (
             <View style={styles.section}>
               <ThemedText style={[styles.sectionHeading, { opacity: 0.7 }]}>
-                WHAT YOU NOTICED MOST
+                COACHING TAKEAWAYS
               </ThemedText>
               {(synthesizedThemes.length > 0 || noticedMost.length > 0) ? (
                 (synthesizedThemes.length > 0 ? synthesizedThemes : noticedMost.map((m) => m.text)).map((text, i) => (
@@ -520,50 +420,47 @@ export default function PostGameSummaryScreen() {
             </View>
           )}
 
-          <View style={styles.section}>
-            <ThemedText style={[styles.sectionHeading, { opacity: 0.7 }]}>
-              PLAYER-SPECIFIC NOTES
-            </ThemedText>
-            {playerNotes.length > 0 ? (
-              playerNotes.map((note, i) => (
-                <View
-                  key={`${note.number}-${note.label}-${i}`}
-                  style={[
-                    styles.card,
-                    { backgroundColor: colorScheme === 'dark' ? '#2A2A2A' : '#F0F0F0' },
-                  ]}
-                >
-                  <ThemedText style={[styles.playerTag, { color: Colors[colorScheme ?? 'light'].tint }]}>
-                    #{note.number}
-                  </ThemedText>
-                  <ThemedText style={styles.cardText} numberOfLines={2}>
-                    {note.label}
-                  </ThemedText>
-                </View>
-              ))
-            ) : (
-              <View style={[styles.insufficientData, { backgroundColor: isDark ? '#2A2A2A' : '#F5F5F5' }]}>
-                <IconSymbol name="person.text.rectangle" size={24} color={isDark ? '#666' : '#999'} />
-                <ThemedText style={styles.insufficientDataText}>Not enough information</ThemedText>
-              </View>
-            )}
-          </View>
-
           {!synthesisLoading && (
             <View style={styles.section}>
-              <ThemedText style={[styles.sectionHeading, { opacity: 0.7 }]}>MATCH FLOW</ThemedText>
-              {(synthesizedMatchFlowBullets.length > 0 || matchFlow.length > 0) ? (
-                (synthesizedMatchFlowBullets.length > 0 ? synthesizedMatchFlowBullets : matchFlow.map((l) => rephraseForMatchFlow(l, players))).map((sentence, i) => (
-                  <View key={`flow-${i}`} style={styles.flowRow}>
-                    <View style={[styles.bullet, { backgroundColor: Colors[colorScheme ?? 'light'].tint }]} />
-                    <ThemedText style={styles.flowText} numberOfLines={4}>
-                      {typeof sentence === 'string' ? sentence.replace(/\.+$/, '') : sentence}
+              <ThemedText style={[styles.sectionHeading, { opacity: 0.7 }]}>
+                PLAYER-SPECIFIC NOTES
+              </ThemedText>
+              {playerSummaries.length > 0 ? (
+                playerSummaries.map((ps, i) => (
+                  <View
+                    key={`ps-${ps.name}-${i}`}
+                    style={[
+                      styles.card,
+                      { backgroundColor: colorScheme === 'dark' ? '#2A2A2A' : '#F0F0F0' },
+                    ]}
+                  >
+                    <ThemedText style={[styles.playerTag, { color: Colors[colorScheme ?? 'light'].tint }]}>
+                      {ps.name}
+                    </ThemedText>
+                    <ThemedText style={styles.cardText} numberOfLines={2}>
+                      {ps.summary}
                     </ThemedText>
                   </View>
                 ))
               ) : (
                 <View style={[styles.insufficientData, { backgroundColor: isDark ? '#2A2A2A' : '#F5F5F5' }]}>
-                  <IconSymbol name="arrow.triangle.branch" size={24} color={isDark ? '#666' : '#999'} />
+                  <IconSymbol name="person.text.rectangle" size={24} color={isDark ? '#666' : '#999'} />
+                  <ThemedText style={styles.insufficientDataText}>Not enough information</ThemedText>
+                </View>
+              )}
+            </View>
+          )}
+
+          {!synthesisLoading && (
+            <View style={styles.section}>
+              <ThemedText style={[styles.sectionHeading, { opacity: 0.7 }]}>POST-GAME SUMMARY</ThemedText>
+              {postGameSummary ? (
+                <View style={[styles.summaryCard, { backgroundColor: colorScheme === 'dark' ? '#2A2A2A' : '#F0F0F0' }]}>
+                  <ThemedText style={styles.summaryText}>{postGameSummary}</ThemedText>
+                </View>
+              ) : (
+                <View style={[styles.insufficientData, { backgroundColor: isDark ? '#2A2A2A' : '#F5F5F5' }]}>
+                  <IconSymbol name="doc.text" size={24} color={isDark ? '#666' : '#999'} />
                   <ThemedText style={styles.insufficientDataText}>Not enough information</ThemedText>
                 </View>
               )}
@@ -688,22 +585,15 @@ const styles = StyleSheet.create({
     fontSize: 15,
     lineHeight: 20,
   },
-  flowRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    marginBottom: 10,
-    gap: 10,
+  summaryCard: {
+    paddingVertical: 16,
+    paddingHorizontal: 18,
+    borderRadius: 12,
+    marginBottom: 8,
   },
-  bullet: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    marginTop: 6,
-  },
-  flowText: {
-    flex: 1,
+  summaryText: {
     fontSize: 15,
-    lineHeight: 22,
+    lineHeight: 24,
   },
   insufficientData: {
     flexDirection: 'row',

@@ -2,9 +2,8 @@ const groqApiKey = process.env.EXPO_PUBLIC_GROQ_API_KEY;
 
 const MODELS = [
   'llama-3.3-70b-versatile',
-  'llama3-70b-8192',
+  'meta-llama/llama-4-scout-17b-16e-instruct',
   'llama-3.1-8b-instant',
-  'gemma2-9b-it',
 ];
 
 let activeModel = MODELS[0];

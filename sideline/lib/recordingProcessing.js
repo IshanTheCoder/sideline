@@ -5,6 +5,14 @@ import { serializeAiLabels, applyVolleyballTranscriptionCorrections } from './vo
 import { getPlayersForGameSession, buildRosterNameCorrections, buildRosterNumberCorrections } from './roster';
 import { getCustomBucketsForPrompt } from './customBuckets';
 
+function findMentionedPlayers(text, rosterPlayers) {
+  if (!text || !rosterPlayers?.length) return [];
+  const lower = text.toLowerCase();
+  return rosterPlayers
+    .filter((p) => p.name && lower.includes(p.name.toLowerCase()))
+    .map((p) => p.name);
+}
+
 // catches DB errors about columns that don't exist yet — growing pains of schema changes
 const isMissingColumnError = (error, column) => {
   if (!error || typeof error !== 'object') return false;
@@ -136,12 +144,15 @@ export async function processRecording(recordingId, userId) {
       // no label? not the end of the world — transcription is the MVP here
     } else {
       console.log('✅ Label generated:', labelResult.label);
+      const mentioned = findMentionedPlayers(correctedTranscription, rosterPlayers);
+      const resolvedPosition = mentioned.length > 1 ? 'multiple_players' : (labelResult.position ?? undefined);
       aiLabel = serializeAiLabels(labelResult.label, {
         skillCategory: labelResult.skillCategory ?? undefined,
-        position: labelResult.position ?? undefined,
+        position: resolvedPosition,
         playPattern: labelResult.playPattern ?? undefined,
         feedbackType: labelResult.feedbackType ?? undefined,
         ruleNote: labelResult.ruleNote ?? undefined,
+        taggedPlayers: mentioned.length ? mentioned : undefined,
       });
     }
 
@@ -320,12 +331,15 @@ export async function generateLabelsForGameSession(gameSessionId, userId) {
 
       console.log(`✅ Label generated for ${recording.id}: "${labelResult.label}"`);
 
+      const mentioned = findMentionedPlayers(recording.transcription, rosterPlayers);
+      const resolvedPosition = mentioned.length > 1 ? 'multiple_players' : (labelResult.position ?? undefined);
       const aiLabel = serializeAiLabels(labelResult.label, {
         skillCategory: labelResult.skillCategory ?? undefined,
-        position: labelResult.position ?? undefined,
+        position: resolvedPosition,
         playPattern: labelResult.playPattern ?? undefined,
         feedbackType: labelResult.feedbackType ?? undefined,
         ruleNote: labelResult.ruleNote ?? undefined,
+        taggedPlayers: mentioned.length ? mentioned : undefined,
       });
 
       const { error: updateError } = await updateRecordingData(recording.id, userId, {
@@ -441,12 +455,15 @@ export async function generateMissingLabels(userId, gameSessionId) {
 
         console.log(`✅ Label generated for ${recording.id}: "${labelResult.label}"`);
 
+        const mentioned = findMentionedPlayers(transcriptionText, rosterPlayers);
+        const resolvedPosition = mentioned.length > 1 ? 'multiple_players' : (labelResult.position ?? undefined);
         const aiLabel = serializeAiLabels(labelResult.label, {
           skillCategory: labelResult.skillCategory ?? undefined,
-          position: labelResult.position ?? undefined,
+          position: resolvedPosition,
           playPattern: labelResult.playPattern ?? undefined,
           feedbackType: labelResult.feedbackType ?? undefined,
           ruleNote: labelResult.ruleNote ?? undefined,
+          taggedPlayers: mentioned.length ? mentioned : undefined,
         });
 
         const { error: updateError } = await updateRecordingData(recording.id, userId, {

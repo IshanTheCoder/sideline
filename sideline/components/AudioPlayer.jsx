@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Platform, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { Audio } from 'expo-av';
+import * as FileSystem from 'expo-file-system/legacy';
 
 const Slider = Platform.OS !== 'web'
   ? require('@react-native-community/slider').default
@@ -39,8 +40,28 @@ export default function AudioPlayer({ audioUrl }) {
           setSound(null);
         }
 
+        let playUri = audioUrl;
+
+        if (Platform.OS !== 'web' && audioUrl && audioUrl.startsWith('http')) {
+          const urlPath = audioUrl.split('?')[0];
+          const isWebm = urlPath.endsWith('.webm');
+
+          if (isWebm && Platform.OS === 'ios') {
+            throw new Error('This recording was made on the web and cannot be played on iOS.');
+          }
+
+          const hash = urlPath.split('/').pop() || 'audio';
+          const ext = isWebm ? '.webm' : (hash.includes('.') ? '' : '.m4a');
+          const localPath = `${FileSystem.cacheDirectory}audio_${hash}${ext}`;
+          const info = await FileSystem.getInfoAsync(localPath);
+          if (!info.exists) {
+            await FileSystem.downloadAsync(audioUrl, localPath);
+          }
+          playUri = localPath;
+        }
+
         const { sound: newSound } = await Audio.Sound.createAsync(
-          { uri: audioUrl },
+          { uri: playUri },
           { shouldPlay: false },
           (status) => {
             if (!status.isLoaded) return;

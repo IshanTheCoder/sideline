@@ -40,6 +40,7 @@ export const POSITIONS = {
   OPPOSITE: 'opposite',
   LIBERO: 'libero',
   DEFENSIVE_SPECIALIST: 'defensive_specialist',
+  MULTIPLE_PLAYERS: 'multiple_players',
   ENTIRE_TEAM: 'entire_team',
 };
 
@@ -50,6 +51,7 @@ export const POSITION_LABELS = {
   [POSITIONS.OPPOSITE]: 'Opposite',
   [POSITIONS.LIBERO]: 'Libero',
   [POSITIONS.DEFENSIVE_SPECIALIST]: 'Defensive Specialist',
+  [POSITIONS.MULTIPLE_PLAYERS]: 'Multiple Players',
   [POSITIONS.ENTIRE_TEAM]: 'Entire Team',
 };
 
@@ -98,7 +100,7 @@ export const SKILL_TERMS = {
   ],
   [SKILL_CATEGORIES.ATTACKING]: [
     'attack', 'spike', 'hit', 'kill', 'tip', 'roll shot', 'approach',
-    'arm swing', 'follow-through', 'line shot', 'cross court',
+    'arm swing', 'follow-through', 'line shot', 'line', 'angle', 'cross court',
   ],
   [SKILL_CATEGORIES.BLOCKING]: [
     'block', 'blocking', 'solo block', 'double block', 'triple block',
@@ -134,6 +136,7 @@ export const POSITION_TERMS = {
   [POSITIONS.OPPOSITE]: ['opposite', 'right side', 'RS', 'right side hitter'],
   [POSITIONS.LIBERO]: ['libero', 'lib', 'L', 'libero'],
   [POSITIONS.DEFENSIVE_SPECIALIST]: ['DS', 'defensive specialist', 'defensive sub'],
+  [POSITIONS.MULTIPLE_PLAYERS]: ['multiple players', 'both', 'two players', 'several players'],
   [POSITIONS.ENTIRE_TEAM]: ['entire team', 'whole team', 'team', 'everyone', 'all players', 'full team'],
 };
 
@@ -150,9 +153,12 @@ export const PLAY_PATTERN_TERMS = [
  * Applied in order so by the time we store the text, it sounds literate.
  */
 export const TRANSCRIPTION_CORRECTIONS = [
-  // STT hears "Server C" when the coach says "serve receive" — classic
+  // STT confuses "serve receive" with "server" constantly
   [/\bServer\s+C\b/gi, 'serve receive'],
-  [/\bserve\s+receive\b/gi, 'serve receive'], // tidy up weird spacing or caps
+  [/\bserver\s+receive\b/gi, 'serve receive'],
+  [/\bserver\s+see\b/gi, 'serve receive'],
+  [/\bserver\s+seed\b/gi, 'serve receive'],
+  [/\bserve\s+receive\b/gi, 'serve receive'],
   // more greatest hits of "things Siri thinks you said"
   [/\bset\s+her\b/gi, 'setter'], // "set her" ≠ a command — it's the position
   [/\bfree\s+fall\b/gi, 'free ball'],
@@ -162,6 +168,10 @@ export const TRANSCRIPTION_CORRECTIONS = [
   [/\boutside\s+hitter\b/gi, 'outside hitter'],
   [/\bright\s+side\b/gi, 'right side'],
   [/\bleft\s+side\b/gi, 'left side'],
+  // attacking directions — Whisper hears "Lon" for "line", "Engel" for "angle"
+  [/\bLon\b/g, 'line'],
+  [/\bEngel\b/g, 'angle'],
+  [/\bAngel\b/g, 'angle'],
   // more common Whisper mishearings in volleyball contexts
   [/\blie\s*bero\b/gi, 'libero'],
   [/\bLibero\b/g, 'libero'],        // normalise capitalisation for matching

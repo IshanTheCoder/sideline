@@ -14,6 +14,7 @@ import {
   View,
 } from 'react-native';
 import { Audio } from 'expo-av';
+import * as FileSystem from 'expo-file-system/legacy';
 import Slider from '@react-native-community/slider';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ThemedText } from '@/components/themed-text';
@@ -30,6 +31,7 @@ import {
   createSignedRecordingUrl,
   saveRecordingNotes,
   serializeRecordingNotes,
+  updateRecording,
 } from '@/lib/recording';
 import { generateMissingLabels, processRecording } from '@/lib/recordingProcessing';
 import {
@@ -67,6 +69,9 @@ export default function GameRecordingsScreen() {
   const [editingNotes, setEditingNotes] = useState('');
   const [originalNotes, setOriginalNotes] = useState('');
   const [savingNotes, setSavingNotes] = useState(false);
+  const [editingTranscription, setEditingTranscription] = useState('');
+  const [originalTranscription, setOriginalTranscription] = useState('');
+  const [savingTranscription, setSavingTranscription] = useState(false);
   const [playerExpanded, setPlayerExpanded] = useState(true);
   const [transcriptionScrollIndicator, setTranscriptionScrollIndicator] = useState({
     show: false,
@@ -125,12 +130,14 @@ export default function GameRecordingsScreen() {
     }, [loadRecordings])
   );
 
-  // Initialize editing notes when modal opens
   useEffect(() => {
     if (modalVisible && selectedRecording) {
       const { notes } = parseRecordingNotes(selectedRecording.manual_notes ?? null);
       setEditingNotes(notes);
-      setOriginalNotes(notes); // Track original to detect changes
+      setOriginalNotes(notes);
+      const transcription = selectedRecording.transcription ?? '';
+      setEditingTranscription(transcription);
+      setOriginalTranscription(transcription);
     }
   }, [modalVisible, selectedRecording]);
 
@@ -250,10 +257,33 @@ export default function GameRecordingsScreen() {
         return;
       }
 
-      console.log('Loading audio from signed URL:', signedUrl);
+      const urlPath = signedUrl.split('?')[0];
+      const isWebm = urlPath.endsWith('.webm');
+
+      if (isWebm && Platform.OS === 'ios') {
+        showAlert('Unsupported Format', 'This recording was made on the web and cannot be played on iOS. Please use a browser to listen to it.');
+        setPlayingRecordingId(null);
+        currentRecordingIdRef.current = null;
+        setLoadingAudio(false);
+        isLoadingAudioRef.current = false;
+        return;
+      }
+
+      let playUri = signedUrl;
+      if (Platform.OS !== 'web') {
+        const ext = isWebm ? 'webm' : 'm4a';
+        const localPath = `${FileSystem.cacheDirectory}audio_${recordingId}.${ext}`;
+        const info = await FileSystem.getInfoAsync(localPath);
+        if (!info.exists) {
+          await FileSystem.downloadAsync(signedUrl, localPath);
+        }
+        playUri = localPath;
+      }
+
+      console.log('Loading audio from:', playUri);
       const { sound: newSound } = await Audio.Sound.createAsync(
-        { uri: signedUrl },
-        { shouldPlay: false }, // Load but don't auto-play
+        { uri: playUri },
+        { shouldPlay: false },
         (status) => {
           // Only update state if this is still the active recording
           if (currentRecordingIdRef.current !== recordingId) {
@@ -534,6 +564,40 @@ export default function GameRecordingsScreen() {
     }
   };
 
+  const handleSaveTranscription = async () => {
+    if (!user?.id || !selectedRecording) return;
+    if (editingTranscription === originalTranscription) return;
+
+    try {
+      setSavingTranscription(true);
+      const { error } = await updateRecording(user.id, selectedRecording.id, {
+        transcription: editingTranscription,
+      });
+
+      if (error) {
+        showAlert('Error', 'Failed to save transcription');
+        return;
+      }
+
+      setRecordings((prev) =>
+        prev.map((rec) =>
+          rec.id === selectedRecording.id
+            ? { ...rec, transcription: editingTranscription }
+            : rec
+        )
+      );
+      setOriginalTranscription(editingTranscription);
+      setSelectedRecording((prev) =>
+        prev ? { ...prev, transcription: editingTranscription } : prev
+      );
+    } catch (err) {
+      console.error('Error saving transcription:', err);
+      showAlert('Error', 'Failed to save transcription');
+    } finally {
+      setSavingTranscription(false);
+    }
+  };
+
   const handleTranscriptionScroll = (event) => {
     const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent;
     const contentHeight = contentSize.height;
@@ -751,19 +815,20 @@ export default function GameRecordingsScreen() {
                   <ThemedText style={styles.recordingTitle} numberOfLines={2}>
                     {labelInfo.displayLabel}
                   </ThemedText>
-                  {(labelInfo.skillLabel || labelInfo.positionLabel || labelInfo.feedbackLabel) ? (
-                    <View style={styles.volleyballChipsRow}>
-                      <View style={[styles.volleyballChip, { backgroundColor: colorScheme === 'dark' ? '#333' : '#E8E8E8' }]}>
-                        <ThemedText style={styles.volleyballChipText}>{labelInfo.skillLabel}</ThemedText>
+                  {(() => {
+                    const chips = [labelInfo.skillLabel, labelInfo.positionLabel, labelInfo.feedbackLabel]
+                      .filter((v) => v && v !== 'Any');
+                    if (chips.length === 0) return null;
+                    return (
+                      <View style={styles.volleyballChipsRow}>
+                        {chips.map((chip, ci) => (
+                          <View key={ci} style={[styles.volleyballChip, { backgroundColor: colorScheme === 'dark' ? '#333' : '#E8E8E8' }]}>
+                            <ThemedText style={styles.volleyballChipText}>{chip}</ThemedText>
+                          </View>
+                        ))}
                       </View>
-                      <View style={[styles.volleyballChip, { backgroundColor: colorScheme === 'dark' ? '#333' : '#E8E8E8' }]}>
-                        <ThemedText style={styles.volleyballChipText}>{labelInfo.positionLabel}</ThemedText>
-                      </View>
-                      <View style={[styles.volleyballChip, { backgroundColor: colorScheme === 'dark' ? '#333' : '#E8E8E8' }]}>
-                        <ThemedText style={styles.volleyballChipText}>{labelInfo.feedbackLabel}</ThemedText>
-                      </View>
-                    </View>
-                  ) : null}
+                    );
+                  })()}
                 </>
               );
             })()}
@@ -1073,86 +1138,34 @@ export default function GameRecordingsScreen() {
                 directionalLockEnabled={true}
               >
                 {/* Transcription Section */}
-                {selectedRecording?.transcription && (
-                  <View style={styles.modalSection}>
+                <View style={styles.modalSection}>
+                  <View style={styles.notesSectionHeader}>
                     <ThemedText style={styles.modalSectionTitle}>Transcription</ThemedText>
-                    <View 
-                      style={[
-                        styles.transcriptionBox,
-                        { backgroundColor: colorScheme === 'dark' ? '#2A2A2A' : '#F5F5F5' }
-                      ]}
-                    >
-                      <ScrollView 
-                        ref={transcriptionScrollRef}
-                        style={styles.transcriptionScrollView}
-                        contentContainerStyle={styles.transcriptionContent}
-                        nestedScrollEnabled={true}
-                        scrollEnabled={true}
-                        showsVerticalScrollIndicator={false}
-                        bounces={true}
-                        scrollEventThrottle={16}
-                        directionalLockEnabled={true}
-                        onScroll={handleTranscriptionScroll}
-                        onScrollBeginDrag={() => {
-                          setIsScrollingTranscription(true);
-                        }}
-                        onScrollEndDrag={() => {
-                          setIsScrollingTranscription(false);
-                        }}
-                        onMomentumScrollBegin={() => {
-                          setIsScrollingTranscription(true);
-                        }}
-                        onMomentumScrollEnd={() => {
-                          setIsScrollingTranscription(false);
-                        }}
-                        onTouchStart={() => {
-                          setIsScrollingTranscription(true);
-                        }}
-                        onTouchEnd={() => {
-                          setTimeout(() => setIsScrollingTranscription(false), 100);
-                        }}
-                        onLayout={(event) => {
-                          transcriptionLayoutHeight.current = event.nativeEvent.layout.height;
-                        }}
-                        onContentSizeChange={(width, height) => {
-                          transcriptionContentSize.current = { height, width };
-                          const scrollViewHeight = transcriptionLayoutHeight.current || Math.min(height, 800);
-                          handleTranscriptionScroll({
-                            nativeEvent: {
-                              contentOffset: { y: 0 },
-                              contentSize: { height, width },
-                              layoutMeasurement: { height: scrollViewHeight, width }
-                            }
-                          });
-                        }}
-                      >
-                        <ThemedText style={styles.transcriptionText}>
-                          {selectedRecording.transcription}
-                        </ThemedText>
-                      </ScrollView>
-                      
-                      {/* Custom Always-Visible Scrollbar */}
-                      {transcriptionScrollIndicator.show && (
-                        <View
-                          {...scrollbarPanResponder.panHandlers}
-                          style={styles.transcriptionScrollbarTrack}
-                          collapsable={false}
-                        >
-                          <View
-                            style={[
-                              styles.transcriptionScrollbar,
-                              {
-                                height: transcriptionScrollIndicator.height,
-                                top: transcriptionScrollIndicator.top,
-                              }
-                            ]}
-                            pointerEvents="none"
-                          />
-                        </View>
-                      )}
-                    </View>
+                    {savingTranscription && (
+                      <View style={styles.savingIndicator}>
+                        <ActivityIndicator size="small" color={Colors[colorScheme ?? 'light'].tint} />
+                        <ThemedText style={styles.savingText}>Saving...</ThemedText>
+                      </View>
+                    )}
                   </View>
-                )}
+                  <TextInput
+                    style={[
+                      styles.transcriptionInput,
+                      {
+                        color: Colors[colorScheme ?? 'light'].text,
+                        backgroundColor: colorScheme === 'dark' ? '#2A2A2A' : '#F5F5F5',
+                      },
+                    ]}
+                    placeholder="No transcription yet"
+                    placeholderTextColor={colorScheme === 'dark' ? '#666' : '#999'}
+                    value={editingTranscription}
+                    onChangeText={setEditingTranscription}
+                    onBlur={handleSaveTranscription}
+                    multiline
+                    scrollEnabled={true}
+                    textAlignVertical="top"
+                  />
+                </View>
 
                 {/* Manual Notes Section */}
                 <View style={styles.modalSection}>
@@ -1526,6 +1539,16 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(128, 128, 128, 0.2)',
     minHeight: 150,
     maxHeight: 300,
+    fontSize: 15,
+    lineHeight: 22,
+  },
+  transcriptionInput: {
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(128, 128, 128, 0.2)',
+    minHeight: 100,
+    maxHeight: 200,
     fontSize: 15,
     lineHeight: 22,
   },

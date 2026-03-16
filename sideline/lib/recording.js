@@ -71,7 +71,7 @@ export const uploadRecording = async (userId, recordingId, audioUri) => {
     // web = webm, native = m4a — gotta match the audio format to the platform
     const isWeb = Platform.OS === 'web';
     const ext = isWeb ? 'webm' : 'm4a';
-    const contentType = isWeb ? 'audio/webm' : 'audio/m4a';
+    const contentType = isWeb ? 'audio/webm' : 'audio/mp4';
     const fileName = `${userId}/${recordingId}.${ext}`;
 
     console.log('Preparing audio file for upload. URI:', audioUri, 'format:', ext);
