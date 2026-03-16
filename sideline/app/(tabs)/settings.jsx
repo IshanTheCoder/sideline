@@ -155,7 +155,7 @@ export default function SettingsScreen() {
       <View style={[styles.header, { paddingTop: Platform.OS === 'ios' ? 60 : Platform.OS === 'web' ? 24 : 40 }]}>
         <TouchableOpacity 
           style={styles.backButton}
-          onPress={() => router.back()}
+          onPress={() => router.replace('/(tabs)')}
           activeOpacity={0.7}
         >
           <IconSymbol

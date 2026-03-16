@@ -148,15 +148,28 @@ export function parseRosterCsv(csvText) {
   });
 
   const first = rows[0].map((c) => c.toLowerCase());
+  const headerKey = (value) => {
+    const h = String(value ?? '').toLowerCase().trim();
+    if (h === 'name' || h === 'player' || h === 'player name') return 'name';
+    if (h === '#' || h === 'number' || h === 'no' || h === 'jersey' || h === 'jersey number') return 'number';
+    if (h === 'position' || h === 'positions' || h === 'pos') return 'position';
+    if (h === 'grade' || h === 'class' || h === 'year') return 'grade';
+    return null;
+  };
+  const normalizedHeaders = first.map(headerKey);
   const hasHeader =
-    first.some((c) => c === 'name' || c === 'number' || c === 'position' || c === 'grade') ||
+    normalizedHeaders.some(Boolean) ||
     (first.length >= 1 && first[0] === 'name');
   const dataRows = hasHeader ? rows.slice(1) : rows;
 
-  const nameIdx = hasHeader ? first.indexOf('name') : 0;
-  const numIdx = hasHeader ? (first.indexOf('number') >= 0 ? first.indexOf('number') : 1) : 1;
-  const posIdx = hasHeader ? (first.indexOf('position') >= 0 ? first.indexOf('position') : 2) : 2;
-  const gradeIdx = hasHeader ? (first.indexOf('grade') >= 0 ? first.indexOf('grade') : 3) : 3;
+  const indexOfHeader = (key, fallback) => {
+    const idx = normalizedHeaders.indexOf(key);
+    return idx >= 0 ? idx : fallback;
+  };
+  const nameIdx = hasHeader ? indexOfHeader('name', 0) : 0;
+  const numIdx = hasHeader ? indexOfHeader('number', 1) : 1;
+  const posIdx = hasHeader ? indexOfHeader('position', 2) : 2;
+  const gradeIdx = hasHeader ? indexOfHeader('grade', 3) : 3;
 
   return dataRows.map((row) => ({
     name: (row[nameIdx] ?? '').trim() || '',
@@ -175,14 +188,27 @@ export function parseRosterCsv(csvText) {
 export function parseRosterSheetRows(rows) {
   if (!Array.isArray(rows) || rows.length === 0) return [];
   const first = rows[0].map((c) => String(c ?? '').toLowerCase().trim());
+  const headerKey = (value) => {
+    const h = String(value ?? '').toLowerCase().trim();
+    if (h === 'name' || h === 'player' || h === 'player name') return 'name';
+    if (h === '#' || h === 'number' || h === 'no' || h === 'jersey' || h === 'jersey number') return 'number';
+    if (h === 'position' || h === 'positions' || h === 'pos') return 'position';
+    if (h === 'grade' || h === 'class' || h === 'year') return 'grade';
+    return null;
+  };
+  const normalizedHeaders = first.map(headerKey);
   const hasHeader =
-    first.some((c) => c === 'name' || c === 'number' || c === 'position' || c === 'grade') ||
+    normalizedHeaders.some(Boolean) ||
     (first.length >= 1 && first[0] === 'name');
   const dataRows = hasHeader ? rows.slice(1) : rows;
-  const nameIdx = hasHeader ? (first.indexOf('name') >= 0 ? first.indexOf('name') : 0) : 0;
-  const numIdx = hasHeader ? (first.indexOf('number') >= 0 ? first.indexOf('number') : 1) : 1;
-  const posIdx = hasHeader ? (first.indexOf('position') >= 0 ? first.indexOf('position') : 2) : 2;
-  const gradeIdx = hasHeader ? (first.indexOf('grade') >= 0 ? first.indexOf('grade') : 3) : 3;
+  const indexOfHeader = (key, fallback) => {
+    const idx = normalizedHeaders.indexOf(key);
+    return idx >= 0 ? idx : fallback;
+  };
+  const nameIdx = hasHeader ? indexOfHeader('name', 0) : 0;
+  const numIdx = hasHeader ? indexOfHeader('number', 1) : 1;
+  const posIdx = hasHeader ? indexOfHeader('position', 2) : 2;
+  const gradeIdx = hasHeader ? indexOfHeader('grade', 3) : 3;
   return dataRows.map((row) => ({
     name: String(row[nameIdx] ?? '').trim() || '',
     number: String(row[numIdx] ?? '').trim() || '',
@@ -224,6 +250,37 @@ export async function importRosterFromSheetRows(teamId, rows) {
     if (error) errors.push(`${row.name}: ${error.message || 'Failed'}`);
     else added++;
   }
+  return { added, errors, error: null };
+}
+
+/**
+ * Bulk-imports already-parsed player rows (name/number/position/grade).
+ * This is used by screenshot imports after OCR + AI structuring.
+ * @param {string} teamId - destination team
+ * @param {Array<{ name: string, number?: string, position?: string, grade?: string }>} players
+ * @returns {Promise<{ added: number, errors: string[], error: Error|null }>}
+ */
+export async function importRosterPlayers(teamId, players) {
+  if (!teamId) return { added: 0, errors: [], error: new Error('Team is required') };
+  if (!Array.isArray(players) || players.length === 0) return { added: 0, errors: [], error: null };
+
+  let added = 0;
+  const errors = [];
+
+  for (const player of players) {
+    const name = String(player?.name ?? '').trim();
+    if (!name) continue;
+    const row = {
+      name,
+      number: player?.number != null ? String(player.number).trim() : undefined,
+      position: player?.position != null ? String(player.position).trim() : undefined,
+      grade: player?.grade != null ? String(player.grade).trim() : undefined,
+    };
+    const { error } = await addPlayer(teamId, row);
+    if (error) errors.push(`${name}: ${error.message || 'Failed'}`);
+    else added++;
+  }
+
   return { added, errors, error: null };
 }
 
