@@ -36,27 +36,12 @@ export default function HomeScreen() {
   const colorScheme = useColorScheme();
   const router = useRouter();
   const [menuVisible, setMenuVisible] = useState(false);
-  const { isTutorialActive, currentStep, registerTarget, registerCallback } = useTutorial();
+  const { isTutorialActive, registerTarget } = useTutorial();
 
   const hamburgerRef = useRef(null);
   const startRecordingRef = useRef(null);
   const recentGamesRef = useRef(null);
   const homeScrollRef = useRef(null);
-
-  useEffect(() => {
-    const unregOpen = registerCallback('openMenu', () => setMenuVisible(true));
-    const unregClose = registerCallback('closeMenu', () => setMenuVisible(false));
-    return () => { unregOpen(); unregClose(); };
-  }, [registerCallback]);
-
-  useEffect(() => {
-    if (!isTutorialActive) return;
-    if (currentStep?.action === 'openMenu') {
-      setMenuVisible(true);
-    } else if (currentStep?.action === 'closeMenu') {
-      setMenuVisible(false);
-    }
-  }, [isTutorialActive, currentStep]);
 
   const measureTarget = useCallback((key, ref) => {
     if (!ref?.current) return;

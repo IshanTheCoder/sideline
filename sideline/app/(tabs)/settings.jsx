@@ -12,8 +12,7 @@ import { useTheme } from '@/contexts/ThemeContext';
 import { supabase } from '@/lib/supabase';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
-import { useFocusEffect } from '@react-navigation/native';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Platform, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { showAlert } from '@/lib/alert';
 
@@ -21,7 +20,7 @@ export default function SettingsScreen() {
   const { user, profile, signOut, refreshProfile } = useAuth();
   const { colorScheme } = useTheme();
   const router = useRouter();
-  const { isTutorialActive, startTutorial, registerTarget } = useTutorial();
+  const { startTutorial } = useTutorial();
   const [profileImageUri, setProfileImageUri] = useState(
     profile?.profile_picture_url || null
   );
@@ -33,31 +32,6 @@ export default function SettingsScreen() {
   const [savingSport, setSavingSport] = useState(false);
   const prevPictureUrl = useRef(profile?.profile_picture_url || null);
   const cacheBusterRef = useRef(Date.now());
-
-  const scrollRef = useRef(null);
-  const profileRef = useRef(null);
-  const profilePicRef = useRef(null);
-  const privacyRef = useRef(null);
-
-  const measureTarget = useCallback((key, ref) => {
-    if (!ref?.current) return;
-    ref.current.measureInWindow((x, y, width, height) => {
-      if (width > 0 && height > 0) registerTarget(key, { x, y, width, height });
-    });
-  }, [registerTarget]);
-
-  useFocusEffect(
-    useCallback(() => {
-      if (!isTutorialActive) return;
-      scrollRef.current?.scrollTo({ y: 0, animated: false });
-      const timer = setTimeout(() => {
-        measureTarget('settings:profile', profileRef);
-        measureTarget('settings:profilePic', profilePicRef);
-        measureTarget('settings:privacy', privacyRef);
-      }, 700);
-      return () => clearTimeout(timer);
-    }, [isTutorialActive, measureTarget])
-  );
 
   useEffect(() => {
     if (profile?.profile_picture_url) {
@@ -197,7 +171,6 @@ export default function SettingsScreen() {
       </View>
 
       <ScrollView
-        ref={scrollRef}
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
@@ -206,8 +179,8 @@ export default function SettingsScreen() {
         <View style={styles.section}>
           <ThemedText style={styles.sectionTitle}>Profile</ThemedText>
           
-          <View ref={profileRef} style={styles.profileContainer}>
-            <View ref={profilePicRef} style={styles.profilePictureContainer}>
+          <View style={styles.profileContainer}>
+            <View style={styles.profilePictureContainer}>
               {/* profile pic or initials fallback */}
               <View style={[styles.profilePictureWrapper, {
                 borderWidth: 2,
@@ -258,7 +231,7 @@ export default function SettingsScreen() {
         </View>
 
         {/* email & password settings */}
-        <View ref={privacyRef} style={styles.section}>
+        <View style={styles.section}>
           <ThemedText style={styles.sectionTitle}>Privacy</ThemedText>
           
           <TouchableOpacity 

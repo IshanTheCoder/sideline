@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Keyboard,
@@ -14,7 +14,6 @@ import {
   View,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { useFocusEffect } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -22,7 +21,6 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useAuth } from '@/contexts/AuthContext';
-import { useTutorial } from '@/contexts/TutorialContext';
 import { showAlert } from '@/lib/alert';
 import {
   fetchRosterForUser,
@@ -92,7 +90,6 @@ export default function RosterScreen() {
   const router = useRouter();
   const colorScheme = useColorScheme();
   const { user } = useAuth();
-  const { isTutorialActive, registerTarget, setRosterPlayerCount, setRosterPlayerNames } = useTutorial();
   const [players, setPlayers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -104,27 +101,6 @@ export default function RosterScreen() {
   const [formGrade, setFormGrade] = useState('');
   const [saving, setSaving] = useState(false);
   const [importing, setImporting] = useState(false);
-
-  const addPlayerRef = useRef(null);
-  const importRef = useRef(null);
-
-  const measureTarget = useCallback((key, ref) => {
-    if (!ref?.current) return;
-    ref.current.measureInWindow((x, y, width, height) => {
-      if (width > 0 && height > 0) registerTarget(key, { x, y, width, height });
-    });
-  }, [registerTarget]);
-
-  useFocusEffect(
-    useCallback(() => {
-      if (!isTutorialActive) return;
-      const timer = setTimeout(() => {
-        measureTarget('roster:addPlayer', addPlayerRef);
-        measureTarget('roster:import', importRef);
-      }, 700);
-      return () => clearTimeout(timer);
-    }, [isTutorialActive, measureTarget])
-  );
 
   const loadRoster = useCallback(async () => {
     if (!user?.id) {
@@ -151,17 +127,6 @@ export default function RosterScreen() {
   useEffect(() => {
     loadRoster();
   }, [loadRoster]);
-
-  useEffect(() => {
-    if (!isTutorialActive) return;
-    setRosterPlayerCount(players.length);
-    setRosterPlayerNames(
-      players.map((p) => {
-        const num = p.number ? `#${p.number} ` : '';
-        return `${num}${p.name}`;
-      })
-    );
-  }, [players, isTutorialActive, setRosterPlayerCount, setRosterPlayerNames]);
 
   const openAdd = () => {
     setEditingPlayer(null);
@@ -440,7 +405,6 @@ export default function RosterScreen() {
       </ThemedText>
 
       <TouchableOpacity
-        ref={addPlayerRef}
         style={[styles.addButton, { backgroundColor: tint }]}
         onPress={openAdd}
         activeOpacity={0.8}
@@ -450,7 +414,6 @@ export default function RosterScreen() {
         <ThemedText style={styles.addButtonText}>Add player</ThemedText>
       </TouchableOpacity>
       <TouchableOpacity
-        ref={importRef}
         style={[
           styles.importButton,
           {

@@ -14,7 +14,7 @@ import { useTutorial } from '@/contexts/TutorialContext';
 const SPOTLIGHT_PADDING = 10;
 const TOOLTIP_MARGIN = 16;
 const TOOLTIP_MAX_WIDTH = 340;
-const TOOLTIP_ESTIMATED_HEIGHT = 260;
+const TOOLTIP_ESTIMATED_HEIGHT = 220;
 const ARROW_SIZE = 10;
 const SAFE_TOP = Platform.OS === 'ios' ? 60 : 44;
 const SAFE_BOTTOM = 40;
@@ -29,9 +29,6 @@ export default function TutorialOverlay() {
     prevStep,
     endTutorial,
     getTarget,
-    canAdvance,
-    rosterPlayerCount,
-    recordingCount,
   } = useTutorial();
 
   const { width: screenW, height: screenH } = useWindowDimensions();
@@ -96,65 +93,36 @@ export default function TutorialOverlay() {
   const isFinalStep = currentStepIndex === totalSteps - 1;
   const isFirstStep = currentStepIndex === 0;
   const hasSpotlight = !!spotlightRect;
-  const isInteractive = !!currentStep.interactive;
-  const hasPlayerReq = !!currentStep.requirePlayerCount;
-  const hasRecordingReq = !!currentStep.requireRecordingCount;
 
   const tooltipPos = hasSpotlight
     ? computeTooltipPosition(spotlightRect, currentStep.tooltipPosition, screenW, screenH)
     : null;
 
   const tooltipCard = (
-    <View style={[styles.tooltipCard, isInteractive && styles.tooltipCardCompact]}>
+    <View style={styles.tooltipCard}>
       <View style={styles.tooltipHeader}>
         <View style={styles.aiBadge}>
           <IconSymbol name="sparkles" size={14} color="#FFF" />
           <ThemedText style={styles.aiBadgeText}>AI Coach</ThemedText>
         </View>
         <ThemedText style={styles.stepCounter}>
-          {currentStep.phaseLabel} · {currentStepIndex + 1}/{totalSteps}
+          {currentStepIndex + 1} / {totalSteps}
         </ThemedText>
       </View>
-      <ThemedText style={[styles.tooltipTitle, isInteractive && styles.tooltipTitleCompact]}>
+      <ThemedText style={styles.tooltipTitle}>
         {currentStep.title}
       </ThemedText>
-      <ThemedText style={[styles.tooltipBody, isInteractive && styles.tooltipBodyCompact]}>
+      <ThemedText style={styles.tooltipBody}>
         {currentStep.body}
       </ThemedText>
-      {hasPlayerReq && (
-        <View style={styles.progressRow}>
-          <ThemedText style={styles.progressIcon}>👥</ThemedText>
-          <ThemedText style={[
-            styles.progressText,
-            canAdvance && styles.progressTextDone,
-          ]}>
-            Players added: {rosterPlayerCount}/{currentStep.requirePlayerCount}
-            {canAdvance ? '  ✓' : ''}
-          </ThemedText>
-        </View>
-      )}
-      {hasRecordingReq && (
-        <View style={styles.progressRow}>
-          <ThemedText style={styles.progressIcon}>🎙️</ThemedText>
-          <ThemedText style={[
-            styles.progressText,
-            canAdvance && styles.progressTextDone,
-          ]}>
-            Recordings: {recordingCount}/{currentStep.requireRecordingCount}
-            {canAdvance ? '  ✓' : ''}
-          </ThemedText>
-        </View>
-      )}
-      {!isInteractive && (
-        <View style={styles.phaseDots}>
-          {Array.from({ length: 7 }, (_, i) => (
-            <View key={i} style={[styles.dot, currentStep.phase === i + 1 ? styles.dotActive : styles.dotInactive]} />
-          ))}
-        </View>
-      )}
+      <View style={styles.stepDots}>
+        {Array.from({ length: totalSteps }, (_, i) => (
+          <View key={i} style={[styles.dot, i === currentStepIndex ? styles.dotActive : styles.dotInactive]} />
+        ))}
+      </View>
       <View style={styles.tooltipActions}>
         <TouchableOpacity onPress={endTutorial} activeOpacity={0.7} style={styles.skipBtn} hitSlop={12}>
-          <ThemedText style={styles.skipText}>Skip Tutorial</ThemedText>
+          <ThemedText style={styles.skipText}>Skip</ThemedText>
         </TouchableOpacity>
         <View style={styles.navButtons}>
           {!isFirstStep && (
@@ -164,17 +132,16 @@ export default function TutorialOverlay() {
             </TouchableOpacity>
           )}
           <TouchableOpacity
-            onPress={canAdvance ? nextStep : undefined}
-            activeOpacity={canAdvance ? 0.85 : 1}
-            disabled={!canAdvance}
-            style={[styles.nextBtn, !canAdvance && styles.nextBtnDisabled]}
+            onPress={nextStep}
+            activeOpacity={0.85}
+            style={styles.nextBtn}
             hitSlop={8}
           >
-            <ThemedText style={[styles.nextBtnText, !canAdvance && styles.nextBtnTextDisabled]}>
+            <ThemedText style={styles.nextBtnText}>
               {isFinalStep ? 'Done' : 'Next'}
             </ThemedText>
             {!isFinalStep && (
-              <IconSymbol name="chevron.right" size={16} color={canAdvance ? '#FFF' : 'rgba(255,255,255,0.3)'} />
+              <IconSymbol name="chevron.right" size={16} color="#FFF" />
             )}
           </TouchableOpacity>
         </View>
@@ -184,14 +151,12 @@ export default function TutorialOverlay() {
 
   if (hasSpotlight) {
     return (
-      <Animated.View style={[styles.root, { opacity: fadeAnim }]} pointerEvents={isInteractive ? 'box-none' : 'auto'}>
-        {/* 4 dark backdrop regions */}
-        <View pointerEvents={isInteractive ? 'none' : undefined} style={[styles.backdrop, { top: 0, left: 0, right: 0, height: Math.max(0, spotlightRect.y) }]} />
-        <View pointerEvents={isInteractive ? 'none' : undefined} style={[styles.backdrop, { top: spotlightRect.y + spotlightRect.height, left: 0, right: 0, bottom: 0 }]} />
-        <View pointerEvents={isInteractive ? 'none' : undefined} style={[styles.backdrop, { top: spotlightRect.y, left: 0, width: Math.max(0, spotlightRect.x), height: spotlightRect.height }]} />
-        <View pointerEvents={isInteractive ? 'none' : undefined} style={[styles.backdrop, { top: spotlightRect.y, left: spotlightRect.x + spotlightRect.width, right: 0, height: spotlightRect.height }]} />
+      <Animated.View style={[styles.root, { opacity: fadeAnim }]} pointerEvents="auto">
+        <View style={[styles.backdrop, { top: 0, left: 0, right: 0, height: Math.max(0, spotlightRect.y) }]} />
+        <View style={[styles.backdrop, { top: spotlightRect.y + spotlightRect.height, left: 0, right: 0, bottom: 0 }]} />
+        <View style={[styles.backdrop, { top: spotlightRect.y, left: 0, width: Math.max(0, spotlightRect.x), height: spotlightRect.height }]} />
+        <View style={[styles.backdrop, { top: spotlightRect.y, left: spotlightRect.x + spotlightRect.width, right: 0, height: spotlightRect.height }]} />
 
-        {/* Spotlight ring — visual only */}
         <View
           pointerEvents="none"
           style={[styles.spotlightRing, {
@@ -203,7 +168,6 @@ export default function TutorialOverlay() {
           }]}
         />
 
-        {/* Tooltip */}
         <View pointerEvents="box-none" style={[styles.tooltipAbsolute, tooltipPos]}>
           {tooltipCard}
         </View>
@@ -211,21 +175,6 @@ export default function TutorialOverlay() {
     );
   }
 
-  if (isInteractive) {
-    const interactiveStyle = currentStep.tooltipPosition === 'top'
-      ? styles.tooltipInteractiveTop
-      : styles.tooltipInteractiveBottom;
-    return (
-      <Animated.View style={[styles.root, { opacity: fadeAnim }]} pointerEvents="box-none">
-        <View style={[styles.backdropLight, StyleSheet.absoluteFill]} pointerEvents="none" />
-        <View pointerEvents="box-none" style={interactiveStyle}>
-          {tooltipCard}
-        </View>
-      </Animated.View>
-    );
-  }
-
-  // Centered / no-spotlight — full dark overlay blocks everything except tooltip buttons
   return (
     <Animated.View style={[styles.root, { opacity: fadeAnim }]} pointerEvents="auto">
       <View style={[styles.backdrop, StyleSheet.absoluteFill]} />
@@ -269,10 +218,6 @@ const styles = StyleSheet.create({
     position: 'absolute',
     backgroundColor: 'rgba(0, 0, 0, 0.72)',
   },
-  backdropLight: {
-    position: 'absolute',
-    backgroundColor: 'rgba(0, 0, 0, 0.08)',
-  },
   spotlightRing: {
     position: 'absolute',
     borderWidth: 2.5,
@@ -286,34 +231,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: TOOLTIP_MARGIN,
-  },
-  tooltipBottomFixed: {
-    position: 'absolute',
-    bottom: SAFE_BOTTOM,
-    left: TOOLTIP_MARGIN,
-    right: TOOLTIP_MARGIN,
-    alignItems: 'center',
-  },
-  tooltipTopFixed: {
-    position: 'absolute',
-    top: SAFE_TOP,
-    left: TOOLTIP_MARGIN,
-    right: TOOLTIP_MARGIN,
-    alignItems: 'center',
-  },
-  tooltipInteractiveTop: {
-    position: 'absolute',
-    top: SAFE_TOP,
-    left: TOOLTIP_MARGIN,
-    right: TOOLTIP_MARGIN,
-    alignItems: 'center',
-  },
-  tooltipInteractiveBottom: {
-    position: 'absolute',
-    bottom: SAFE_BOTTOM,
-    left: TOOLTIP_MARGIN,
-    right: TOOLTIP_MARGIN,
-    alignItems: 'flex-end',
   },
   tooltipCard: {
     backgroundColor: '#1E1E1E',
@@ -329,11 +246,6 @@ const styles = StyleSheet.create({
     elevation: 20,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.08)',
-  },
-  tooltipCardCompact: {
-    paddingVertical: 10,
-    paddingHorizontal: 14,
-    maxWidth: 300,
   },
   tooltipHeader: {
     flexDirection: 'row',
@@ -367,23 +279,13 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     lineHeight: 26,
   },
-  tooltipTitleCompact: {
-    fontSize: 16,
-    marginBottom: 4,
-    lineHeight: 22,
-  },
   tooltipBody: {
     color: 'rgba(255,255,255,0.82)',
     fontSize: 15,
     lineHeight: 22,
     marginBottom: 16,
   },
-  tooltipBodyCompact: {
-    fontSize: 12,
-    lineHeight: 17,
-    marginBottom: 6,
-  },
-  phaseDots: {
+  stepDots: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -447,32 +349,5 @@ const styles = StyleSheet.create({
     color: '#FFF',
     fontSize: 14,
     fontWeight: '700',
-  },
-  nextBtnDisabled: {
-    backgroundColor: 'rgba(255,255,255,0.12)',
-  },
-  nextBtnTextDisabled: {
-    color: 'rgba(255,255,255,0.3)',
-  },
-  progressRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: 'rgba(255,255,255,0.06)',
-    borderRadius: 10,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    marginBottom: 12,
-  },
-  progressIcon: {
-    fontSize: 16,
-  },
-  progressText: {
-    color: 'rgba(255,255,255,0.55)',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  progressTextDone: {
-    color: '#4CD964',
   },
 });

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -15,7 +15,6 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useAuth } from '@/contexts/AuthContext';
-import { useTutorial } from '@/contexts/TutorialContext';
 import {
   deleteGameForUser,
   fetchRecordingsForUser,
@@ -28,12 +27,10 @@ export default function ReviewScreen() {
   const router = useRouter();
   const colorScheme = useColorScheme();
   const { user } = useAuth();
-  const { isTutorialActive, tutorialGameId, registerTarget } = useTutorial();
   const [recordings, setRecordings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
-  const tutorialGameRef = useRef(null);
 
   const titleText = useMemo(() => '🏟️ Games', []);
 
@@ -88,18 +85,6 @@ export default function ReviewScreen() {
         loadRecordings();
       }
     }, [user?.id, loadRecordings])
-  );
-
-  useFocusEffect(
-    useCallback(() => {
-      if (!isTutorialActive) return;
-      const timer = setTimeout(() => {
-        tutorialGameRef.current?.measureInWindow((x, y, width, height) => {
-          if (width > 0 && height > 0) registerTarget('review:tutorialGame', { x, y, width, height });
-        });
-      }, 700);
-      return () => clearTimeout(timer);
-    }, [isTutorialActive, registerTarget])
   );
 
   const formatDate = (dateString) => {
@@ -189,20 +174,13 @@ export default function ReviewScreen() {
       (sum, rec) => sum + (rec.duration ?? 0),
       0
     );
-    const isTutorialGame = isTutorialActive && item.id === tutorialGameId;
-
     return (
       <TouchableOpacity
-        ref={isTutorialGame ? tutorialGameRef : undefined}
-        collapsable={false}
         style={[
           styles.gameItem,
           {
             backgroundColor: colorScheme === 'dark' ? '#2A2A2A' : '#F5F5F5',
-            borderColor: isTutorialGame
-              ? Colors[colorScheme ?? 'light'].tint
-              : (colorScheme === 'dark' ? '#3A3A3A' : '#E5E5E5'),
-            borderWidth: isTutorialGame ? 2 : 1,
+            borderColor: colorScheme === 'dark' ? '#3A3A3A' : '#E5E5E5',
           },
         ]}
         onPress={() => router.push(`/(tabs)/review/game/${item.id}`)}

@@ -27,11 +27,10 @@ export default function RecordScreen() {
   const router = useRouter();
   const { user } = useAuth();
   const { activeSession, clearActiveSession } = useActiveSession();
-  const { isTutorialActive, setRecordingCount, setSetSelected, registerTarget } = useTutorial();
-  const tutorialRecCountRef = useRef(0);
-  const setSelectorRef = useRef(null);
+  const { isTutorialActive, registerTarget } = useTutorial();
   const { status, requestPermission, isLoading: isPermissionLoading } = useAudioPermissions();
   const iconColor = useThemeColor({}, 'icon');
+  const recordButtonRef = useRef(null);
   
   // all the state we need to track while recording
   const [isRecording, setIsRecording] = useState(false);
@@ -74,18 +73,12 @@ export default function RecordScreen() {
     };
   }, []);
 
-  useEffect(() => {
-    if (isTutorialActive && selectedSet) {
-      setSetSelected(true);
-    }
-  }, [isTutorialActive, selectedSet, setSetSelected]);
-
   useFocusEffect(
     useCallback(() => {
       if (!isTutorialActive) return;
       const timer = setTimeout(() => {
-        setSelectorRef.current?.measureInWindow((x, y, width, height) => {
-          if (width > 0 && height > 0) registerTarget('record:setSelector', { x, y, width, height });
+        recordButtonRef.current?.measureInWindow((x, y, width, height) => {
+          if (width > 0 && height > 0) registerTarget('record:recordButton', { x, y, width, height });
         });
       }, 700);
       return () => clearTimeout(timer);
@@ -249,11 +242,6 @@ export default function RecordScreen() {
       setSelectedSetOffsetSeconds(null);
       setIsLoading(false);
       clearError();
-
-      if (isTutorialActive) {
-        tutorialRecCountRef.current += 1;
-        setRecordingCount(tutorialRecCountRef.current);
-      }
 
       showToast('success', 'Recording saved — uploading…');
 
@@ -569,7 +557,7 @@ export default function RecordScreen() {
           <ActiveSessionIndicator session={activeSession} />
         </View>
 
-        <View ref={setSelectorRef} collapsable={false} style={styles.markerSection}>
+        <View style={styles.markerSection}>
           <ThemedText style={styles.markerLabel}>Select set</ThemedText>
           <View style={styles.markerButtons}>
             {['Set 1', 'Set 2', 'Set 3', 'Set 4', 'Set 5'].map((label) => (
@@ -639,12 +627,14 @@ export default function RecordScreen() {
             </View>
           )}
 
-          <RecordButton
-            isRecording={isRecording}
-            recordingDuration={recordingDuration}
-            onPress={handleRecordPress}
-            disabled={status !== 'granted' || isLoading}
-          />
+          <View ref={recordButtonRef} collapsable={false}>
+            <RecordButton
+              isRecording={isRecording}
+              recordingDuration={recordingDuration}
+              onPress={handleRecordPress}
+              disabled={status !== 'granted' || isLoading}
+            />
+          </View>
           
           {isLoading && (
             <ActivityIndicator
