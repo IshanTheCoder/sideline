@@ -162,6 +162,13 @@ export const TRANSCRIPTION_CORRECTIONS = [
   [/\boutside\s+hitter\b/gi, 'outside hitter'],
   [/\bright\s+side\b/gi, 'right side'],
   [/\bleft\s+side\b/gi, 'left side'],
+  // more common Whisper mishearings in volleyball contexts
+  [/\blie\s*bero\b/gi, 'libero'],
+  [/\bLibero\b/g, 'libero'],        // normalise capitalisation for matching
+  [/\bpan\s*cake\b/gi, 'pancake'],
+  [/\broll\s+shot\b/gi, 'roll shot'],
+  [/\bjump\s+serve\b/gi, 'jump serve'],
+  [/\bfloat\s+serve\b/gi, 'float serve'],
 ];
 
 /**

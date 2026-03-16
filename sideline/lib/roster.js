@@ -389,27 +389,45 @@ export function buildRosterNumberCorrections(transcription, players) {
 /**
  * Fuzzy-matches words in the transcription against the roster to catch likely
  * name typos (similar length, edit distance 1–2). Returns find-and-replace pairs.
+ *
+ * Splits multi-word roster names into individual tokens so that each first/last
+ * name part is matched independently (e.g. "Sarha" → "Sarah", "Nelsn" → "Nelson").
+ *
  * @param {string} transcription - the raw transcription where names might be mangled
  * @param {string[]} correctNames - the correctly-spelled roster names to match against
  * @returns {Array<{ from: string, to: string }>}
  */
 export function buildRosterNameCorrections(transcription, correctNames) {
   if (!transcription || !correctNames?.length) return [];
+
+  // Build a deduplicated set of individual name tokens from the roster
+  // e.g. ["Sarah Nelson", "John Rivera"] → ["Sarah", "Nelson", "John", "Rivera"]
+  const rosterTokens = [];
+  for (const fullName of correctNames) {
+    const trimmed = (fullName || '').trim();
+    if (!trimmed) continue;
+    for (const part of trimmed.split(/\s+/)) {
+      const clean = part.replace(/[^a-zA-Z'-]/g, '').trim();
+      if (clean.length >= 2) rosterTokens.push(clean);
+    }
+  }
+  if (!rosterTokens.length) return [];
+
   const words = transcription.split(/\s+/).filter((w) => w.length >= 2);
   const seen = new Set();
   const corrections = [];
   for (const word of words) {
-    const clean = word.replace(/[^a-zA-Z]/g, '');
-    if (!clean || seen.has(clean.toLowerCase())) continue;
-    for (const correct of correctNames) {
-      const c = correct.trim();
-      if (!c || clean.toLowerCase() === c.toLowerCase()) continue;
-      const lenDiff = Math.abs(clean.length - c.length);
+    const clean = word.replace(/[^a-zA-Z'-]/g, '');
+    if (!clean || clean.length < 2 || seen.has(clean.toLowerCase())) continue;
+    for (const token of rosterTokens) {
+      if (clean.toLowerCase() === token.toLowerCase()) break; // already correct
+      const lenDiff = Math.abs(clean.length - token.length);
       if (lenDiff > 1) continue;
-      const dist = levenshtein(clean.toLowerCase(), c.toLowerCase());
+      if (clean[0].toLowerCase() !== token[0].toLowerCase()) continue; // must share first letter
+      const dist = levenshtein(clean.toLowerCase(), token.toLowerCase());
       if (dist >= 1 && dist <= 2) {
         seen.add(clean.toLowerCase());
-        corrections.push({ from: clean, to: c });
+        corrections.push({ from: clean, to: token });
         break;
       }
     }

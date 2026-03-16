@@ -65,18 +65,28 @@ export async function processRecording(recordingId, userId) {
 
     console.log('🎵 Audio URL retrieved:', audioUrl);
 
-    // step 2.5: storage is private so we need a signed URL (like a concert wristband)
+    // step 2.5: fetch the roster early — we need names for BOTH Whisper and post-processing
+    let rosterPlayers = [];
+    if (recording.game_session_id) {
+      const { players } = await getPlayersForGameSession(recording.game_session_id);
+      rosterPlayers = players;
+      if (rosterPlayers.length > 0) {
+        console.log(`📋 Loaded roster: ${rosterPlayers.length} players`);
+      }
+    }
+
+    // step 2.6: storage is private so we need a signed URL (like a concert wristband)
     // gotta extract the file path from the public URL format:
     // https://[project].supabase.co/storage/v1/object/public/recordings/[path]
     let downloadUrl = audioUrl;
     if (audioUrl.includes('/public/recordings/')) {
       const filePath = audioUrl.split('/public/recordings/')[1];
       console.log('🔐 Creating signed URL for file:', filePath);
-      
+
       const { data: signedUrlData, error: signedUrlError } = await supabase.storage
         .from('recordings')
         .createSignedUrl(filePath, 3600); // 1 hour TTL — more than enough
-      
+
       if (signedUrlError || !signedUrlData?.signedUrl) {
         console.error('❌ Failed to create signed URL:', signedUrlError);
       } else {
@@ -85,9 +95,11 @@ export async function processRecording(recordingId, userId) {
       }
     }
 
-    // step 3: ship audio to Whisper for transcription
+    // step 3: ship audio to Whisper for transcription — pass roster names so Whisper
+    // can bias toward the correct spelling of player names
+    const playerNames = rosterPlayers.map((p) => p.name);
     console.log('🎤 Starting transcription...');
-    const { transcription, error: transcriptionError } = await transcribeAudio(downloadUrl);
+    const { transcription, error: transcriptionError } = await transcribeAudio(downloadUrl, { playerNames });
 
     if (transcriptionError || !transcription) {
       console.error('❌ Transcription failed:', transcriptionError);
@@ -100,14 +112,6 @@ export async function processRecording(recordingId, userId) {
     }
 
     console.log('✅ Transcription completed:', transcription.substring(0, 100) + '...');
-
-    // step 3.5: autocorrect volleyball jargon, jersey-number references, and name typos.
-    // fetch the full roster (name + number) so we can resolve "number four" → actual player name.
-    let rosterPlayers = [];
-    if (recording.game_session_id) {
-      const { players } = await getPlayersForGameSession(recording.game_session_id);
-      rosterPlayers = players;
-    }
     const numberCorrections = buildRosterNumberCorrections(transcription, rosterPlayers);
     const nameCorrections = buildRosterNameCorrections(transcription, rosterPlayers.map((p) => p.name));
     // apply number substitutions first so "number four" → "Sarah" before name fuzzy-match runs
