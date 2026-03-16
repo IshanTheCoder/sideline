@@ -118,11 +118,28 @@ async function downloadAudioFile(audioUrl) {
 }
 
 /**
+ * Builds a Whisper prompt that includes volleyball terminology and, when available,
+ * the actual roster names so Whisper can recognise them more accurately.
+ * @param {string[]} [playerNames] - optional list of player names from the roster
+ * @returns {string}
+ */
+function buildWhisperPrompt(playerNames = []) {
+  const base =
+    'volleyball coaching note: serve receive, spike, block, setter, libero, rotation, dig, kill, ' +
+    'free ball, down ball, outside hitter, middle blocker, opposite hitter, pancake, pipe, floater';
+  if (!playerNames.length) return base;
+  // Deduplicate and add roster names so Whisper biases toward them
+  const uniqueNames = [...new Set(playerNames.map((n) => n.trim()).filter(Boolean))];
+  return `${base}. Player names: ${uniqueNames.join(', ')}`;
+}
+
+/**
  * pipes audio through Groq's Whisper API — turns sound waves into text like magic
  * @param audioUrl - URL of the audio file to transcribe
+ * @param {{ playerNames?: string[] }} [options] - optional roster names for better accuracy
  * @returns the transcription text, or an error if Whisper struck out
  */
-export async function transcribeAudio(audioUrl) {
+export async function transcribeAudio(audioUrl, options = {}) {
   try {
     if (!groqApiKey) {
       return {
@@ -137,6 +154,8 @@ export async function transcribeAudio(audioUrl) {
     const audioFile = await downloadAudioFile(audioUrl);
     console.log('Audio file downloaded');
 
+    const whisperPrompt = buildWhisperPrompt(options.playerNames);
+
     // RN can't just drop a File in FormData — gotta assemble the payload by hand
     if (Platform.OS !== 'web' && audioFile.uri) {
       console.log('Sending to Groq Whisper API (React Native)...');
@@ -149,7 +168,7 @@ export async function transcribeAudio(audioUrl) {
       });
       formData.append('model', 'whisper-large-v3-turbo');
       formData.append('language', 'en');
-      formData.append('prompt', 'volleyball coaching note: serve receive, spike, block, setter, libero, rotation, dig, kill, free ball, down ball, outside hitter, middle blocker, opposite hitter, pancake, pipe, floater');
+      formData.append('prompt', whisperPrompt);
 
       const response = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
         method: 'POST',
@@ -185,7 +204,7 @@ export async function transcribeAudio(audioUrl) {
       formData.append('file', audioFile);
       formData.append('model', 'whisper-large-v3-turbo');
       formData.append('language', 'en');
-      formData.append('prompt', 'volleyball coaching note: serve receive, spike, block, setter, libero, rotation, dig, kill, outside hitter, middle blocker');
+      formData.append('prompt', whisperPrompt);
 
       const response = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
         method: 'POST',

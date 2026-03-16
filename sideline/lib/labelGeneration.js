@@ -257,7 +257,7 @@ export async function generateLabel(transcriptionText, options = {}) {
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userPrompt },
         ],
-        max_tokens: 120,
+        max_tokens: 200,
         temperature: 0.3,
       }),
     });
