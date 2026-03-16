@@ -1,4 +1,5 @@
-// Always return dark mode
+import { useColorScheme as useRNColorScheme } from 'react-native';
+
 export function useColorScheme() {
-  return 'dark';
+  return useRNColorScheme() ?? 'light';
 }

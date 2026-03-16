@@ -231,6 +231,8 @@ export default function SettingsScreen() {
           <TouchableOpacity 
             style={[styles.settingItem, {
               backgroundColor: Colors[colorScheme].cardBackground,
+              borderWidth: 4,
+              borderColor: Colors[colorScheme].border,
             }]}
             onPress={() => setShowChangeEmailModal(true)}
             activeOpacity={0.7}
@@ -258,6 +260,8 @@ export default function SettingsScreen() {
           <TouchableOpacity 
             style={[styles.settingItem, {
               backgroundColor: Colors[colorScheme].cardBackground,
+              borderWidth: 1,
+              borderColor: Colors[colorScheme].border,
             }]}
             onPress={() => setShowChangePasswordModal(true)}
             activeOpacity={0.7}
@@ -290,6 +294,8 @@ export default function SettingsScreen() {
           <TouchableOpacity 
             style={[styles.settingItem, {
               backgroundColor: Colors[colorScheme].cardBackground,
+              borderWidth: 1,
+              borderColor: Colors[colorScheme].border,
             }]}
             onPress={() => setShowSportModal(true)}
             activeOpacity={0.7}
