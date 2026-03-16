@@ -180,7 +180,11 @@ export default function SettingsScreen() {
           <View style={styles.profileContainer}>
             <View style={styles.profilePictureContainer}>
               {/* profile pic or initials fallback */}
-              <View style={styles.profilePictureWrapper}>
+              <View style={[styles.profilePictureWrapper, {
+                borderWidth: 2,
+                borderColor: Colors[colorScheme].border,
+                borderRadius: 40,
+              }]}>
               {profileImageUri && !imageError ? (
                 <Image
                   key={profileImageUri}
@@ -260,7 +264,7 @@ export default function SettingsScreen() {
           <TouchableOpacity 
             style={[styles.settingItem, {
               backgroundColor: Colors[colorScheme].cardBackground,
-              borderWidth: 1,
+              borderWidth: 4,
               borderColor: Colors[colorScheme].border,
             }]}
             onPress={() => setShowChangePasswordModal(true)}
@@ -294,7 +298,7 @@ export default function SettingsScreen() {
           <TouchableOpacity 
             style={[styles.settingItem, {
               backgroundColor: Colors[colorScheme].cardBackground,
-              borderWidth: 1,
+              borderWidth: 4,
               borderColor: Colors[colorScheme].border,
             }]}
             onPress={() => setShowSportModal(true)}
