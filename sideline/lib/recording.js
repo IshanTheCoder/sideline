@@ -846,21 +846,44 @@ export async function deleteRecordingForUser(userId, recordingId, audioUrl = nul
   }
 }
 
-// scorched earth: nukes ALL recordings in a game session, one by one
 export async function deleteGameForUser(userId, gameSessionId) {
   try {
     const { data, error } = await fetchRecordingsForGame(userId, gameSessionId);
     if (error) return { error };
     const recordings = data ?? [];
 
-    for (const recording of recordings) {
-      const { error: deleteError } = await deleteRecordingForUser(
-        userId,
-        recording.id,
-        recording.audio_url
-      );
-      if (deleteError) {
-        return { error: deleteError };
+    if (recordings.length > 0) {
+      const storagePaths = recordings.map((rec) => {
+        const defaultPath = `${userId}/${rec.id}.m4a`;
+        if (rec.audio_url) {
+          const parsed = getStoragePathFromPublicUrl(rec.audio_url);
+          if (parsed) {
+            const [bucket, ...rest] = parsed.split('/');
+            if (bucket === 'recordings' && rest.length) return rest.join('/');
+          }
+        }
+        return defaultPath;
+      });
+
+      const recordingIds = recordings.map((r) => r.id);
+
+      const storagePromise = supabase.storage
+        .from('recordings')
+        .remove(storagePaths);
+
+      let dbPromise = supabase
+        .from('recordings')
+        .delete()
+        .in('id', recordingIds)
+        .eq('user_id', userId);
+
+      const [storageResult, dbResult] = await Promise.all([storagePromise, dbPromise]);
+
+      if (dbResult.error && isMissingColumnError(dbResult.error, 'user_id')) {
+        const retry = await supabase.from('recordings').delete().in('id', recordingIds);
+        if (retry.error) return { error: retry.error };
+      } else if (dbResult.error) {
+        return { error: dbResult.error };
       }
     }
 

@@ -22,6 +22,7 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useAuth } from '@/contexts/AuthContext';
+import { useTutorial } from '@/contexts/TutorialContext';
 import { showAlert } from '@/lib/alert';
 import {
   deleteRecordingForUser,
@@ -80,6 +81,11 @@ export default function GameRecordingsScreen() {
   const modalScrollRef = useRef(null);
   const [generatingLabels, setGeneratingLabels] = useState(false);
   const [retryingTranscription, setRetryingTranscription] = useState(false);
+  const { isTutorialActive, registerTarget, setTutorialRecordingId } = useTutorial();
+  const generateLabelsRef = useRef(null);
+  const firstRecordingRef = useRef(null);
+  const firstPencilRef = useRef(null);
+  const summaryButtonRef = useRef(null);
   const gameId = useMemo(() => {
     if (Array.isArray(id)) return id[0];
     return id;
@@ -123,6 +129,30 @@ export default function GameRecordingsScreen() {
     useCallback(() => {
       loadRecordings();
     }, [loadRecordings])
+  );
+
+  useEffect(() => {
+    if (isTutorialActive && recordings.length > 0) {
+      setTutorialRecordingId(recordings[0].id);
+    }
+  }, [isTutorialActive, recordings, setTutorialRecordingId]);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (!isTutorialActive) return;
+      const timer = setTimeout(() => {
+        const measure = (key, ref) => {
+          ref.current?.measureInWindow((x, y, width, height) => {
+            if (width > 0 && height > 0) registerTarget(key, { x, y, width, height });
+          });
+        };
+        measure('game:generateLabels', generateLabelsRef);
+        measure('game:firstRecording', firstRecordingRef);
+        measure('game:pencilButton', firstPencilRef);
+        measure('game:summaryButton', summaryButtonRef);
+      }, 700);
+      return () => clearTimeout(timer);
+    }, [isTutorialActive, registerTarget])
   );
 
   // Initialize editing notes when modal opens
@@ -696,12 +726,13 @@ export default function GameRecordingsScreen() {
       }
   };
 
-  const renderRecordingItem = ({ item }) => {
+  const renderRecordingItem = ({ item, index }) => {
     const { setMarkers } = parseRecordingNotes(item.manual_notes ?? null);
     const isCurrentlyPlaying = playingRecordingId === item.id;
     const showPlayer = isCurrentlyPlaying && playerExpanded;
     const sliderValue = isSeeking && isCurrentlyPlaying ? (seekingValue ?? positionMs) : positionMs;
     const sliderMax = durationMs ?? 1;
+    const isFirst = index === 0;
     
     return (
       <View
@@ -718,6 +749,8 @@ export default function GameRecordingsScreen() {
       >
         {/* Main content area */}
         <TouchableOpacity
+          ref={isTutorialActive && isFirst ? firstRecordingRef : undefined}
+          collapsable={false}
           style={styles.recordingMainContent}
           onPress={() => handleTogglePlay(item)}
           activeOpacity={0.7}
@@ -790,6 +823,8 @@ export default function GameRecordingsScreen() {
         
         {/* Edit button - right side, below delete button */}
         <TouchableOpacity
+          ref={isTutorialActive && isFirst ? firstPencilRef : undefined}
+          collapsable={false}
           style={styles.editButton}
           onPress={() => {
             setSelectedRecording(item);
@@ -897,6 +932,8 @@ export default function GameRecordingsScreen() {
           ) : null}
         </View>
         <TouchableOpacity
+          ref={summaryButtonRef}
+          collapsable={false}
           style={styles.headerRightButton}
           onPress={openMatchReflection}
           activeOpacity={0.7}
@@ -965,6 +1002,8 @@ export default function GameRecordingsScreen() {
               </TouchableOpacity>
             )}
             <TouchableOpacity
+              ref={generateLabelsRef}
+              collapsable={false}
               style={[
                 styles.generateLabelsButton,
                 { backgroundColor: Colors[colorScheme ?? 'light'].tint }

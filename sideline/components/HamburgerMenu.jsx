@@ -14,6 +14,7 @@ import { ThemedView } from '@/components/themed-view';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useTutorial } from '@/contexts/TutorialContext';
 import { useRouter } from 'expo-router';
 
 const { width } = Dimensions.get('window');
@@ -22,6 +23,7 @@ const MENU_WIDTH = Math.min(280, width * 0.75);
 export default function HamburgerMenu({ visible, onClose, onSignOut }) {
   const colorScheme = useColorScheme();
   const router = useRouter();
+  const { isTutorialActive } = useTutorial();
   const slideAnim = React.useRef(new Animated.Value(-MENU_WIDTH)).current;
   const statusBarHeight = StatusBar.currentHeight || 0;
 
@@ -120,7 +122,8 @@ export default function HamburgerMenu({ visible, onClose, onSignOut }) {
       <TouchableOpacity
         style={styles.backdrop}
         activeOpacity={1}
-        onPress={onClose}
+        onPress={isTutorialActive ? undefined : onClose}
+        disabled={isTutorialActive}
       >
         {/* Menu Panel */}
         <Animated.View
@@ -144,7 +147,10 @@ export default function HamburgerMenu({ visible, onClose, onSignOut }) {
               <ThemedText type="title" style={styles.headerText}>
                 Menu
               </ThemedText>
-              <TouchableOpacity onPress={onClose} style={styles.closeButton}>
+              <TouchableOpacity onPress={onClose} style={[
+                styles.closeButton,
+                isTutorialActive && styles.closeButtonHighlighted,
+              ]}>
                 <IconSymbol
                   name="xmark"
                   size={24}
@@ -154,7 +160,10 @@ export default function HamburgerMenu({ visible, onClose, onSignOut }) {
             </ThemedView>
 
             {/* Menu Items */}
-            <View style={[styles.menuItems, { flex: 1 }]}>
+            <View
+              style={[styles.menuItems, { flex: 1 }]}
+              pointerEvents={isTutorialActive ? 'none' : 'auto'}
+            >
               {menuItems.map((item, index) => (
                 <TouchableOpacity
                   key={item.id}
@@ -164,6 +173,7 @@ export default function HamburgerMenu({ visible, onClose, onSignOut }) {
                     {
                       borderBottomColor: colorScheme === 'dark' ? '#333' : '#E5E5E5',
                     },
+                    isTutorialActive && { opacity: 0.35 },
                   ]}
                   onPress={item.onPress}
                   activeOpacity={0.7}
@@ -223,6 +233,13 @@ const styles = StyleSheet.create({
   },
   closeButton: {
     padding: 4,
+  },
+  closeButtonHighlighted: {
+    backgroundColor: 'rgba(91, 163, 245, 0.15)',
+    borderWidth: 2,
+    borderColor: 'rgba(91, 163, 245, 0.8)',
+    borderRadius: 20,
+    padding: 6,
   },
   menuItems: {
     paddingTop: 20,

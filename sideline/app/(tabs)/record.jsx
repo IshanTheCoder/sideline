@@ -1,8 +1,9 @@
-import { useState, useEffect, useRef } from 'react';
-import { Animated, StyleSheet, View, TouchableOpacity, ActivityIndicator, Platform } from 'react-native';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { Animated, ScrollView, StyleSheet, View, TouchableOpacity, ActivityIndicator, Platform } from 'react-native';
 import { showAlert } from '@/lib/alert';
 import { Audio } from 'expo-av';
 import { useRouter } from 'expo-router';
+import { useFocusEffect } from '@react-navigation/native';
 import * as Crypto from 'expo-crypto';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -13,6 +14,7 @@ import { useAudioPermissions } from '@/hooks/use-audio-permissions';
 import { useThemeColor } from '@/hooks/use-theme-color';
 import { useAuth } from '@/contexts/AuthContext';
 import { useActiveSession } from '@/contexts/ActiveSessionContext';
+import { useTutorial } from '@/contexts/TutorialContext';
 import {
   uploadRecording,
   createRecordingRecord,
@@ -25,6 +27,9 @@ export default function RecordScreen() {
   const router = useRouter();
   const { user } = useAuth();
   const { activeSession, clearActiveSession } = useActiveSession();
+  const { isTutorialActive, setRecordingCount, setSetSelected, registerTarget } = useTutorial();
+  const tutorialRecCountRef = useRef(0);
+  const setSelectorRef = useRef(null);
   const { status, requestPermission, isLoading: isPermissionLoading } = useAudioPermissions();
   const iconColor = useThemeColor({}, 'icon');
   
@@ -68,6 +73,24 @@ export default function RecordScreen() {
       }
     };
   }, []);
+
+  useEffect(() => {
+    if (isTutorialActive && selectedSet) {
+      setSetSelected(true);
+    }
+  }, [isTutorialActive, selectedSet, setSetSelected]);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (!isTutorialActive) return;
+      const timer = setTimeout(() => {
+        setSelectorRef.current?.measureInWindow((x, y, width, height) => {
+          if (width > 0 && height > 0) registerTarget('record:setSelector', { x, y, width, height });
+        });
+      }, 700);
+      return () => clearTimeout(timer);
+    }, [isTutorialActive, registerTarget])
+  );
 
   // ticks up every second while recording — like a stopwatch
   useEffect(() => {
@@ -171,197 +194,130 @@ export default function RecordScreen() {
   const stopRecording = async () => {
     try {
       setIsLoading(true);
-      clearError(); // wipe old errors before we try to stop
+      clearError();
 
       if (!recordingRef.current) {
         setIsLoading(false);
-        const errorMsg = 'No active recording found.';
-        setError(errorMsg);
+        setError('No active recording found.');
         return;
       }
 
       if (!user?.id) {
         setIsLoading(false);
-        const errorMsg = 'You must be logged in to save recordings. Please log in and try again.';
-        setError(errorMsg);
-        showAlert(
-          'Authentication Error',
-          errorMsg,
-          [{ text: 'OK', onPress: clearError }]
-        );
+        setError('You must be logged in to save recordings.');
         return;
       }
 
-      // hit the brakes on the recording and free up resources
       let uri = null;
       try {
         await recordingRef.current.stopAndUnloadAsync();
         uri = recordingRef.current.getURI();
       } catch (stopError) {
         console.error('Failed to stop recording:', stopError);
-        const errorMsg = getErrorMessage(stopError, 'Failed to stop recording. The audio may be lost.');
-        setError(errorMsg);
-        setIsLoading(false);
-        showAlert(
-          'Recording Stop Error',
-          errorMsg,
-          [{ text: 'OK', onPress: clearError }]
-        );
+        showToast('error', 'Could not read recording file. Please try again.');
         recordingRef.current = null;
         setIsRecording(false);
-        return;
-      }
-      
-      if (!uri) {
-        const errorMsg = 'Recording file not found. Please try recording again.';
-        setError(errorMsg);
         setIsLoading(false);
-        showAlert(
-          'Recording Error',
-          errorMsg,
-          [{ text: 'OK', onPress: clearError }]
-        );
-        recordingRef.current = null;
-        setIsRecording(false);
         return;
       }
 
-      // mint a fresh UUID to tag this recording
+      if (!uri) {
+        showToast('error', 'Recording file not found. Please try again.');
+        recordingRef.current = null;
+        setIsRecording(false);
+        setIsLoading(false);
+        return;
+      }
+
       let recordingId;
       try {
         recordingId = Crypto.randomUUID();
-      } catch (uuidError) {
-        console.error('Failed to generate UUID:', uuidError);
-        const errorMsg = 'Failed to generate recording ID. Please try again.';
-        setError(errorMsg);
-        setIsLoading(false);
-        showAlert(
-          'Error',
-          errorMsg,
-          [{ text: 'OK', onPress: clearError }]
-        );
-        recordingRef.current = null;
-        setIsRecording(false);
-        return;
+      } catch {
+        recordingId = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
       }
 
+      const capturedDuration = recordingDuration;
+      const capturedSetMarkers = getSelectedSetMarker();
+      const capturedSessionId = activeSession?.id ?? null;
+      const capturedSession = activeSession
+        ? { opponent_name: activeSession.opponentName, date: activeSession.date.toISOString() }
+        : { opponent_name: 'Current Game', date: new Date().toISOString() };
       const timestamp = new Date().toISOString();
 
-      // ship the audio file up to Supabase cloud storage
-      console.log('Uploading recording to Supabase Storage...');
-      const { url: audioUrl, error: uploadError } = await uploadRecording(
-        user.id,
-        recordingId,
-        uri
-      );
-
-      if (uploadError || !audioUrl) {
-        console.error('Upload error:', uploadError);
-        const errorMsg = getErrorMessage(
-          uploadError,
-          'Failed to upload recording. Please check your connection and try again.'
-        );
-        setError(errorMsg);
-        setIsLoading(false);
-        showAlert(
-          'Upload Error',
-          errorMsg,
-          [
-            { text: 'Cancel', style: 'cancel', onPress: clearError },
-            { text: 'Retry', onPress: () => stopRecording() }
-          ]
-        );
-        // keep recording state intact so user can retry the upload
-        return;
-      }
-
-      console.log('Recording uploaded successfully. URL:', audioUrl);
-
-      // save the recording metadata to the database
-      console.log('Creating recording record in database...');
-      const { data: recordingRecord, error: dbError } = await createRecordingRecord({
-        id: recordingId,
-        user_id: user.id,
-        game_session_id: activeSession?.id ?? null,
-        audio_url: audioUrl,
-        duration: recordingDuration,
-        timestamp: timestamp,
-        manual_notes: selectedSet
-          ? serializeRecordingNotes('', getSelectedSetMarker())
-          : undefined,
-      });
-
-      if (dbError || !recordingRecord) {
-        console.error('Database error:', dbError);
-        const dbErrorMsg = getErrorMessage(
-          dbError,
-          'Your recording was uploaded, but there was an issue saving it to the database. The audio file is safe.'
-        );
-        showToast('error', dbErrorMsg, 6000);
-      } else {
-        console.log('Recording record created successfully:', recordingRecord);
-        showToast('success', 'Recording saved');
-
-        // kick off transcription in the background without blocking new recordings
-        setProcessingCount((count) => count + 1);
-        processRecording(recordingId, user.id)
-          .then((result) => {
-            if (result.success) {
-              console.log('✅ Recording transcribed successfully!');
-              console.log('Transcription:', result.transcription?.substring(0, 100));
-              showToast('success', 'Transcription complete');
-            } else {
-              const msg = result.error?.message || 'Unknown error';
-              console.error('⚠️ Recording transcription failed:', msg);
-              showToast('error', `Transcription failed: ${msg}`, 8000);
-            }
-          })
-          .catch((err) => {
-            const msg = err?.message || 'Unknown error';
-            console.error('❌ Unexpected error during transcription:', msg);
-            showToast('error', `Transcription error: ${msg}`, 8000);
-          })
-          .finally(() => {
-            setProcessingCount((count) => Math.max(0, count - 1));
-          });
-      }
-
-      // build a local recording object so the UI can show it immediately
-      const newRecording = {
-        id: recordingId,
-        created_at: timestamp,
-        duration: recordingDuration,
-        audio_url: audioUrl,
-        game_session_id: activeSession?.id ?? null,
-        game_session: activeSession
-          ? {
-              opponent_name: activeSession.opponentName,
-              date: activeSession.date.toISOString(),
-            }
-          : {
-              opponent_name: 'Current Game',
-              date: timestamp,
-            },
-      };
-
-      // clean up the recorder ref so we're ready for the next one
       recordingRef.current = null;
       setIsRecording(false);
       setSelectedSetOffsetSeconds(null);
-      setCurrentRecording(newRecording);
       setIsLoading(false);
-      clearError(); // we made it — clear any leftover errors
+      clearError();
 
+      if (isTutorialActive) {
+        tutorialRecCountRef.current += 1;
+        setRecordingCount(tutorialRecCountRef.current);
+      }
+
+      showToast('success', 'Recording saved — uploading…');
+
+      (async () => {
+        try {
+          const { url: audioUrl, error: uploadError } = await uploadRecording(
+            user.id,
+            recordingId,
+            uri
+          );
+
+          if (uploadError || !audioUrl) {
+            console.error('Upload error:', uploadError);
+            showToast('error', 'Upload failed — recording will sync when connection returns.', 6000);
+            return;
+          }
+
+          const { data: recordingRecord, error: dbError } = await createRecordingRecord({
+            id: recordingId,
+            user_id: user.id,
+            game_session_id: capturedSessionId,
+            audio_url: audioUrl,
+            duration: capturedDuration,
+            timestamp,
+            manual_notes: capturedSetMarkers.length > 0
+              ? serializeRecordingNotes('', capturedSetMarkers)
+              : undefined,
+          });
+
+          if (dbError || !recordingRecord) {
+            console.error('Database error:', dbError);
+            showToast('error', 'Upload succeeded but database save failed. Recording is safe.', 6000);
+            return;
+          }
+
+          showToast('success', 'Recording uploaded');
+
+          setProcessingCount((count) => count + 1);
+          processRecording(recordingId, user.id)
+            .then((result) => {
+              if (result.success) {
+                showToast('success', 'Transcription complete');
+              } else {
+                console.error('Transcription failed:', result.error?.message);
+              }
+            })
+            .catch((err) => {
+              console.error('Transcription error:', err?.message);
+            })
+            .finally(() => {
+              setProcessingCount((count) => Math.max(0, count - 1));
+            });
+        } catch (err) {
+          console.error('Background upload error:', err);
+          showToast('error', 'Upload failed — recording will sync when connection returns.', 6000);
+        }
+      })();
     } catch (error) {
       console.error('Failed to stop recording:', error);
-      setIsLoading(false);
-      const errorMsg = getErrorMessage(error, 'Failed to save recording. Please try again.');
-      showToast('error', errorMsg, 8000);
-
-      // even if things blew up, reset so the user can try again
+      showToast('error', 'Failed to save recording. Please try again.', 8000);
       recordingRef.current = null;
       setIsRecording(false);
       setSelectedSetOffsetSeconds(null);
+      setIsLoading(false);
     }
   };
 
@@ -381,6 +337,10 @@ export default function RecordScreen() {
             },
           ]
         );
+        return;
+      }
+      if (!selectedSet) {
+        showAlert('Select a set', 'Please select a set above before recording.');
         return;
       }
       await startRecording();
@@ -589,115 +549,122 @@ export default function RecordScreen() {
         </Animated.View>
       )}
 
-      {/* transcription-in-progress banner */}
-      {isProcessing && (
-        <View style={styles.processingBanner}>
-          <ActivityIndicator size="small" color="#5BA3F5" />
-          <ThemedText style={styles.processingText}>Transcribing recording...</ThemedText>
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
+        {/* transcription-in-progress banner */}
+        {isProcessing && (
+          <View style={styles.processingBanner}>
+            <ActivityIndicator size="small" color="#5BA3F5" />
+            <ThemedText style={styles.processingText}>Transcribing recording...</ThemedText>
+          </View>
+        )}
+
+        {/* active game session info */}
+        <View style={styles.gameSessionSection}>
+          <ThemedText style={styles.sectionLabel}>Current Game Session</ThemedText>
+          <ActiveSessionIndicator session={activeSession} />
         </View>
-      )}
 
-      {/* active game session info */}
-      <View style={styles.gameSessionSection}>
-        <ThemedText style={styles.sectionLabel}>Current Game Session</ThemedText>
-        <ActiveSessionIndicator session={activeSession} />
-      </View>
-
-      <View style={styles.markerSection}>
-        <ThemedText style={styles.markerLabel}>Select set</ThemedText>
-        <View style={styles.markerButtons}>
-          {['Set 1', 'Set 2', 'Set 3', 'Set 4', 'Set 5'].map((label) => (
-            <TouchableOpacity
-              key={label}
-              style={[
-                styles.markerButton,
-                selectedSet === label && styles.markerButtonActive,
-              ]}
-              onPress={() => setSelectedSet(label)}
-            >
-              <ThemedText
+        <View ref={setSelectorRef} collapsable={false} style={styles.markerSection}>
+          <ThemedText style={styles.markerLabel}>Select set</ThemedText>
+          <View style={styles.markerButtons}>
+            {['Set 1', 'Set 2', 'Set 3', 'Set 4', 'Set 5'].map((label) => (
+              <TouchableOpacity
+                key={label}
                 style={[
-                  styles.markerButtonText,
-                  selectedSet === label && styles.markerButtonTextActive,
+                  styles.markerButton,
+                  selectedSet === label && styles.markerButtonActive,
                 ]}
+                onPress={() => setSelectedSet(label)}
               >
-                {label}
-              </ThemedText>
-            </TouchableOpacity>
-          ))}
-        </View>
-        <ThemedText style={styles.markerHint}>
-          {selectedSet ? `Selected: ${selectedSet}` : 'Pick a set before recording'}
-        </ThemedText>
-      </View>
-
-      {/* the big record button — front and center */}
-      <View style={styles.recordSection}>
-        {status !== 'granted' && (
-          <View style={styles.permissionSection}>
-            <ThemedText style={styles.permissionStatus}>
-              {getStatusText()}
-            </ThemedText>
-            
-            <TouchableOpacity
-              style={styles.permissionButton}
-              onPress={() => {
-                clearError();
-                requestPermission();
-              }}
-              disabled={isPermissionLoading}
-            >
-              {isPermissionLoading ? (
-                <ActivityIndicator color="#fff" />
-              ) : (
-                <ThemedText style={styles.permissionButtonText}>
-                  Request Microphone Permission
+                <ThemedText
+                  style={[
+                    styles.markerButtonText,
+                    selectedSet === label && styles.markerButtonTextActive,
+                  ]}
+                >
+                  {label}
                 </ThemedText>
-              )}
-            </TouchableOpacity>
+              </TouchableOpacity>
+            ))}
           </View>
-        )}
-        
-        {/* error banner with dismiss button */}
-        {error && (
-          <View style={styles.errorContainer}>
-            <ThemedText style={styles.errorText}>
-              {error}
-            </ThemedText>
-            <TouchableOpacity
-              onPress={clearError}
-              style={styles.errorDismissButton}
-            >
-              <IconSymbol name="xmark" size={20} color={iconColor} />
-            </TouchableOpacity>
-          </View>
-        )}
+          <ThemedText style={styles.markerHint}>
+            {selectedSet ? `Selected: ${selectedSet}` : 'Pick a set before recording'}
+          </ThemedText>
+        </View>
 
-        <RecordButton
-          isRecording={isRecording}
-          recordingDuration={recordingDuration}
-          onPress={handleRecordPress}
-          disabled={status !== 'granted' || isLoading}
-        />
-        
-        {isLoading && (
-          <ActivityIndicator
-            size="small"
-            style={styles.loadingIndicator}
+        {/* the big record button — front and center */}
+        <View style={styles.recordSection}>
+          {status !== 'granted' && (
+            <View style={styles.permissionSection}>
+              <ThemedText style={styles.permissionStatus}>
+                {getStatusText()}
+              </ThemedText>
+              
+              <TouchableOpacity
+                style={styles.permissionButton}
+                onPress={() => {
+                  clearError();
+                  requestPermission();
+                }}
+                disabled={isPermissionLoading}
+              >
+                {isPermissionLoading ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <ThemedText style={styles.permissionButtonText}>
+                    Request Microphone Permission
+                  </ThemedText>
+                )}
+              </TouchableOpacity>
+            </View>
+          )}
+          
+          {/* error banner with dismiss button */}
+          {error && (
+            <View style={styles.errorContainer}>
+              <ThemedText style={styles.errorText}>
+                {error}
+              </ThemedText>
+              <TouchableOpacity
+                onPress={clearError}
+                style={styles.errorDismissButton}
+              >
+                <IconSymbol name="xmark" size={20} color={iconColor} />
+              </TouchableOpacity>
+            </View>
+          )}
+
+          <RecordButton
+            isRecording={isRecording}
+            recordingDuration={recordingDuration}
+            onPress={handleRecordPress}
+            disabled={status !== 'granted' || isLoading}
           />
-        )}
-        
-        {isRecording && (
-          <ThemedText style={styles.recordingHint}>
-            Tap to stop recording
-          </ThemedText>
-        )}
-        {!isRecording && status === 'granted' && !error && (
-          <ThemedText style={styles.recordingHint}>
-            Tap to start recording
-          </ThemedText>
-        )}
-      </View>
+          
+          {isLoading && (
+            <ActivityIndicator
+              size="small"
+              style={styles.loadingIndicator}
+            />
+          )}
+          
+          {isRecording && (
+            <ThemedText style={styles.recordingHint}>
+              Tap to stop recording
+            </ThemedText>
+          )}
+          {!isRecording && status === 'granted' && !error && (
+            <ThemedText style={styles.recordingHint}>
+              Tap to start recording
+            </ThemedText>
+          )}
+        </View>
+      </ScrollView>
     </ThemedView>
   );
 }
@@ -705,14 +672,20 @@ export default function RecordScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 20,
+    paddingHorizontal: 20,
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingTop: 50,
-    paddingBottom: 20,
+    paddingBottom: 12,
+  },
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    paddingBottom: 40,
   },
   navButton: {
     padding: 8,
@@ -739,10 +712,10 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   recordSection: {
-    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 40,
+    paddingVertical: 32,
+    minHeight: 320,
   },
   permissionSection: {
     marginBottom: 24,

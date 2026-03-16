@@ -7,6 +7,7 @@ import {
   ChevronRight,
   ChevronUp,
   Circle,
+  CircleQuestionMark,
   Code2,
   Eye,
   EyeOff,
@@ -83,6 +84,7 @@ const MAPPING = {
   'xmark.circle.fill': XCircle,
   'person.2': Users,
   plus: Plus,
+  'questionmark.circle': CircleQuestionMark,
 };
 
 /**

@@ -397,11 +397,11 @@ export default function PostGameSummaryScreen() {
           ) : null}
 
           {/* Analytics charts */}
-          {pieChartData && pieChartData.length > 0 && (
-            <View style={styles.section}>
-              <ThemedText style={[styles.sectionHeading, { opacity: 0.7 }]}>
-                SKILL DISTRIBUTION
-              </ThemedText>
+          <View style={styles.section}>
+            <ThemedText style={[styles.sectionHeading, { opacity: 0.7 }]}>
+              SKILL DISTRIBUTION
+            </ThemedText>
+            {pieChartData && pieChartData.length > 0 ? (
               <View style={[styles.chartWrapper, { backgroundColor: isDark ? '#2A2A2A' : '#F5F5F5' }]}>
                 <PieChart
                   data={pieChartData}
@@ -414,14 +414,19 @@ export default function PostGameSummaryScreen() {
                   absolute
                 />
               </View>
-            </View>
-          )}
+            ) : (
+              <View style={[styles.insufficientData, { backgroundColor: isDark ? '#2A2A2A' : '#F5F5F5' }]}>
+                <IconSymbol name="chart.pie" size={24} color={isDark ? '#666' : '#999'} />
+                <ThemedText style={styles.insufficientDataText}>Not enough information</ThemedText>
+              </View>
+            )}
+          </View>
 
-          {barChartData && barChartData.labels.length > 0 && (
-            <View style={styles.section}>
-              <ThemedText style={[styles.sectionHeading, { opacity: 0.7 }]}>
-                PLAYER MENTIONS
-              </ThemedText>
+          <View style={styles.section}>
+            <ThemedText style={[styles.sectionHeading, { opacity: 0.7 }]}>
+              PLAYER MENTIONS
+            </ThemedText>
+            {barChartData && barChartData.labels.length > 0 ? (
               <View style={[styles.chartWrapper, styles.feedbackChartWrapper, { backgroundColor: isDark ? '#2A2A2A' : '#F5F5F5' }]}>
                 <BarChart
                   data={barChartData}
@@ -439,14 +444,19 @@ export default function PostGameSummaryScreen() {
                   style={styles.feedbackChartStyle}
                 />
               </View>
-            </View>
-          )}
+            ) : (
+              <View style={[styles.insufficientData, { backgroundColor: isDark ? '#2A2A2A' : '#F5F5F5' }]}>
+                <IconSymbol name="person.2" size={24} color={isDark ? '#666' : '#999'} />
+                <ThemedText style={styles.insufficientDataText}>Not enough information</ThemedText>
+              </View>
+            )}
+          </View>
 
-          {feedbackPerSetData && feedbackPerSetData.datasets[0].data.some((n) => n > 0) && (
-            <View style={styles.section}>
-              <ThemedText style={[styles.sectionHeading, { opacity: 0.7 }]}>
-                FEEDBACK BY SET
-              </ThemedText>
+          <View style={styles.section}>
+            <ThemedText style={[styles.sectionHeading, { opacity: 0.7 }]}>
+              FEEDBACK BY SET
+            </ThemedText>
+            {feedbackPerSetData && feedbackPerSetData.datasets[0].data.some((n) => n > 0) ? (
               <View style={[styles.chartWrapper, styles.feedbackChartWrapper, { backgroundColor: isDark ? '#2A2A2A' : '#F5F5F5' }]}>
                 <BarChart
                   data={feedbackPerSetData}
@@ -464,10 +474,15 @@ export default function PostGameSummaryScreen() {
                   style={styles.feedbackChartStyle}
                 />
               </View>
-            </View>
-          )}
+            ) : (
+              <View style={[styles.insufficientData, { backgroundColor: isDark ? '#2A2A2A' : '#F5F5F5' }]}>
+                <IconSymbol name="chart.bar" size={24} color={isDark ? '#666' : '#999'} />
+                <ThemedText style={styles.insufficientDataText}>Not enough information</ThemedText>
+              </View>
+            )}
+          </View>
 
-          {(synthesisLoading && (noticedMostInput.length > 0 || matchFlow.length > 0)) && (
+          {synthesisLoading && (noticedMostInput.length > 0 || matchFlow.length > 0) && (
             <View style={styles.section}>
               <View style={[styles.synthesisLoadingRow, { backgroundColor: colorScheme === 'dark' ? '#2A2A2A' : '#F0F0F0' }]}>
                 <ActivityIndicator size="small" color={Colors[colorScheme ?? 'light'].tint} />
@@ -476,34 +491,41 @@ export default function PostGameSummaryScreen() {
             </View>
           )}
 
-          {!synthesisLoading && (synthesizedThemes.length > 0 || noticedMost.length > 0) && (
+          {!synthesisLoading && (
             <View style={styles.section}>
               <ThemedText style={[styles.sectionHeading, { opacity: 0.7 }]}>
                 WHAT YOU NOTICED MOST
               </ThemedText>
-              {(synthesizedThemes.length > 0 ? synthesizedThemes : noticedMost.map((m) => m.text)).map((text, i) => (
-                <View
-                  key={`theme-${i}`}
-                  style={[
-                    styles.card,
-                    { backgroundColor: colorScheme === 'dark' ? '#2A2A2A' : '#F0F0F0' },
-                  ]}
-                >
-                  <View style={[styles.themeBullet, { backgroundColor: Colors[colorScheme ?? 'light'].tint }]} />
-                  <ThemedText style={styles.cardText} numberOfLines={3}>
-                    {text}
-                  </ThemedText>
+              {(synthesizedThemes.length > 0 || noticedMost.length > 0) ? (
+                (synthesizedThemes.length > 0 ? synthesizedThemes : noticedMost.map((m) => m.text)).map((text, i) => (
+                  <View
+                    key={`theme-${i}`}
+                    style={[
+                      styles.card,
+                      { backgroundColor: colorScheme === 'dark' ? '#2A2A2A' : '#F0F0F0' },
+                    ]}
+                  >
+                    <View style={[styles.themeBullet, { backgroundColor: Colors[colorScheme ?? 'light'].tint }]} />
+                    <ThemedText style={styles.cardText} numberOfLines={3}>
+                      {text}
+                    </ThemedText>
+                  </View>
+                ))
+              ) : (
+                <View style={[styles.insufficientData, { backgroundColor: isDark ? '#2A2A2A' : '#F5F5F5' }]}>
+                  <IconSymbol name="eye" size={24} color={isDark ? '#666' : '#999'} />
+                  <ThemedText style={styles.insufficientDataText}>Not enough information</ThemedText>
                 </View>
-              ))}
+              )}
             </View>
           )}
 
-          {playerNotes.length > 0 && (
-            <View style={styles.section}>
-              <ThemedText style={[styles.sectionHeading, { opacity: 0.7 }]}>
-                PLAYER-SPECIFIC NOTES
-              </ThemedText>
-              {playerNotes.map((note, i) => (
+          <View style={styles.section}>
+            <ThemedText style={[styles.sectionHeading, { opacity: 0.7 }]}>
+              PLAYER-SPECIFIC NOTES
+            </ThemedText>
+            {playerNotes.length > 0 ? (
+              playerNotes.map((note, i) => (
                 <View
                   key={`${note.number}-${note.label}-${i}`}
                   style={[
@@ -518,29 +540,33 @@ export default function PostGameSummaryScreen() {
                     {note.label}
                   </ThemedText>
                 </View>
-              ))}
-            </View>
-          )}
+              ))
+            ) : (
+              <View style={[styles.insufficientData, { backgroundColor: isDark ? '#2A2A2A' : '#F5F5F5' }]}>
+                <IconSymbol name="person.text.rectangle" size={24} color={isDark ? '#666' : '#999'} />
+                <ThemedText style={styles.insufficientDataText}>Not enough information</ThemedText>
+              </View>
+            )}
+          </View>
 
-          {!synthesisLoading && (synthesizedMatchFlowBullets.length > 0 || matchFlow.length > 0) && (
+          {!synthesisLoading && (
             <View style={styles.section}>
               <ThemedText style={[styles.sectionHeading, { opacity: 0.7 }]}>MATCH FLOW</ThemedText>
-              {(synthesizedMatchFlowBullets.length > 0 ? synthesizedMatchFlowBullets : matchFlow.map((l) => rephraseForMatchFlow(l, players))).map((sentence, i) => (
-                <View key={`flow-${i}`} style={styles.flowRow}>
-                  <View style={[styles.bullet, { backgroundColor: Colors[colorScheme ?? 'light'].tint }]} />
-                  <ThemedText style={styles.flowText} numberOfLines={4}>
-                    {typeof sentence === 'string' ? sentence.replace(/\.+$/, '') : sentence}
-                  </ThemedText>
+              {(synthesizedMatchFlowBullets.length > 0 || matchFlow.length > 0) ? (
+                (synthesizedMatchFlowBullets.length > 0 ? synthesizedMatchFlowBullets : matchFlow.map((l) => rephraseForMatchFlow(l, players))).map((sentence, i) => (
+                  <View key={`flow-${i}`} style={styles.flowRow}>
+                    <View style={[styles.bullet, { backgroundColor: Colors[colorScheme ?? 'light'].tint }]} />
+                    <ThemedText style={styles.flowText} numberOfLines={4}>
+                      {typeof sentence === 'string' ? sentence.replace(/\.+$/, '') : sentence}
+                    </ThemedText>
+                  </View>
+                ))
+              ) : (
+                <View style={[styles.insufficientData, { backgroundColor: isDark ? '#2A2A2A' : '#F5F5F5' }]}>
+                  <IconSymbol name="arrow.triangle.branch" size={24} color={isDark ? '#666' : '#999'} />
+                  <ThemedText style={styles.insufficientDataText}>Not enough information</ThemedText>
                 </View>
-              ))}
-            </View>
-          )}
-
-          {!synthesisLoading && synthesizedThemes.length === 0 && synthesizedMatchFlowBullets.length === 0 && noticedMost.length === 0 && matchFlow.length === 0 && playerNotes.length === 0 && (
-            <View style={styles.emptySection}>
-              <ThemedText style={[styles.emptyText, { opacity: 0.7 }]}>
-                No insights yet. Record and label plays during the game to see match reflection here.
-              </ThemedText>
+              )}
             </View>
           )}
         </ScrollView>
@@ -678,6 +704,18 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 15,
     lineHeight: 22,
+  },
+  insufficientData: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 16,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+  },
+  insufficientDataText: {
+    fontSize: 14,
+    opacity: 0.5,
   },
   emptySection: {
     paddingVertical: 24,

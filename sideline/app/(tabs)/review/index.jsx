@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -15,6 +15,7 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useAuth } from '@/contexts/AuthContext';
+import { useTutorial } from '@/contexts/TutorialContext';
 import {
   deleteGameForUser,
   fetchRecordingsForUser,
@@ -27,10 +28,12 @@ export default function ReviewScreen() {
   const router = useRouter();
   const colorScheme = useColorScheme();
   const { user } = useAuth();
+  const { isTutorialActive, tutorialGameId, registerTarget } = useTutorial();
   const [recordings, setRecordings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
+  const tutorialGameRef = useRef(null);
 
   const titleText = useMemo(() => '🏟️ Games', []);
 
@@ -54,13 +57,14 @@ export default function ReviewScreen() {
       if (
         fetchError.message.includes('does not exist') ||
         fetchError.message.includes('column') ||
-        // Empty response for RLS, table missing, or join error
         (fetchError).code === 'PGRST116'
       ) {
         setRecordings([]);
         setError(null);
       } else {
-        setError(fetchError.message);
+        const msg = fetchError.message || '';
+        const isNetworkError = msg.includes('fetch') || msg.includes('network') || msg.includes('Network') || msg.includes('TypeError');
+        setError(isNetworkError ? 'Network error — check your connection and try again.' : msg);
       }
     } else {
       setRecordings(data ?? []);
@@ -84,6 +88,18 @@ export default function ReviewScreen() {
         loadRecordings();
       }
     }, [user?.id, loadRecordings])
+  );
+
+  useFocusEffect(
+    useCallback(() => {
+      if (!isTutorialActive) return;
+      const timer = setTimeout(() => {
+        tutorialGameRef.current?.measureInWindow((x, y, width, height) => {
+          if (width > 0 && height > 0) registerTarget('review:tutorialGame', { x, y, width, height });
+        });
+      }, 700);
+      return () => clearTimeout(timer);
+    }, [isTutorialActive, registerTarget])
   );
 
   const formatDate = (dateString) => {
@@ -124,12 +140,11 @@ export default function ReviewScreen() {
   }, [recordings]);
 
   const executeDeleteGame = async (gameId) => {
-    const { error: deleteError } = await deleteGameForUser(user.id, gameId);
-    if (deleteError) {
-      if (Platform.OS === 'web') window.alert('Delete failed: ' + deleteError.message);
-      else showAlert('Delete failed', deleteError.message);
-      return;
-    }
+    const removedRecordings = recordings.filter((rec) =>
+      gameId === 'unassigned'
+        ? rec.game_session_id === null
+        : rec.game_session_id === gameId
+    );
     setRecordings((prev) =>
       prev.filter((rec) =>
         gameId === 'unassigned'
@@ -137,6 +152,13 @@ export default function ReviewScreen() {
           : rec.game_session_id !== gameId
       )
     );
+
+    const { error: deleteError } = await deleteGameForUser(user.id, gameId);
+    if (deleteError) {
+      setRecordings((prev) => [...prev, ...removedRecordings]);
+      if (Platform.OS === 'web') window.alert('Delete failed: ' + deleteError.message);
+      else showAlert('Delete failed', deleteError.message);
+    }
   };
 
   const handleDeleteGame = (gameId) => {
@@ -167,14 +189,20 @@ export default function ReviewScreen() {
       (sum, rec) => sum + (rec.duration ?? 0),
       0
     );
+    const isTutorialGame = isTutorialActive && item.id === tutorialGameId;
 
     return (
       <TouchableOpacity
+        ref={isTutorialGame ? tutorialGameRef : undefined}
+        collapsable={false}
         style={[
           styles.gameItem,
           {
             backgroundColor: colorScheme === 'dark' ? '#2A2A2A' : '#F5F5F5',
-            borderColor: colorScheme === 'dark' ? '#3A3A3A' : '#E5E5E5',
+            borderColor: isTutorialGame
+              ? Colors[colorScheme ?? 'light'].tint
+              : (colorScheme === 'dark' ? '#3A3A3A' : '#E5E5E5'),
+            borderWidth: isTutorialGame ? 2 : 1,
           },
         ]}
         onPress={() => router.push(`/(tabs)/review/game/${item.id}`)}
@@ -359,10 +387,13 @@ const styles = StyleSheet.create({
   recordingMeta: {
     flexDirection: 'row',
     alignItems: 'center',
+    flexWrap: 'wrap',
+    rowGap: 4,
   },
   metaText: {
     fontSize: 13,
     opacity: 0.6,
+    flexShrink: 0,
   },
   metaSeparator: {
     width: 4,
@@ -370,6 +401,7 @@ const styles = StyleSheet.create({
     borderRadius: 2,
     backgroundColor: '#999',
     marginHorizontal: 8,
+    flexShrink: 0,
   },
   separator: {
     height: 12,

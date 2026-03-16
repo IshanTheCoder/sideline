@@ -11,6 +11,8 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { ThemeProvider, useTheme } from '@/contexts/ThemeContext';
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
 import { ActiveSessionProvider } from '@/contexts/ActiveSessionContext';
+import { TutorialProvider } from '@/contexts/TutorialContext';
+import TutorialOverlay from '@/components/TutorialOverlay';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Colors } from '@/constants/theme';
 
@@ -76,13 +78,19 @@ function RootLayoutNav() {
   if (Platform.OS === 'web') {
     return (
       <View style={[styles.webOuter, { backgroundColor }]}>
-        <View style={styles.webInner}>
+        <View style={[styles.webInner, { position: 'relative' }]}>
           <Slot />
+          <TutorialOverlay />
         </View>
       </View>
     );
   }
-  return <Slot />;
+  return (
+    <View style={styles.nativeRoot}>
+      <Slot />
+      <TutorialOverlay />
+    </View>
+  );
 }
 
 export default function RootLayout() {
@@ -90,7 +98,9 @@ export default function RootLayout() {
     <ThemeProvider>
       <AuthProvider>
         <ActiveSessionProvider>
-          <ThemedNavigationProvider />
+          <TutorialProvider>
+            <ThemedNavigationProvider />
+          </TutorialProvider>
         </ActiveSessionProvider>
       </AuthProvider>
     </ThemeProvider>
@@ -108,6 +118,9 @@ function ThemedNavigationProvider() {
 }
 
 const styles = StyleSheet.create({
+  nativeRoot: {
+    flex: 1,
+  },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',

@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { StyleSheet, View, TouchableOpacity, TextInput, Modal, Platform, ActivityIndicator } from 'react-native';
 import { showAlert } from '@/lib/alert';
 
@@ -12,6 +12,7 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useThemeColor } from '@/hooks/use-theme-color';
 import { useAuth } from '@/contexts/AuthContext';
 import { useActiveSession } from '@/contexts/ActiveSessionContext';
+import { useTutorial } from '@/contexts/TutorialContext';
 import { createGameSession } from '@/lib/gameSessions';
 
 export default function RecordDetailsScreen() {
@@ -35,6 +36,19 @@ export default function RecordDetailsScreen() {
   const dateInputRef = useRef(null);
   const [formError, setFormError] = useState(null);
   const [isSaving, setIsSaving] = useState(false);
+
+  const { isTutorialActive, setGameOpponent, setGameMatchType, setTutorialGameId, registerCallback } = useTutorial();
+  const startRecordingRef = useRef(null);
+
+  useEffect(() => {
+    if (!isTutorialActive) return;
+    setGameOpponent(opponent);
+  }, [opponent, isTutorialActive, setGameOpponent]);
+
+  useEffect(() => {
+    if (!isTutorialActive) return;
+    setGameMatchType(matchType);
+  }, [matchType, isTutorialActive, setGameMatchType]);
 
   const matchTypes = ['Preseason', 'Regular Season', 'Post Season', 'Scrimmage', 'Practice'];
 
@@ -91,6 +105,10 @@ export default function RecordDetailsScreen() {
       return;
     }
 
+    if (isTutorialActive) {
+      setTutorialGameId(id);
+    }
+
     setActiveSession({
       id,
       opponentName: trimmedOpponent,
@@ -102,20 +120,38 @@ export default function RecordDetailsScreen() {
     router.push('/(tabs)/record');
   };
 
+  startRecordingRef.current = handleStartRecording;
+
+  useEffect(() => {
+    if (!isTutorialActive) return;
+    const unreg = registerCallback('submitGameForm', () => {
+      startRecordingRef.current?.();
+    });
+    return unreg;
+  }, [isTutorialActive, registerCallback]);
+
+  const goBack = () => {
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.replace('/(tabs)');
+    }
+  };
+
   const handleCancel = () => {
     if (opponent || matchType) {
       if (Platform.OS === 'web') {
         const confirmed = window.confirm('Discard game details? Your inputs will be cleared.');
-        if (confirmed) router.back();
+        if (confirmed) goBack();
         return;
       }
       showAlert('Discard game details?', 'Your inputs will be cleared.', [
         { text: 'Keep Editing', style: 'cancel' },
-        { text: 'Discard', style: 'destructive', onPress: () => router.back() },
+        { text: 'Discard', style: 'destructive', onPress: goBack },
       ]);
       return;
     }
-    router.back();
+    goBack();
   };
 
   return (
@@ -216,9 +252,9 @@ export default function RecordDetailsScreen() {
 
       <View style={styles.footer}>
         <TouchableOpacity
-          style={[styles.startButton, { backgroundColor: tintColor }]}
+          style={[styles.startButton, { backgroundColor: tintColor, opacity: isTutorialActive ? 0.4 : 1 }]}
           onPress={handleStartRecording}
-          disabled={isSaving}
+          disabled={isSaving || isTutorialActive}
         >
           {isSaving ? (
             <ActivityIndicator color="#fff" />

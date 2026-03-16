@@ -68,12 +68,11 @@ export default function TabLayout() {
           href: null, // tucked away — get here through the hamburger menu
         }}
       />
-      {/* explore tab — placeholder demo stuff, will swap in real features later */}
       <Tabs.Screen
         name="explore"
         options={{
           title: 'Explore',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="paperplane.fill" color={color} />,
+          href: null,
         }}
       />
     </Tabs>

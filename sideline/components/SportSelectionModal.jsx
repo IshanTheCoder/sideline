@@ -9,7 +9,7 @@ import {
 import { ThemedText } from './themed-text';
 import { ThemedView } from './themed-view';
 import { SportButtonSelector } from './SportButtonSelector';
-import { Ionicons } from '@expo/vector-icons';
+import { IconSymbol } from './ui/icon-symbol';
 
 export function SportSelectionModal({
   visible,
@@ -38,7 +38,7 @@ export function SportSelectionModal({
               Select Your Sport
             </ThemedText>
             <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-              <Ionicons name="close" size={24} color="#3B6FA8" />
+              <IconSymbol name="xmark" size={22} color="#3B6FA8" />
             </TouchableOpacity>
           </View>
 
