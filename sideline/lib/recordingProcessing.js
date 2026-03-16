@@ -95,9 +95,7 @@ export async function processRecording(recordingId, userId) {
       }
     }
 
-    // step 3: ship audio to Whisper for transcription — pass roster names so Whisper
-    // can bias toward the correct spelling of player names
-    const playerNames = rosterPlayers.map((p) => p.name);
+    const playerNames = rosterPlayers.map((p) => p.name).filter(Boolean);
     console.log('🎤 Starting transcription...');
     const { transcription, error: transcriptionError } = await transcribeAudio(downloadUrl, { playerNames });
 
@@ -112,6 +110,7 @@ export async function processRecording(recordingId, userId) {
     }
 
     console.log('✅ Transcription completed:', transcription.substring(0, 100) + '...');
+
     const numberCorrections = buildRosterNumberCorrections(transcription, rosterPlayers);
     const nameCorrections = buildRosterNameCorrections(transcription, rosterPlayers.map((p) => p.name));
     // apply number substitutions first so "number four" → "Sarah" before name fuzzy-match runs
@@ -368,94 +367,101 @@ export async function generateLabelsForGameSession(gameSessionId, userId) {
  */
 export async function generateMissingLabels(userId, gameSessionId) {
   try {
-    console.log('🏷️  Finding recordings with transcriptions for game session:', gameSessionId);
+    console.log('🏷️  Generating labels for recordings in game session:', gameSessionId);
 
-    // find all transcribed recordings in this game session
     let { data: recordings, error: fetchError } = await supabase
       .from('recordings')
-      .select('id, transcription, ai_labels')
+      .select('id, audio_url, transcription, ai_labels')
       .eq('user_id', userId)
-      .eq('game_session_id', gameSessionId)
-      .not('transcription', 'is', null);
+      .eq('game_session_id', gameSessionId);
 
-    // backward compat — older schema without user_id? retry the query
     if (fetchError && isMissingColumnError(fetchError, 'user_id')) {
       const retry = await supabase
         .from('recordings')
-        .select('id, transcription, ai_labels')
-        .eq('game_session_id', gameSessionId)
-        .not('transcription', 'is', null);
+        .select('id, audio_url, transcription, ai_labels')
+        .eq('game_session_id', gameSessionId);
       recordings = retry.data;
       fetchError = retry.error;
     }
 
     if (fetchError) {
       console.error('❌ Failed to fetch recordings:', fetchError);
-      return {
-        processedCount: 0,
-        failedCount: 0,
-        error: fetchError,
-      };
+      return { processedCount: 0, failedCount: 0, error: fetchError };
     }
 
     if (!recordings || recordings.length === 0) {
-      console.log('ℹ️  No recordings with transcriptions found');
-      return {
-        processedCount: 0,
-        failedCount: 0,
-        error: null,
-      };
+      console.log('ℹ️  No recordings found');
+      return { processedCount: 0, failedCount: 0, error: null };
     }
 
-    console.log(`📋 Found ${recordings.length} recordings to generate labels for`);
+    console.log(`📋 Found ${recordings.length} recordings to process`);
 
-    const { players: rosterPlayers } = await getPlayersForGameSession(gameSessionId);
-    const customBuckets = await getCustomBucketsForPrompt(userId);
+    let rosterPlayers = [];
+    try {
+      const { players } = await getPlayersForGameSession(gameSessionId);
+      rosterPlayers = players || [];
+    } catch (rosterErr) {
+      console.warn('⚠️ Could not load roster:', rosterErr?.message);
+    }
+
+    let customBuckets = {};
+    try {
+      customBuckets = await getCustomBucketsForPrompt(userId) || {};
+    } catch (bucketErr) {
+      console.warn('⚠️ Could not load custom buckets:', bucketErr?.message);
+    }
 
     let processedCount = 0;
     let failedCount = 0;
+    let skippedCount = 0;
 
-    // run through each recording and give it a brand new label
     for (const recording of recordings) {
-      console.log(`🏷️  Generating label for recording ${recording.id}...`);
+      try {
+        const transcriptionText = recording.transcription;
 
-      const labelResult = await generateLabel(recording.transcription, { players: rosterPlayers, customBuckets });
+        if (!transcriptionText) {
+          console.log(`⏭️  Skipping ${recording.id} — no transcription available`);
+          skippedCount++;
+          continue;
+        }
 
-      if (labelResult.error || !labelResult.label) {
-        console.error(`❌ Label generation failed for ${recording.id}:`, labelResult.error);
+        console.log(`🏷️  Generating label for recording ${recording.id}...`);
+        const labelResult = await generateLabel(transcriptionText, { players: rosterPlayers, customBuckets });
+
+        if (labelResult.error || !labelResult.label) {
+          console.error(`❌ Label generation failed for ${recording.id}:`, labelResult.error?.message || 'no label returned');
+          failedCount++;
+          continue;
+        }
+
+        console.log(`✅ Label generated for ${recording.id}: "${labelResult.label}"`);
+
+        const aiLabel = serializeAiLabels(labelResult.label, {
+          skillCategory: labelResult.skillCategory ?? undefined,
+          position: labelResult.position ?? undefined,
+          playPattern: labelResult.playPattern ?? undefined,
+          feedbackType: labelResult.feedbackType ?? undefined,
+          ruleNote: labelResult.ruleNote ?? undefined,
+        });
+
+        const { error: updateError } = await updateRecordingData(recording.id, userId, {
+          ai_labels: aiLabel,
+        });
+
+        if (updateError) {
+          console.error(`❌ Failed to update recording ${recording.id}:`, updateError);
+          failedCount++;
+        } else {
+          processedCount++;
+        }
+      } catch (recError) {
+        console.error(`❌ Error processing recording ${recording.id}:`, recError?.message || recError);
         failedCount++;
-        continue;
-      }
-
-      console.log(`✅ Label generated for ${recording.id}: "${labelResult.label}"`);
-
-      const aiLabel = serializeAiLabels(labelResult.label, {
-        skillCategory: labelResult.skillCategory ?? undefined,
-        position: labelResult.position ?? undefined,
-        playPattern: labelResult.playPattern ?? undefined,
-        feedbackType: labelResult.feedbackType ?? undefined,
-        ruleNote: labelResult.ruleNote ?? undefined,
-      });
-
-      const { error: updateError } = await updateRecordingData(recording.id, userId, {
-        ai_labels: aiLabel,
-      });
-
-      if (updateError) {
-        console.error(`❌ Failed to update recording ${recording.id}:`, updateError);
-        failedCount++;
-      } else {
-        processedCount++;
       }
     }
 
-    console.log(`✅ Label generation complete! Processed: ${processedCount}, Failed: ${failedCount}`);
-
-    return {
-      processedCount,
-      failedCount,
-      error: null,
-    };
+    console.log(`✅ Processing complete! Processed: ${processedCount}, Failed: ${failedCount}, Skipped (no transcription): ${skippedCount}`);
+    return { processedCount, failedCount, skippedCount, error: null };
   } catch (error) {
     console.error('❌ Unexpected error generating missing labels:', error);
     return {

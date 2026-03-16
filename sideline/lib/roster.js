@@ -400,36 +400,44 @@ export function buildRosterNumberCorrections(transcription, players) {
 export function buildRosterNameCorrections(transcription, correctNames) {
   if (!transcription || !correctNames?.length) return [];
 
-  // Build a deduplicated set of individual name tokens from the roster
-  // e.g. ["Sarah Nelson", "John Rivera"] → ["Sarah", "Nelson", "John", "Rivera"]
-  const rosterTokens = [];
-  for (const fullName of correctNames) {
-    const trimmed = (fullName || '').trim();
-    if (!trimmed) continue;
-    for (const part of trimmed.split(/\s+/)) {
-      const clean = part.replace(/[^a-zA-Z'-]/g, '').trim();
-      if (clean.length >= 2) rosterTokens.push(clean);
-    }
-  }
-  if (!rosterTokens.length) return [];
+  const COMMON_WORDS = new Set([
+    'the', 'and', 'for', 'are', 'but', 'not', 'you', 'all', 'can', 'her',
+    'was', 'one', 'our', 'out', 'has', 'his', 'how', 'its', 'let', 'may',
+    'new', 'now', 'old', 'see', 'way', 'who', 'did', 'get', 'got', 'him',
+    'had', 'she', 'set', 'hit', 'run', 'use', 'say', 'put', 'try', 'ask',
+    'keep', 'left', 'right', 'side', 'back', 'good', 'great', 'need',
+    'make', 'like', 'just', 'over', 'such', 'take', 'come', 'than',
+    'them', 'been', 'have', 'from', 'they', 'with', 'this', 'that',
+    'what', 'when', 'your', 'will', 'each', 'more', 'some', 'work',
+    'kill', 'ball', 'pass', 'block', 'serve', 'swing', 'angle', 'trust',
+    'lock', 'line', 'combo', 'energy', 'patience', 'improve', 'approach',
+    'aggressive', 'explosive', 'perfect', 'communicate', 'composed',
+  ]);
 
-  const words = transcription.split(/\s+/).filter((w) => w.length >= 2);
+  const words = transcription.split(/\s+/).filter((w) => w.length >= 4);
   const seen = new Set();
   const corrections = [];
   for (const word of words) {
-    const clean = word.replace(/[^a-zA-Z'-]/g, '');
-    if (!clean || clean.length < 2 || seen.has(clean.toLowerCase())) continue;
-    for (const token of rosterTokens) {
-      if (clean.toLowerCase() === token.toLowerCase()) break; // already correct
-      const lenDiff = Math.abs(clean.length - token.length);
-      if (lenDiff > 1) continue;
-      if (clean[0].toLowerCase() !== token[0].toLowerCase()) continue; // must share first letter
-      const dist = levenshtein(clean.toLowerCase(), token.toLowerCase());
-      if (dist >= 1 && dist <= 2) {
-        seen.add(clean.toLowerCase());
-        corrections.push({ from: clean, to: token });
-        break;
+    const clean = word.replace(/[^a-zA-Z]/g, '');
+    if (!clean || clean.length < 4 || seen.has(clean.toLowerCase())) continue;
+    if (COMMON_WORDS.has(clean.toLowerCase())) continue;
+    const isCapitalized = clean[0] === clean[0].toUpperCase();
+    if (!isCapitalized) continue;
+    for (const correct of correctNames) {
+      const parts = correct.trim().split(/\s+/);
+      for (const c of parts) {
+        if (!c || c.length < 4 || clean.toLowerCase() === c.toLowerCase()) continue;
+        if (clean[0].toLowerCase() !== c[0].toLowerCase()) continue;
+        const lenDiff = Math.abs(clean.length - c.length);
+        if (lenDiff > 1) continue;
+        const dist = levenshtein(clean.toLowerCase(), c.toLowerCase());
+        if (dist === 1) {
+          seen.add(clean.toLowerCase());
+          corrections.push({ from: clean, to: c });
+          break;
+        }
       }
+      if (seen.has(clean.toLowerCase())) break;
     }
   }
   return corrections;

@@ -703,19 +703,18 @@ export default function GameRecordingsScreen() {
       if (result.error) {
         showAlert('Error', 'Failed to generate recording names. Please try again.');
       } else if (result.processedCount === 0 && result.failedCount === 0) {
-        const untranscribed = recordings.filter((r) => !r.transcription).length;
+        const skipped = result.skippedCount || 0;
         showAlert(
           'No Transcriptions',
-          untranscribed > 0
-            ? `${untranscribed} recording${untranscribed !== 1 ? 's have' : ' has'} no transcription yet. Tap "Retry Transcriptions" first, then try again.`
+          skipped > 0
+            ? `${skipped} recording${skipped !== 1 ? 's have' : ' has'} no transcription yet. Tap "Retry Transcriptions" first, then try again.`
             : 'No recordings with transcriptions found in this game.'
         );
       } else {
-        showAlert(
-          'Names Generated',
-          `Successfully generated ${result.processedCount} recording name${result.processedCount !== 1 ? 's' : ''} for this game.${result.failedCount > 0 ? ` ${result.failedCount} failed.` : ''}`
-        );
-        // Reload recordings to show new labels
+        const parts = [`Successfully generated ${result.processedCount} recording name${result.processedCount !== 1 ? 's' : ''} for this game.`];
+        if (result.failedCount > 0) parts.push(`${result.failedCount} failed.`);
+        if (result.skippedCount > 0) parts.push(`${result.skippedCount} had no transcription.`);
+        showAlert('Names Generated', parts.join(' '));
         await loadRecordings();
       }
     } catch (error) {

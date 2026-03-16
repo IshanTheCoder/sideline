@@ -54,7 +54,32 @@ function escapeRegex(s) {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
-function correctLabelPlayerNames(label, players = []) {
+function toTitleCase(str) {
+  if (!str) return str;
+  return str.replace(/\b[a-zA-Z][a-zA-Z'-]*\b/g, (word) => {
+    if (/^[A-Z]\.?$/.test(word)) return word;
+    return word.charAt(0).toUpperCase() + word.slice(1);
+  });
+}
+
+const LABEL_COMMON_WORDS = new Set([
+  'the', 'and', 'for', 'are', 'but', 'not', 'you', 'all', 'can', 'her',
+  'was', 'one', 'our', 'out', 'has', 'his', 'how', 'its', 'let', 'may',
+  'new', 'now', 'old', 'see', 'way', 'who', 'did', 'get', 'got', 'him',
+  'had', 'she', 'set', 'hit', 'run', 'use', 'say', 'put', 'try', 'ask',
+  'keep', 'left', 'right', 'side', 'back', 'good', 'great', 'need',
+  'make', 'like', 'just', 'over', 'such', 'take', 'come', 'than',
+  'them', 'been', 'have', 'from', 'they', 'with', 'this', 'that',
+  'what', 'when', 'your', 'will', 'each', 'more', 'some', 'work',
+  'kill', 'ball', 'pass', 'block', 'serve', 'swing', 'angle', 'trust',
+  'lock', 'line', 'combo', 'energy', 'patience', 'improve', 'approach',
+  'aggressive', 'explosive', 'perfect', 'communicate', 'composed',
+  'attack', 'defense', 'setter', 'libero', 'hitter', 'blocker',
+  'receive', 'position', 'rotation', 'technique', 'coverage', 'dig',
+  'spike', 'float', 'pipe', 'tighten', 'overlap', 'Noah',
+]);
+
+function correctLabelSpelling(label, players = []) {
   if (!label || !Array.isArray(players) || players.length === 0) return label;
 
   const rosterTokens = [];
@@ -71,13 +96,14 @@ function correctLabelPlayerNames(label, players = []) {
   if (!rosterTokens.length) return label;
 
   let corrected = label;
-  const words = corrected.match(/\b[A-Za-z][A-Za-z'-]+\b/g) ?? [];
+  const words = corrected.match(/\b[A-Z][a-zA-Z'-]+\b/g) ?? [];
   const seen = new Set();
 
   words.forEach((word) => {
     const cleanWord = word.replace(/[^a-zA-Z'-]/g, '').trim();
     const lowerWord = cleanWord.toLowerCase();
-    if (!cleanWord || seen.has(lowerWord)) return;
+    if (!cleanWord || cleanWord.length < 3 || seen.has(lowerWord)) return;
+    if (LABEL_COMMON_WORDS.has(lowerWord)) return;
     seen.add(lowerWord);
 
     let bestMatch = null;
@@ -86,9 +112,8 @@ function correctLabelPlayerNames(label, players = []) {
     rosterTokens.forEach((token) => {
       const lowerToken = token.toLowerCase();
       if (lowerToken === lowerWord) return;
-      if (lowerToken[0] !== lowerWord[0]) return;
       const lenDiff = Math.abs(lowerToken.length - lowerWord.length);
-      if (lenDiff > 2) return;
+      if (lenDiff > 1) return;
       const distance = levenshtein(lowerWord, lowerToken);
       if (distance >= 1 && distance <= 2 && distance < bestDistance) {
         bestDistance = distance;
@@ -97,7 +122,7 @@ function correctLabelPlayerNames(label, players = []) {
     });
 
     if (bestMatch) {
-      const re = new RegExp(`\\b${escapeRegex(cleanWord)}\\b`, 'gi');
+      const re = new RegExp(`\\b${escapeRegex(cleanWord)}\\b`, 'g');
       corrected = corrected.replace(re, bestMatch);
     }
   });
@@ -127,9 +152,6 @@ function abbreviatePlayerNames(label, players = []) {
 }
 
 function buildVolleyballSystemPrompt(isLongRecording, players = [], customBuckets = {}) {
-  // Build a roster hint that covers both name spelling and jersey-number → name resolution.
-  // If any players have numbers, show the full "#N = Name" table so the AI can map
-  // references like "number 4" or "player four" to the right person.
   let namesHint = '';
   if (players.length > 0) {
     const withNumbers = players.filter((p) => p.number);
@@ -137,18 +159,16 @@ function buildVolleyballSystemPrompt(isLongRecording, players = [], customBucket
     if (withNumbers.length > 0) {
       const rows = withNumbers.map((p) => `#${p.number} = ${p.name}`).join(', ');
       const extras = withoutNumbers.length > 0 ? ` Also: ${withoutNumbers.map((p) => p.name).join(', ')}.` : '';
-      namesHint = `\nRoster (if coach says "number X" or "player X", resolve to the name): ${rows}.${extras}`;
+      namesHint = `\nRoster for spelling reference: ${rows}.${extras}\n`;
     } else {
       const names = players.map((p) => p.name).join(', ');
-      namesHint = `\nKnown player names on this team: ${names}.`;
+      namesHint = `\nRoster for spelling reference: ${names}.\n`;
     }
-    namesHint += `\nIMPORTANT NAME RULES:
-- Only use a player name if their name is CLEARLY spoken in the transcription. Do NOT guess or assume a player based on context alone.
-- In the label, use FIRST NAME + LAST INITIAL only (e.g., "Sarah N.", "Arha J."). Never use full last names.\n`;
   }
+
   const lengthGuidance = isLongRecording
-    ? 'For LONGER recordings with multiple topics, create a GENERAL summary of the main themes (e.g., "Halftime adjustments and team strategy", "Multiple player technique corrections", "Set review and tactical changes"). Maximum 8 words.'
-    : 'For SHORT, focused recordings: ALWAYS include player names when mentioned. Be as specific as possible about the exact technique or feedback. Maximum 8 words. Prioritize: 1) Player name (if mentioned), 2) Volleyball skill/technique, 3) What needs improvement.';
+    ? 'For LONGER recordings: summarize the main themes. Maximum 10 words.'
+    : 'For SHORT recordings: summarize what the coach said. Include names if spoken. Maximum 10 words.';
 
   const rulesContext = getVolleyballRulesContext();
 
@@ -156,25 +176,29 @@ function buildVolleyballSystemPrompt(isLongRecording, players = [], customBucket
   const customPosition = (customBuckets.position && customBuckets.position.length) ? `, ${customBuckets.position.join(', ')}` : '';
   const customFeedback = (customBuckets.feedback && customBuckets.feedback.length) ? `, ${customBuckets.feedback.join(', ')}` : '';
 
-  return `You are a volleyball coach assistant. You create labels and metadata for coaching recordings using VOLLEYBALL terminology only.
+  return `You are a volleyball coach assistant. You create labels and metadata for coaching recordings.
 ${namesHint}
-Volleyball rules (use to interpret technique/rule discussion; flag possible violations or incorrect calls):
+NAME RULES:
+- If a player's first name appears in the transcription, include ONLY THAT FIRST NAME in the label. Use the roster to correct the spelling if needed.
+- Do NOT add last names, middle names, or any name parts that are not in the transcription. Example: if the transcription says "Andrew, lock in" then use "Andrew" — do NOT add a last name like "Andrew Ryan".
+- If NO name appears in the transcription, do NOT add one.
+- Use ONLY the first name (e.g., "Andrew", "Eshwar"). No last initials unless the transcription actually contains the last name.
+- Capitalize the first letter of every word in the label (Title Case).
+
+Volleyball rules context:
 ${rulesContext}
 
-Volleyball skill categories (use exactly one, or null if unclear): ${SKILL_LIST}${customSkill}
-
-Player positions (use exactly one if mentioned, else null): ${POSITION_LIST}${customPosition}
-
-Feedback types (use exactly one, or null): ${FEEDBACK_LIST}${customFeedback}
-
-Play patterns (use if mentioned, else null): "6-2", "5-1", "4-2", "rotation one" through "rotation six", "serve receive", "out of system", or null.
+Volleyball skill categories (pick one, or null): ${SKILL_LIST}${customSkill}
+Player positions (pick one if mentioned, else null): ${POSITION_LIST}${customPosition}
+Feedback types (pick one, or null): ${FEEDBACK_LIST}${customFeedback}
+Play patterns (if mentioned, else null): "6-2", "5-1", "4-2", "rotation one" through "rotation six", "serve receive", "out of system", or null.
 
 ${lengthGuidance}
 
-If the discussion clearly mentions a possible rule violation, incorrect technique call, or ref dispute, set ruleNote to a brief rule-based suggestion (one short sentence). Otherwise set ruleNote to null.
+If the transcription mentions a rule violation or ref dispute, set ruleNote to a brief suggestion. Otherwise null.
 
-Respond with ONLY a valid JSON object, no other text:
-{"label":"your 8-word max label here","skillCategory":"one of skill categories or null","position":"one of positions or null","playPattern":"formation/rotation or null","feedbackType":"one of feedback types or null","ruleNote":"brief rule suggestion or null"}
+Respond with ONLY a valid JSON object:
+{"label":"concise label from transcription words only","skillCategory":"or null","position":"or null","playPattern":"or null","feedbackType":"or null","ruleNote":"or null"}
 
 Examples of good labels: ${VOLLEYBALL_LABEL_EXAMPLES.join('; ')}`;
 }
@@ -279,13 +303,15 @@ export async function generateLabel(transcriptionText, options = {}) {
 
     const structured = parseStructuredResponse(content);
     if (structured) {
-      const correctedLabel = abbreviatePlayerNames(
-        correctLabelPlayerNames(structured.label, players),
-        players
+      const finalLabel = toTitleCase(
+        abbreviatePlayerNames(
+          correctLabelSpelling(structured.label, players),
+          players
+        )
       );
-      console.log('✅ Label generated (volleyball):', correctedLabel, structured.skillCategory ?? '', structured.position ?? '');
+      console.log('✅ Label generated (volleyball):', finalLabel, structured.skillCategory ?? '', structured.position ?? '');
       return {
-        label: correctedLabel,
+        label: finalLabel,
         skillCategory: structured.skillCategory ?? null,
         position: structured.position ?? null,
         playPattern: structured.playPattern ?? null,
@@ -297,13 +323,15 @@ export async function generateLabel(transcriptionText, options = {}) {
 
     // plan B: AI didn't return proper JSON — use the raw text as a label, it's better than nothing
     const fallbackLabel = content.replace(/^["']|["']$/g, '').trim().slice(0, 80);
-    const correctedFallbackLabel = abbreviatePlayerNames(
-      correctLabelPlayerNames(fallbackLabel, players),
-      players
+    const finalFallbackLabel = toTitleCase(
+      abbreviatePlayerNames(
+        correctLabelSpelling(fallbackLabel, players),
+        players
+      )
     );
-    console.log('✅ Label generated (plain fallback):', correctedFallbackLabel);
+    console.log('✅ Label generated (plain fallback):', finalFallbackLabel);
     return {
-      label: correctedFallbackLabel,
+      label: finalFallbackLabel,
       skillCategory: null,
       position: null,
       playPattern: null,

@@ -128,9 +128,11 @@ function buildWhisperPrompt(playerNames = []) {
     'volleyball coaching note: serve receive, spike, block, setter, libero, rotation, dig, kill, ' +
     'free ball, down ball, outside hitter, middle blocker, opposite hitter, pancake, pipe, floater';
   if (!playerNames.length) return base;
-  // Deduplicate and add roster names so Whisper biases toward them
-  const uniqueNames = [...new Set(playerNames.map((n) => n.trim()).filter(Boolean))];
-  return `${base}. Player names: ${uniqueNames.join(', ')}`;
+  const firstNames = [...new Set(
+    playerNames.map((n) => (n || '').trim().split(/\s+/)[0]).filter(Boolean)
+  )];
+  if (!firstNames.length) return base;
+  return `${base}. Player names: ${firstNames.join(', ')}`;
 }
 
 /**
@@ -150,13 +152,12 @@ export async function transcribeAudio(audioUrl, options = {}) {
 
     console.log('Starting transcription for audio:', audioUrl);
 
-    // fetch the audio file from its URL
     const audioFile = await downloadAudioFile(audioUrl);
     console.log('Audio file downloaded');
 
     const whisperPrompt = buildWhisperPrompt(options.playerNames);
 
-    // RN can't just drop a File in FormData — gotta assemble the payload by hand
+
     if (Platform.OS !== 'web' && audioFile.uri) {
       console.log('Sending to Groq Whisper API (React Native)...');
 
