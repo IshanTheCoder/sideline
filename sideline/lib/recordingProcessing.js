@@ -366,6 +366,7 @@ export async function generateLabelsForGameSession(gameSessionId, userId) {
  * @returns {Promise<{processedCount: number, failedCount: number, error: Error|null}>}
  */
 export async function generateMissingLabels(userId, gameSessionId) {
+  const errors = [];
   try {
     console.log('🏷️  Generating labels for recordings in game session:', gameSessionId);
 
@@ -386,12 +387,12 @@ export async function generateMissingLabels(userId, gameSessionId) {
 
     if (fetchError) {
       console.error('❌ Failed to fetch recordings:', fetchError);
-      return { processedCount: 0, failedCount: 0, error: fetchError };
+      return { processedCount: 0, failedCount: 0, errors: [`Fetch: ${fetchError.message}`], error: fetchError };
     }
 
     if (!recordings || recordings.length === 0) {
       console.log('ℹ️  No recordings found');
-      return { processedCount: 0, failedCount: 0, error: null };
+      return { processedCount: 0, failedCount: 0, errors: [], error: null };
     }
 
     console.log(`📋 Found ${recordings.length} recordings to process`);
@@ -415,21 +416,25 @@ export async function generateMissingLabels(userId, gameSessionId) {
     let failedCount = 0;
     let skippedCount = 0;
 
-    for (const recording of recordings) {
+    for (let i = 0; i < recordings.length; i++) {
+      const recording = recordings[i];
       try {
         const transcriptionText = recording.transcription;
 
         if (!transcriptionText) {
           console.log(`⏭️  Skipping ${recording.id} — no transcription available`);
           skippedCount++;
+          errors.push(`#${i + 1}: no transcription`);
           continue;
         }
 
-        console.log(`🏷️  Generating label for recording ${recording.id}...`);
+        console.log(`🏷️  Generating label for recording ${recording.id} (${transcriptionText.substring(0, 50)}...)...`);
         const labelResult = await generateLabel(transcriptionText, { players: rosterPlayers, customBuckets });
 
         if (labelResult.error || !labelResult.label) {
-          console.error(`❌ Label generation failed for ${recording.id}:`, labelResult.error?.message || 'no label returned');
+          const reason = labelResult.error?.message || 'no label returned';
+          console.error(`❌ Label generation failed for ${recording.id}:`, reason);
+          errors.push(`#${i + 1}: ${reason}`);
           failedCount++;
           continue;
         }
@@ -450,23 +455,34 @@ export async function generateMissingLabels(userId, gameSessionId) {
 
         if (updateError) {
           console.error(`❌ Failed to update recording ${recording.id}:`, updateError);
+          errors.push(`#${i + 1}: DB update failed - ${updateError.message || updateError}`);
           failedCount++;
         } else {
           processedCount++;
         }
+
+        if (i < recordings.length - 1) {
+          await new Promise((r) => setTimeout(r, 1200));
+        }
       } catch (recError) {
-        console.error(`❌ Error processing recording ${recording.id}:`, recError?.message || recError);
+        const msg = recError?.message || String(recError);
+        console.error(`❌ Error processing recording ${recording.id}:`, msg);
+        errors.push(`#${i + 1}: ${msg}`);
         failedCount++;
       }
     }
 
-    console.log(`✅ Processing complete! Processed: ${processedCount}, Failed: ${failedCount}, Skipped (no transcription): ${skippedCount}`);
-    return { processedCount, failedCount, skippedCount, error: null };
+    console.log(`✅ Processing complete! Processed: ${processedCount}, Failed: ${failedCount}, Skipped: ${skippedCount}`);
+    if (errors.length > 0) console.log('Error details:', errors.join(' | '));
+    return { processedCount, failedCount, skippedCount, errors, error: null };
   } catch (error) {
-    console.error('❌ Unexpected error generating missing labels:', error);
+    const msg = error instanceof Error ? error.message : String(error);
+    console.error('❌ Unexpected error generating missing labels:', msg);
+    errors.push(`Fatal: ${msg}`);
     return {
       processedCount: 0,
       failedCount: 0,
+      errors,
       error: error instanceof Error ? error : new Error(String(error)),
     };
   }

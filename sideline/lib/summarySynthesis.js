@@ -4,7 +4,7 @@
  * "Match Flow" narrative. Basically turns coach brain-dump into readable prose.
  */
 
-const groqApiKey = process.env.EXPO_PUBLIC_GROQ_API_KEY;
+import { groqChat, getGroqApiKey } from './groqClient';
 
 const NOTICED_MOST_SYSTEM = `You are a volleyball coach assistant. Given a list of in-game feedback labels and optional transcriptions from a single match, synthesize 3–6 OVERARCHING themes the coach explicitly talked about.
 
@@ -36,7 +36,7 @@ CRITICAL RULES — READ CAREFULLY:
  * @returns {Promise<{ themes: string[], error: Error|null }>}
  */
 export async function synthesizeNoticedMost(items) {
-  if (!groqApiKey) {
+  if (!getGroqApiKey()) {
     return { themes: [], error: new Error('Missing Groq API key') };
   }
   if (!items?.length) {
@@ -51,29 +51,15 @@ export async function synthesizeNoticedMost(items) {
   const userPrompt = `Synthesize overarching coaching themes from these in-game notes. Include ONLY themes the coach EXPLICITLY SAID — nothing inferred or implied. Reply with ONLY a JSON array of 3–6 theme strings.\n\n${input}`;
 
   try {
-    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${groqApiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'llama-3.3-70b-versatile',
-        messages: [
-          { role: 'system', content: NOTICED_MOST_SYSTEM },
-          { role: 'user', content: userPrompt },
-        ],
-        max_tokens: 320,
-        temperature: 0.2,
-      }),
+    const data = await groqChat({
+      messages: [
+        { role: 'system', content: NOTICED_MOST_SYSTEM },
+        { role: 'user', content: userPrompt },
+      ],
+      max_tokens: 320,
+      temperature: 0.2,
     });
 
-    if (!response.ok) {
-      const errText = await response.text();
-      throw new Error(`Groq API error: ${response.status} ${errText}`);
-    }
-
-    const data = await response.json();
     const content = data.choices?.[0]?.message?.content?.trim();
     if (!content) return { themes: [], error: new Error('Empty Groq response') };
 
@@ -96,7 +82,7 @@ export async function synthesizeNoticedMost(items) {
  * @returns {Promise<{ bullets: string[], error: Error|null }>}
  */
 export async function synthesizeMatchFlow(labels) {
-  if (!groqApiKey) {
+  if (!getGroqApiKey()) {
     return { bullets: [], error: new Error('Missing Groq API key') };
   }
   if (!labels?.length) {
@@ -108,29 +94,15 @@ export async function synthesizeMatchFlow(labels) {
   const userPrompt = `Summarize what the coach said based on these labels, in chronological order. Use ONLY the content in these labels — do NOT add, infer, or imply anything the coach did not explicitly say. Do not end any bullet with a period. Reply with ONLY a JSON array of bullet strings.\n\n${input}`;
 
   try {
-    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${groqApiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'llama-3.3-70b-versatile',
-        messages: [
-          { role: 'system', content: MATCH_FLOW_SYSTEM },
-          { role: 'user', content: userPrompt },
-        ],
-        max_tokens: 480,
-        temperature: 0.2,
-      }),
+    const data = await groqChat({
+      messages: [
+        { role: 'system', content: MATCH_FLOW_SYSTEM },
+        { role: 'user', content: userPrompt },
+      ],
+      max_tokens: 480,
+      temperature: 0.2,
     });
 
-    if (!response.ok) {
-      const errText = await response.text();
-      throw new Error(`Groq API error: ${response.status} ${errText}`);
-    }
-
-    const data = await response.json();
     const content = data.choices?.[0]?.message?.content?.trim();
     if (!content) return { bullets: [], error: new Error('Empty Groq response') };
 

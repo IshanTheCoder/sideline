@@ -701,21 +701,25 @@ export default function GameRecordingsScreen() {
       const result = await generateMissingLabels(user.id, gameId);
       
       if (result.error) {
-        showAlert('Error', 'Failed to generate recording names. Please try again.');
+        const detail = result.errors?.length ? `\n\n${result.errors.join('\n')}` : '';
+        showAlert('Error', `Failed to generate recording names.${detail}`);
       } else if (result.processedCount === 0 && result.failedCount === 0) {
         const skipped = result.skippedCount || 0;
+        const detail = result.errors?.length ? `\n\n${result.errors.join('\n')}` : '';
         showAlert(
           'No Transcriptions',
           skipped > 0
-            ? `${skipped} recording${skipped !== 1 ? 's have' : ' has'} no transcription yet. Tap "Retry Transcriptions" first, then try again.`
-            : 'No recordings with transcriptions found in this game.'
+            ? `${skipped} recording${skipped !== 1 ? 's have' : ' has'} no transcription yet. Tap "Retry Transcriptions" first, then try again.${detail}`
+            : `No recordings with transcriptions found in this game.${detail}`
         );
       } else {
-        const parts = [`Successfully generated ${result.processedCount} recording name${result.processedCount !== 1 ? 's' : ''} for this game.`];
-        if (result.failedCount > 0) parts.push(`${result.failedCount} failed.`);
-        if (result.skippedCount > 0) parts.push(`${result.skippedCount} had no transcription.`);
-        showAlert('Names Generated', parts.join(' '));
         await loadRecordings();
+        const parts = [`Generated ${result.processedCount} recording name${result.processedCount !== 1 ? 's' : ''}.`];
+        if (result.failedCount > 0) {
+          parts.push(`${result.failedCount} failed.`);
+          if (result.errors?.length) parts.push(`\n${result.errors.join('\n')}`);
+        }
+        showAlert('Names Generated', parts.join(' '));
       }
     } catch (error) {
       console.error('Error generating labels:', error);

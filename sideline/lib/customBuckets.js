@@ -60,7 +60,7 @@ export async function getCustomBucketsForPrompt(userId) {
   return { skill, position, feedback };
 }
 
-const groqApiKey = process.env.EXPO_PUBLIC_GROQ_API_KEY;
+import { groqChat, getGroqApiKey } from './groqClient';
 
 /**
  * Gets the AI to write a one-liner explaining what this bucket is about — like a tooltip for future you.
@@ -69,27 +69,17 @@ const groqApiKey = process.env.EXPO_PUBLIC_GROQ_API_KEY;
  * @returns {Promise<string>} a short description, or empty string if the AI has nothing to say
  */
 export async function describeBucketWithAI(bucketName, recordingContext = '') {
-  if (!groqApiKey || !bucketName?.trim()) return '';
+  if (!getGroqApiKey() || !bucketName?.trim()) return '';
   const prompt = recordingContext
     ? `You are a coaching assistant. The coach added a custom category "${bucketName}" in the context of this recording note: "${recordingContext.slice(0, 300)}". In one short sentence (under 15 words), describe what this category means or when to use it for tagging future recordings. No quotes or preamble.`
     : `You are a coaching assistant. The coach added a custom category "${bucketName}". In one short sentence (under 15 words), describe what this category means for volleyball coaching. No quotes or preamble.`;
 
   try {
-    const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${groqApiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'llama-3.3-70b-versatile',
-        messages: [{ role: 'user', content: prompt }],
-        max_tokens: 60,
-        temperature: 0.3,
-      }),
+    const data = await groqChat({
+      messages: [{ role: 'user', content: prompt }],
+      max_tokens: 60,
+      temperature: 0.3,
     });
-    if (!res.ok) return '';
-    const data = await res.json();
     const text = data.choices?.[0]?.message?.content?.trim() ?? '';
     return text.slice(0, 120);
   } catch {

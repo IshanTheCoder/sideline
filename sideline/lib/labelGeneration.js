@@ -4,16 +4,7 @@ import {
   getFeedbackTypeList,
 } from './volleyballVocabulary';
 import { getVolleyballRulesContext } from './volleyballRules';
-
-// grab the Groq API key — without this, label generation is basically dead on arrival
-const groqApiKey = process.env.EXPO_PUBLIC_GROQ_API_KEY;
-
-if (!groqApiKey) {
-  console.warn(
-    'Missing Groq API key. Label generation will not work.\n' +
-    'Please add EXPO_PUBLIC_GROQ_API_KEY to your .env file.'
-  );
-}
+import { groqChat, getGroqApiKey } from './groqClient';
 
 const SKILL_LIST = getSkillCategoryList().join(', ');
 const POSITION_LIST = getPositionList().join(', ');
@@ -112,10 +103,12 @@ function correctLabelSpelling(label, players = []) {
     rosterTokens.forEach((token) => {
       const lowerToken = token.toLowerCase();
       if (lowerToken === lowerWord) return;
+      if (lowerWord[0] !== lowerToken[0]) return;
       const lenDiff = Math.abs(lowerToken.length - lowerWord.length);
       if (lenDiff > 1) return;
+      const maxDist = lowerWord.length <= 4 ? 1 : 2;
       const distance = levenshtein(lowerWord, lowerToken);
-      if (distance >= 1 && distance <= 2 && distance < bestDistance) {
+      if (distance >= 1 && distance <= maxDist && distance < bestDistance) {
         bestDistance = distance;
         bestMatch = token;
       }
@@ -178,12 +171,13 @@ function buildVolleyballSystemPrompt(isLongRecording, players = [], customBucket
 
   return `You are a volleyball coach assistant. You create labels and metadata for coaching recordings.
 ${namesHint}
-NAME RULES:
-- If a player's first name appears in the transcription, include ONLY THAT FIRST NAME in the label. Use the roster to correct the spelling if needed.
-- Do NOT add last names, middle names, or any name parts that are not in the transcription. Example: if the transcription says "Andrew, lock in" then use "Andrew" — do NOT add a last name like "Andrew Ryan".
+NAME RULES (VERY IMPORTANT — follow strictly):
+- ALWAYS start the label with every player name that appears in the transcription. This is the #1 priority.
+- Example: transcription "Midyan, Ishan, talk to each other on the overlap" → label MUST start with "Midyan Ishan" then the topic.
+- Example: transcription "Eshwar, that was a perfect swing" → label MUST start with "Eshwar" then the topic.
+- Use ONLY first names. Do NOT add last names unless the transcription contains them.
 - If NO name appears in the transcription, do NOT add one.
-- Use ONLY the first name (e.g., "Andrew", "Eshwar"). No last initials unless the transcription actually contains the last name.
-- Capitalize the first letter of every word in the label (Title Case).
+- Capitalize the first letter of every word (Title Case).
 
 Volleyball rules context:
 ${rulesContext}
@@ -237,7 +231,7 @@ function parseStructuredResponse(content) {
  */
 export async function generateLabel(transcriptionText, options = {}) {
   try {
-    if (!groqApiKey) {
+    if (!getGroqApiKey()) {
       return {
         label: null,
         error: new Error('Groq API key not configured'),
@@ -251,7 +245,6 @@ export async function generateLabel(transcriptionText, options = {}) {
       };
     }
 
-    // prefer the richer players array (name+number); fall back to plain names for compat
     const players = options.players && Array.isArray(options.players)
       ? options.players
       : (options.playerNames && Array.isArray(options.playerNames)
@@ -266,32 +259,18 @@ export async function generateLabel(transcriptionText, options = {}) {
 
     const systemPrompt = buildVolleyballSystemPrompt(isLongRecording, players, customBuckets);
     const userPrompt = isLongRecording
-      ? `Create a general summary label and metadata for this longer coaching recording. Reply with JSON only:\n\n${transcriptionText}`
-      : `Create a specific coaching label and metadata for this recording. Include any player names. Reply with JSON only:\n\n${transcriptionText}`;
+      ? `Create a label and metadata for this coaching recording. Start the label with any player names mentioned. Reply with JSON only:\n\n${transcriptionText}`
+      : `Create a label and metadata for this recording. IMPORTANT: If any player names appear in the transcription, the label MUST start with those names. Reply with JSON only:\n\n${transcriptionText}`;
 
-    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${groqApiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'llama-3.3-70b-versatile',
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userPrompt },
-        ],
-        max_tokens: 200,
-        temperature: 0.3,
-      }),
+    const result = await groqChat({
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt },
+      ],
+      max_tokens: 200,
+      temperature: 0.3,
     });
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Groq API error: ${response.status} ${errorText}`);
-    }
-
-    const result = await response.json();
     const content = result.choices?.[0]?.message?.content?.trim();
 
     if (!content) {
@@ -341,17 +320,9 @@ export async function generateLabel(transcriptionText, options = {}) {
     };
   } catch (error) {
     console.error('Error generating label:', error);
-    let errorMessage = 'Failed to generate label';
-    if (error instanceof Error) {
-      if (error.message.includes('API key')) errorMessage = 'Invalid Groq API key';
-      else if (error.message.includes('quota')) errorMessage = 'Groq API quota exceeded';
-      else if (error.message.includes('network')) errorMessage = 'Network error - please check your connection';
-      else if (error.message.includes('model')) errorMessage = 'Model not available - check your Groq account';
-      else errorMessage = error.message;
-    }
     return {
       label: null,
-      error: new Error(errorMessage),
+      error: error instanceof Error ? error : new Error(String(error)),
     };
   }
 }
