@@ -5,9 +5,11 @@ import { useRouter } from 'expo-router';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import TutorialOverlay from '@/components/TutorialOverlay';
 import { useThemeColor } from '@/hooks/use-theme-color';
 import { useAuth } from '@/contexts/AuthContext';
 import { useActiveSession } from '@/contexts/ActiveSessionContext';
+import { useTutorial } from '@/contexts/TutorialContext';
 import { createGameSession } from '@/lib/gameSessions';
 
 export default function RecordDetailsScreen() {
@@ -105,6 +107,7 @@ export default function RecordDetailsScreen() {
 
   return (
     <ThemedView style={styles.container}>
+      <TutorialOverlay screenName="record-details" />
       <View style={styles.header}>
         <TouchableOpacity
           style={styles.navButton}

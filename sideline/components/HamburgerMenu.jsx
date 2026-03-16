@@ -12,8 +12,10 @@ import {
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import TutorialOverlay from '@/components/TutorialOverlay';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useTutorial } from '@/contexts/TutorialContext';
 import { useRouter } from 'expo-router';
 
 const { width } = Dimensions.get('window');
@@ -22,8 +24,18 @@ const MENU_WIDTH = Math.min(280, width * 0.75);
 export default function HamburgerMenu({ visible, onClose, onSignOut }) {
   const colorScheme = useColorScheme();
   const router = useRouter();
+  const { currentStep, nextStep } = useTutorial();
   const slideAnim = React.useRef(new Animated.Value(-MENU_WIDTH)).current;
   const statusBarHeight = StatusBar.currentHeight || 0;
+
+  const handleTutorialAction = React.useCallback((step) => {
+    if (step.action === 'navigate' && step.navigateTo) {
+      onClose();
+      setTimeout(() => {
+        router.push(step.navigateTo);
+      }, 300);
+    }
+  }, [router, onClose]);
 
   React.useEffect(() => {
     if (visible) {
@@ -176,6 +188,9 @@ export default function HamburgerMenu({ visible, onClose, onSignOut }) {
             </View>
           </TouchableOpacity>
         </Animated.View>
+        {visible && (
+          <TutorialOverlay screenName="hamburger_menu" onAction={handleTutorialAction} />
+        )}
       </TouchableOpacity>
     </Modal>
   );

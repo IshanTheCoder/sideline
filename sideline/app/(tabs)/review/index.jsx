@@ -13,9 +13,11 @@ import { useFocusEffect } from '@react-navigation/native';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import TutorialOverlay from '@/components/TutorialOverlay';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useAuth } from '@/contexts/AuthContext';
+import { useTutorial } from '@/contexts/TutorialContext';
 import {
   deleteGameForUser,
   fetchRecordingsForUser,
@@ -246,6 +248,7 @@ export default function ReviewScreen() {
 
   return (
     <ThemedView style={styles.container}>
+      <TutorialOverlay screenName="review" />
       <View style={styles.header}>
         <TouchableOpacity
           style={styles.backButton}

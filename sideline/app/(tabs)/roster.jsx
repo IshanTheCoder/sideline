@@ -15,9 +15,11 @@ import { useRouter } from 'expo-router';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import TutorialOverlay from '@/components/TutorialOverlay';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useAuth } from '@/contexts/AuthContext';
+import { useTutorial } from '@/contexts/TutorialContext';
 import {
   fetchRosterForUser,
   addPlayer,
@@ -34,6 +36,13 @@ export default function RosterScreen() {
   const router = useRouter();
   const colorScheme = useColorScheme();
   const { user } = useAuth();
+  const tutorial = useTutorial();
+
+  const handleTutorialAction = useCallback((step) => {
+    if (step.action === 'navigate' && step.navigateTo) {
+      router.push(step.navigateTo);
+    }
+  }, [router]);
   const [players, setPlayers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -211,6 +220,7 @@ export default function RosterScreen() {
 
   return (
     <ThemedView style={styles.container}>
+      <TutorialOverlay screenName="roster" onAction={handleTutorialAction} />
       <View style={styles.header}>
         <TouchableOpacity style={styles.backButton} onPress={() => router.back()} activeOpacity={0.7}>
           <IconSymbol name="chevron.left" size={28} color={Colors[colorScheme ?? 'light'].text} />

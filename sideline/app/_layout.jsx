@@ -8,6 +8,7 @@ import 'react-native-reanimated';
 import { ThemeProvider, useTheme } from '@/contexts/ThemeContext';
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
 import { ActiveSessionProvider } from '@/contexts/ActiveSessionContext';
+import { TutorialProvider } from '@/contexts/TutorialContext';
 
 export const unstable_settings = {
   initialRouteName: '(tabs)',
@@ -63,7 +64,9 @@ export default function RootLayout() {
     <ThemeProvider>
       <AuthProvider>
         <ActiveSessionProvider>
-          <ThemedNavigationProvider />
+          <TutorialProvider>
+            <ThemedNavigationProvider />
+          </TutorialProvider>
         </ActiveSessionProvider>
       </AuthProvider>
     </ThemeProvider>

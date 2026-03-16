@@ -6,6 +6,8 @@ import { ThemedView } from '@/components/themed-view';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useAuth } from '@/contexts/AuthContext';
 import HamburgerMenu from '@/components/HamburgerMenu';
+import TutorialOverlay from '@/components/TutorialOverlay';
+import { useTutorial } from '@/contexts/TutorialContext';
 import { useFocusEffect } from '@react-navigation/native';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -17,6 +19,19 @@ export default function HomeScreen() {
   const colorScheme = useColorScheme();
   const router = useRouter();
   const [menuVisible, setMenuVisible] = useState(false);
+  const { isTutorialActive, currentStep, checkTutorialStatus, startTutorial } = useTutorial();
+
+  // Auto-start tutorial on first launch
+  useEffect(() => {
+    const initTutorial = async () => {
+      const completed = await checkTutorialStatus();
+      if (!completed && user) {
+        // Small delay to let the home screen render first
+        setTimeout(() => startTutorial(), 800);
+      }
+    };
+    initTutorial();
+  }, [user]);
   
   // State for games
   const [recordings, setRecordings] = useState([]);
@@ -175,6 +190,14 @@ export default function HomeScreen() {
     return greetings[Math.floor(Math.random() * greetings.length)];
   };
 
+  const handleTutorialAction = useCallback((step) => {
+    if (step.action === 'navigate' && step.navigateTo) {
+      router.push(step.navigateTo);
+    } else if (step.action === 'open_menu') {
+      setMenuVisible(true);
+    }
+  }, [router]);
+
   return (
     <ThemedView style={styles.container}>
       <HamburgerMenu
@@ -182,6 +205,7 @@ export default function HomeScreen() {
         onClose={() => setMenuVisible(false)}
         onSignOut={handleSignOut}
       />
+      <TutorialOverlay screenName="home" onAction={handleTutorialAction} />
       
       {/* Header */}
       <View style={styles.header}>

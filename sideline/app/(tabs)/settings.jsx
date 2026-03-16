@@ -2,22 +2,31 @@ import ChangeEmailModal from '@/components/ChangeEmailModal';
 import ChangePasswordModal from '@/components/ChangePasswordModal';
 import ProfileEditModal from '@/components/ProfileEditModal';
 import { SportSelectionModal } from '@/components/SportSelectionModal';
+import TutorialOverlay from '@/components/TutorialOverlay';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors } from '@/constants/theme';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
+import { useTutorial } from '@/contexts/TutorialContext';
 import { supabase } from '@/lib/supabase';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Alert, Platform, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 
 export default function SettingsScreen() {
   const { user, profile, signOut, refreshProfile } = useAuth();
   const { colorScheme } = useTheme();
   const router = useRouter();
+  const { startTutorial } = useTutorial();
+
+  const handleTutorialAction = useCallback((step) => {
+    if (step.action === 'navigate' && step.navigateTo) {
+      router.push(step.navigateTo);
+    }
+  }, [router]);
   const [profileImageUri, setProfileImageUri] = useState(
     profile?.profile_picture_url || null
   );
@@ -189,6 +198,7 @@ export default function SettingsScreen() {
 
   return (
     <ThemedView style={styles.container}>
+      <TutorialOverlay screenName="settings" onAction={handleTutorialAction} />
       {/* Header */}
       <View style={[styles.header, { paddingTop: Platform.OS === 'ios' ? 60 : 40 }]}>
         <TouchableOpacity 
@@ -382,8 +392,38 @@ export default function SettingsScreen() {
         {/* Account Section */}
         <View style={styles.section}>
           <ThemedText style={styles.sectionTitle}>Account</ThemedText>
-          
-          <TouchableOpacity 
+
+          <TouchableOpacity
+            style={[styles.settingItem, {
+              backgroundColor: Colors[colorScheme].cardBackground,
+            }]}
+            onPress={() => {
+              startTutorial();
+              router.push('/(tabs)');
+            }}
+            activeOpacity={0.7}
+          >
+            <View style={styles.settingLeft}>
+              <IconSymbol
+                name="questionmark.circle"
+                size={24}
+                color={Colors[colorScheme ?? 'light'].tint}
+              />
+              <View style={styles.settingTextContainer}>
+                <ThemedText style={styles.settingTitle}>Replay Tutorial</ThemedText>
+                <ThemedText style={styles.settingSubtitle}>
+                  Walk through the app guide again
+                </ThemedText>
+              </View>
+            </View>
+            <IconSymbol
+              name="chevron.right"
+              size={20}
+              color={Colors[colorScheme].icon}
+            />
+          </TouchableOpacity>
+
+          <TouchableOpacity
             style={[styles.settingItem, styles.signOutButton]}
             onPress={handleSignOut}
             activeOpacity={0.7}
