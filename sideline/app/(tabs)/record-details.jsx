@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { StyleSheet, View, TouchableOpacity, TextInput, Modal, Platform, ActivityIndicator } from 'react-native';
+import { StyleSheet, View, TouchableOpacity, TextInput, Modal, Platform, ActivityIndicator, ScrollView } from 'react-native';
 import { showAlert } from '@/lib/alert';
 
 const DateTimePicker = Platform.OS !== 'web'
@@ -128,113 +128,119 @@ export default function RecordDetailsScreen() {
 
   return (
     <ThemedView style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.navButton}
-          onPress={handleCancel}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-        >
-          <IconSymbol name="chevron.left" size={32} color={iconColor} />
-        </TouchableOpacity>
-        <ThemedText style={styles.headerTitle}>Game Details</ThemedText>
-        <View style={styles.navButton} />
-      </View>
-
-      <View style={styles.section}>
-        <ThemedText style={styles.sectionTitle}>Opponent</ThemedText>
-        <TextInput
-          value={opponent}
-          onChangeText={setOpponent}
-          placeholder="e.g., Lincoln High School"
-          autoCapitalize="words"
-          style={[
-            styles.textInput,
-            { color: textColor, backgroundColor: inputBackground, borderColor },
-          ]}
-          placeholderTextColor={placeholderColor}
-        />
-      </View>
-
-      <View style={styles.section}>
-        <ThemedText style={styles.sectionTitle}>Game date</ThemedText>
-        <TouchableOpacity
-          style={[styles.dateButton, { borderColor, backgroundColor: inputBackground }]}
-          onPress={openDatePicker}
-        >
-          <ThemedText style={styles.dateButtonText}>{formatDate(gameDate)}</ThemedText>
-        </TouchableOpacity>
-        {Platform.OS === 'web' && (
-          <input
-            ref={dateInputRef}
-            type="date"
-            style={{ display: 'none' }}
-            value={gameDate.toISOString().split('T')[0]}
-            onChange={(e) => {
-              if (e.target.value) setGameDate(new Date(e.target.value + 'T00:00:00'));
-            }}
-          />
-        )}
-        {showDatePicker && Platform.OS === 'android' && (
-          <DateTimePicker
-            value={gameDate}
-            mode="date"
-            display="default"
-            onChange={(_, selectedDate) => {
-              setShowDatePicker(false);
-              if (selectedDate) {
-                setGameDate(selectedDate);
-              }
-            }}
-          />
-        )}
-      </View>
-
-      <View style={styles.section}>
-        <ThemedText style={styles.sectionTitle}>Match type</ThemedText>
-        <ThemedText style={[styles.sectionSubtitle, { color: textSecondary }]}>
-          Choose one option to label the session.
-        </ThemedText>
-        <View style={styles.matchTypeContainer}>
-          {matchTypes.map((type) => {
-            const isSelected = matchType === type;
-            return (
-              <TouchableOpacity
-                key={type}
-                style={[
-                  styles.matchTypeButton,
-                  { borderColor },
-                  isSelected && { backgroundColor: tintColor, borderColor: tintColor },
-                ]}
-                onPress={() => setMatchType(type)}
-              >
-                <ThemedText style={[styles.matchTypeText, isSelected && styles.matchTypeTextActive]}>
-                  {type}
-                </ThemedText>
-              </TouchableOpacity>
-            );
-          })}
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={styles.header}>
+          <TouchableOpacity
+            style={styles.navButton}
+            onPress={handleCancel}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          >
+            <IconSymbol name="chevron.left" size={32} color={iconColor} />
+          </TouchableOpacity>
+          <ThemedText style={styles.headerTitle}>Game Details</ThemedText>
+          <View style={styles.navButton} />
         </View>
-      </View>
 
-      {formError && (
-        <View style={[styles.errorContainer, { borderColor: errorColor }]}>
-          <ThemedText style={[styles.errorText, { color: errorColor }]}>{formError}</ThemedText>
+        <View style={styles.section}>
+          <ThemedText style={styles.sectionTitle}>Opponent</ThemedText>
+          <TextInput
+            value={opponent}
+            onChangeText={setOpponent}
+            placeholder="e.g., Lincoln High School"
+            autoCapitalize="words"
+            style={[
+              styles.textInput,
+              { color: textColor, backgroundColor: inputBackground, borderColor },
+            ]}
+            placeholderTextColor={placeholderColor}
+          />
         </View>
-      )}
 
-      <View style={styles.footer}>
-        <TouchableOpacity
-          style={[styles.startButton, { backgroundColor: tintColor }]}
-          onPress={handleStartRecording}
-          disabled={isSaving}
-        >
-          {isSaving ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <ThemedText style={styles.startButtonText}>Start Recording</ThemedText>
+        <View style={styles.section}>
+          <ThemedText style={styles.sectionTitle}>Game date</ThemedText>
+          <TouchableOpacity
+            style={[styles.dateButton, { borderColor, backgroundColor: inputBackground }]}
+            onPress={openDatePicker}
+          >
+            <ThemedText style={styles.dateButtonText}>{formatDate(gameDate)}</ThemedText>
+          </TouchableOpacity>
+          {Platform.OS === 'web' && (
+            <input
+              ref={dateInputRef}
+              type="date"
+              style={{ display: 'none' }}
+              value={gameDate.toISOString().split('T')[0]}
+              onChange={(e) => {
+                if (e.target.value) setGameDate(new Date(e.target.value + 'T00:00:00'));
+              }}
+            />
           )}
-        </TouchableOpacity>
-      </View>
+          {showDatePicker && Platform.OS === 'android' && (
+            <DateTimePicker
+              value={gameDate}
+              mode="date"
+              display="default"
+              onChange={(_, selectedDate) => {
+                setShowDatePicker(false);
+                if (selectedDate) {
+                  setGameDate(selectedDate);
+                }
+              }}
+            />
+          )}
+        </View>
+
+        <View style={styles.section}>
+          <ThemedText style={styles.sectionTitle}>Match type</ThemedText>
+          <ThemedText style={[styles.sectionSubtitle, { color: textSecondary }]}>
+            Choose one option to label the session.
+          </ThemedText>
+          <View style={styles.matchTypeContainer}>
+            {matchTypes.map((type) => {
+              const isSelected = matchType === type;
+              return (
+                <TouchableOpacity
+                  key={type}
+                  style={[
+                    styles.matchTypeButton,
+                    { borderColor },
+                    isSelected && { backgroundColor: tintColor, borderColor: tintColor },
+                  ]}
+                  onPress={() => setMatchType(type)}
+                >
+                  <ThemedText style={[styles.matchTypeText, isSelected && styles.matchTypeTextActive]}>
+                    {type}
+                  </ThemedText>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </View>
+
+        {formError && (
+          <View style={[styles.errorContainer, { borderColor: errorColor }]}>
+            <ThemedText style={[styles.errorText, { color: errorColor }]}>{formError}</ThemedText>
+          </View>
+        )}
+
+        <View style={styles.footer}>
+          <TouchableOpacity
+            style={[styles.startButton, { backgroundColor: tintColor }]}
+            onPress={handleStartRecording}
+            disabled={isSaving}
+          >
+            {isSaving ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <ThemedText style={styles.startButtonText}>Start Recording</ThemedText>
+            )}
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
 
       <Modal visible={showDatePicker && Platform.OS === 'ios' && Platform.OS !== 'web'} transparent animationType="fade">
         <View style={styles.dateModalBackdrop}>
@@ -274,7 +280,11 @@ export default function RecordDetailsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  scrollContent: {
+    flexGrow: 1,
     padding: 20,
+    paddingBottom: 60,
   },
   header: {
     flexDirection: 'row',
@@ -354,7 +364,6 @@ const styles = StyleSheet.create({
   },
   footer: {
     marginTop: 'auto',
-    paddingBottom: 20,
   },
   startButton: {
     paddingVertical: 14,

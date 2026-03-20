@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, StyleSheet, TouchableOpacity, Platform, Image, Text } from 'react-native';
+import { View, StyleSheet, TouchableOpacity, Platform, Image, Text, ScrollView } from 'react-native';
 import { useRouter } from 'expo-router';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -11,51 +11,57 @@ export default function WelcomeScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
 
+  const logoSource = colorScheme === 'dark'
+    ? require('@/assets/images/whistle-logo.png')
+    : require('@/assets/images/app-logo.png');
+
   return (
     <ThemedView style={styles.container}>
-      <View style={styles.content}>
-        {/* Logo Section */}
-        <View style={styles.logoContainer}>
-          <Image
-            source={require('@/assets/images/whistle-logo.png')}
-            style={styles.whistleLogo}
-            resizeMode="contain"
-          />
-          <Text style={styles.logoText}>SIDELINE</Text>
-        </View>
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={styles.content}>
+          <View style={styles.logoContainer}>
+            <Image
+              source={logoSource}
+              style={styles.whistleLogo}
+              resizeMode="contain"
+            />
+            <Text style={styles.logoText}>SIDELINE</Text>
+          </View>
 
-        {/* Welcome Text */}
-        <View style={styles.textContainer}>
-          <ThemedText type="title" style={styles.title}>
-            Welcome to Sideline
-          </ThemedText>
-          <ThemedText style={styles.description}>
-            Your coaching assistant for capturing and organizing game observations
-          </ThemedText>
-        </View>
-
-        {/* Action Buttons */}
-        <View style={styles.buttonContainer}>
-          <TouchableOpacity
-            style={[styles.primaryButton, { backgroundColor: '#3B6FA8' }]}
-            onPress={() => router.push('/(auth)/signup')}
-            activeOpacity={0.8}
-          >
-            <ThemedText style={styles.primaryButtonText}>Get Started</ThemedText>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.secondaryButton}
-            onPress={() => router.push('/(auth)/login')}
-            activeOpacity={0.8}
-          >
-            <ThemedText style={styles.secondaryButtonText}>
-              Already have an account?{' '}
-              <ThemedText style={styles.loginLink}>Login</ThemedText>
+          <View style={styles.textContainer}>
+            <ThemedText type="title" style={styles.title}>
+              Welcome to Sideline
             </ThemedText>
-          </TouchableOpacity>
+            <ThemedText style={styles.description}>
+              Your coaching assistant for capturing and organizing game observations
+            </ThemedText>
+          </View>
+
+          <View style={styles.buttonContainer}>
+            <TouchableOpacity
+              style={[styles.primaryButton, { backgroundColor: '#3B6FA8' }]}
+              onPress={() => router.push('/(auth)/signup')}
+              activeOpacity={0.8}
+            >
+              <ThemedText style={styles.primaryButtonText}>Get Started</ThemedText>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.secondaryButton}
+              onPress={() => router.push('/(auth)/login')}
+              activeOpacity={0.8}
+            >
+              <ThemedText style={styles.secondaryButtonText}>
+                Already have an account?{' '}
+                <ThemedText style={styles.loginLink}>Login</ThemedText>
+              </ThemedText>
+            </TouchableOpacity>
+          </View>
         </View>
-      </View>
+      </ScrollView>
     </ThemedView>
   );
 }
@@ -63,10 +69,13 @@ export default function WelcomeScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  scrollContent: {
+    flexGrow: 1,
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 12,
-    overflow: 'visible',
+    paddingBottom: 60,
   },
   content: {
     width: '100%',
@@ -88,7 +97,7 @@ const styles = StyleSheet.create({
   },
   logoText: {
     marginTop: 0,
-    transform: [{ translateY: 28 }],
+    transform: [{ translateY: 48 }],
     fontSize: 68,
     fontWeight: '900',
     color: '#5A8A6D',

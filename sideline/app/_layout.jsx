@@ -130,14 +130,14 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    minHeight: '100vh',
+    minHeight: '100dvh',
     width: '100%',
   },
   webInner: {
     width: '100%',
     maxWidth: WEB_MAX_WIDTH,
     flex: 1,
-    minHeight: '100vh',
+    minHeight: '100dvh',
     ...(Platform.OS === 'web' && {
       boxShadow: '0 0 0 1px rgba(255,255,255,0.06)',
     }),
