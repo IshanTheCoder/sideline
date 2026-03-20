@@ -363,7 +363,7 @@ const styles = StyleSheet.create({
     fontSize: 13,
   },
   footer: {
-    marginTop: 'auto',
+    marginTop: 32,
   },
   startButton: {
     paddingVertical: 14,
