@@ -94,6 +94,7 @@ const styles = StyleSheet.create({
     width: 360,
     height: 360,
     marginBottom: -70,
+    marginTop: 60,
   },
   logoText: {
     marginTop: 0,
@@ -109,7 +110,7 @@ const styles = StyleSheet.create({
     textAlignVertical: 'center',
   },
   textContainer: {
-    marginTop: -10,
+    marginTop: 20,
     marginBottom: 30,
     alignItems: 'center',
   },
