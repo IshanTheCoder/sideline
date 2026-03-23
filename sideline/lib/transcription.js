@@ -102,8 +102,9 @@ async function downloadAudioFile(audioUrl) {
     return file;
   } else {
     // native: download to temp storage first — can't stream like on web
+    // use a unique filename per transcription to avoid clobbering concurrent downloads
     console.log('Native: Downloading audio file to temporary location');
-    const fileUri = `${FileSystem.cacheDirectory}temp_transcription.m4a`;
+    const fileUri = `${FileSystem.cacheDirectory}temp_transcription_${Date.now()}_${Math.random().toString(36).slice(2, 8)}.m4a`;
     
     const downloadResult = await FileSystem.downloadAsync(audioUrl, fileUri);
     
@@ -171,13 +172,21 @@ export async function transcribeAudio(audioUrl, options = {}) {
       formData.append('language', 'en');
       formData.append('prompt', whisperPrompt);
 
-      const response = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${groqApiKey}`,
-        },
-        body: formData,
-      });
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 60000); // 60s — audio files can be large
+      let response;
+      try {
+        response = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${groqApiKey}`,
+          },
+          body: formData,
+          signal: controller.signal,
+        });
+      } finally {
+        clearTimeout(timeoutId);
+      }
 
       if (!response.ok) {
         const errorText = await response.text();
@@ -207,13 +216,21 @@ export async function transcribeAudio(audioUrl, options = {}) {
       formData.append('language', 'en');
       formData.append('prompt', whisperPrompt);
 
-      const response = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${groqApiKey}`,
-        },
-        body: formData,
-      });
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 60000); // 60s — audio files can be large
+      let response;
+      try {
+        response = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${groqApiKey}`,
+          },
+          body: formData,
+          signal: controller.signal,
+        });
+      } finally {
+        clearTimeout(timeoutId);
+      }
 
       if (!response.ok) {
         const errorText = await response.text();
