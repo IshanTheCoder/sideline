@@ -59,10 +59,14 @@ export async function processRecording(recordingId, userId) {
       };
     }
 
+    // mark as in-progress immediately so UI can show correct state
+    await updateRecordingData(recordingId, userId, { status: 'processing' });
+
     // step 2: extract the audio URL — can't transcribe silence
     const audioUrl = recording.audio_url;
     if (!audioUrl) {
       console.error('❌ Recording has no audio URL');
+      await updateRecordingData(recordingId, userId, { status: 'failed' });
       return {
         success: false,
         transcription: null,
@@ -109,6 +113,7 @@ export async function processRecording(recordingId, userId) {
 
     if (transcriptionError || !transcription) {
       console.error('❌ Transcription failed:', transcriptionError);
+      await updateRecordingData(recordingId, userId, { status: 'failed' });
       return {
         success: false,
         transcription: null,
@@ -161,10 +166,13 @@ export async function processRecording(recordingId, userId) {
     const { error: updateError } = await updateRecordingData(recordingId, userId, {
       transcription: correctedTranscription,
       ai_labels: aiLabel,
+      status: 'processed',
     });
 
     if (updateError) {
       console.error('❌ Failed to update recording:', updateError);
+      // best-effort: try to at least mark it failed so UI doesn't show it as stuck
+      await updateRecordingData(recordingId, userId, { status: 'failed' }).catch(() => {});
       return {
         success: false,
         transcription: correctedTranscription,
@@ -182,6 +190,8 @@ export async function processRecording(recordingId, userId) {
     };
   } catch (error) {
     console.error('❌ Unexpected error processing recording:', error);
+    // best-effort status update so the recording doesn't stay stuck in 'new' or 'processing'
+    await updateRecordingData(recordingId, userId, { status: 'failed' }).catch(() => {});
     return {
       success: false,
       transcription: null,

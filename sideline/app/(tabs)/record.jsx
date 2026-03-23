@@ -38,7 +38,7 @@ export default function RecordScreen() {
   const [currentRecording, setCurrentRecording] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [selectedSet, setSelectedSet] = useState(null);
+  const [selectedSet, setSelectedSet] = useState('Set 1');
   const [selectedSetOffsetSeconds, setSelectedSetOffsetSeconds] = useState(null);
   const [processingCount, setProcessingCount] = useState(0);
   const [toast, setToast] = useState(null); // { type: 'success'|'error', message: string } — the little popup banner
@@ -255,7 +255,7 @@ export default function RecordScreen() {
 
           if (uploadError || !audioUrl) {
             console.error('Upload error:', uploadError);
-            showToast('error', 'Upload failed — recording will sync when connection returns.', 6000);
+            showToast('error', 'Upload failed — recording was not saved. Check your connection and try again.', 7000);
             return;
           }
 
@@ -325,10 +325,6 @@ export default function RecordScreen() {
             },
           ]
         );
-        return;
-      }
-      if (!selectedSet) {
-        showAlert('Select a set', 'Please select a set above before recording.');
         return;
       }
       await startRecording();
@@ -581,7 +577,7 @@ export default function RecordScreen() {
             ))}
           </View>
           <ThemedText style={styles.markerHint}>
-            {selectedSet ? `Selected: ${selectedSet}` : 'Pick a set before recording'}
+            Recording in: {selectedSet}
           </ThemedText>
         </View>
 
