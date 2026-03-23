@@ -9,7 +9,8 @@ export function AuthProvider({ children }) {
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // Load user profile from database
+  // Load user profile from database, creating a minimal one if it doesn't exist.
+  // This is the safety net for OAuth users whose profile creation was interrupted.
   const loadProfile = async (userId) => {
     try {
       console.log('📥 Loading profile for user:', userId);
@@ -19,16 +20,43 @@ export function AuthProvider({ children }) {
         .eq('id', userId)
         .single();
 
-      if (error) {
-        // Avoid console.error here (it triggers the red error overlay in Expo)
+      if (error && error.code !== 'PGRST116') {
         console.log('❌ Error loading profile:', error);
-        // Silently handle missing profiles (common for new/OAuth users)
         setProfile(null);
         return;
       }
 
-      console.log('✅ Profile loaded:', data);
-      setProfile(data);
+      if (data) {
+        console.log('✅ Profile loaded:', data);
+        setProfile(data);
+        return;
+      }
+
+      // No profile row exists — create a minimal one so the user isn't stuck.
+      // This covers OAuth users whose sport-selection step was interrupted.
+      console.log('⚠️ No profile found, creating minimal profile for:', userId);
+      const { data: { user: currentUser } } = await supabase.auth.getUser();
+      const emailPrefix = currentUser?.email?.split('@')[0] || 'user';
+
+      const { data: newProfile, error: insertError } = await supabase
+        .from('profiles')
+        .insert({
+          id: userId,
+          username: emailPrefix,
+          name: currentUser?.user_metadata?.full_name || emailPrefix,
+          created_at: new Date().toISOString(),
+        })
+        .select()
+        .single();
+
+      if (insertError) {
+        console.log('❌ Failed to create fallback profile:', insertError);
+        setProfile(null);
+        return;
+      }
+
+      console.log('✅ Fallback profile created:', newProfile);
+      setProfile(newProfile);
     } catch (error) {
       console.log('❌ Unexpected error loading profile:', error);
       setProfile(null);
