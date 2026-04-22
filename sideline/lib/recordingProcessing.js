@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { createSignedRecordingUrl } from './recording';
 import { transcribeAudio } from './transcription';
 import { generateLabel } from './labelGeneration';
 import { serializeAiLabels, applyVolleyballTranscriptionCorrections } from './volleyballVocabulary';
@@ -88,23 +89,16 @@ export async function processRecording(recordingId, userId) {
     }
 
     // step 2.6: storage is private so we need a signed URL (like a concert wristband)
-    // gotta extract the file path from the public URL format:
-    // https://[project].supabase.co/storage/v1/object/public/recordings/[path]
+    // use shared URL parser so this still works if URL shape changes (public URL, raw path, etc)
     let downloadUrl = audioUrl;
-    if (audioUrl.includes('/public/recordings/')) {
-      const filePath = audioUrl.split('/public/recordings/')[1];
-      console.log('🔐 Creating signed URL for file:', filePath);
+    const { url: signedUrl, error: signedUrlError } = await createSignedRecordingUrl(audioUrl, 3600);
 
-      const { data: signedUrlData, error: signedUrlError } = await supabase.storage
-        .from('recordings')
-        .createSignedUrl(filePath, 3600); // 1 hour TTL — more than enough
-
-      if (signedUrlError || !signedUrlData?.signedUrl) {
-        console.error('❌ Failed to create signed URL:', signedUrlError);
-      } else {
-        downloadUrl = signedUrlData.signedUrl;
-        console.log('✅ Signed URL created successfully');
-      }
+    if (signedUrlError || !signedUrl) {
+      console.error('❌ Failed to create signed URL:', signedUrlError);
+      // keep the original URL as fallback; this helps older setups where recordings bucket is public
+    } else {
+      downloadUrl = signedUrl;
+      console.log('✅ Signed URL created successfully');
     }
 
     const playerNames = rosterPlayers.map((p) => p.name).filter(Boolean);
