@@ -61,8 +61,7 @@ We noticed coaches process huge amounts of information in real time, but most of
 Sideline helps preserve those insights and turn them into meaningful improvements.
 
 ## Contributors
-Ishan Sarda
-Sidhant Damarapati
+Ishan Sarda, Sidhant Damarapati
 
 ## Feedback
 If you're a coach, athlete, developer, or just someone with an idea, we'd love to hear from you.
