@@ -296,7 +296,7 @@ export default function RecordScreen() {
             });
         } catch (err) {
           console.error('Background upload error:', err);
-          showToast('error', 'Upload failed — recording will sync when connection returns.', 6000);
+          showToast('error', 'Upload failed — recording was not saved. Check your connection and try again.', 7000);
         }
       })();
     } catch (error) {
