@@ -2,7 +2,10 @@
 // how-it-works, an editorial "built for the sideline" band, and the founders
 // section. Statically rendered for SEO; the app itself lives at /home.
 import Head from 'expo-router/head';
+import { useRouter } from 'expo-router';
+import { useEffect } from 'react';
 import { Platform } from 'react-native';
+import { useAuth } from '@/contexts/AuthContext';
 import { SITE_URL, CONTACT_EMAIL } from './_layout';
 
 const TITLE = 'Sideline — Voice-first coaching notes for volleyball coaches';
@@ -80,6 +83,17 @@ function CourtSketch() {
 }
 
 export default function MarketingHome() {
+  const { user, loading } = useAuth();
+  const router = useRouter();
+
+  // Signed-in coaches typing the root URL want the app, not the pitch —
+  // send them straight to their home tab.
+  useEffect(() => {
+    if (!loading && user) {
+      router.replace('/(tabs)/home');
+    }
+  }, [user, loading, router]);
+
   if (Platform.OS !== 'web') return null;
 
   return (
@@ -109,7 +123,7 @@ export default function MarketingHome() {
               Sideline records your voice notes and turns them into structured, searchable
               feedback — by player, by skill, by game.
             </p>
-            <a className="mk-btn mk-btn-lg" href="/welcome">Start recording</a>
+            <a className="mk-btn mk-btn-lg" href="/app">Start recording</a>
             <p className="mk-hero-cta-note">Works in the browser, on the phone already in your hand.</p>
           </div>
 

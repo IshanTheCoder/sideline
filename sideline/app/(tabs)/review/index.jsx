@@ -237,7 +237,7 @@ export default function ReviewScreen() {
       <View style={styles.header}>
         <TouchableOpacity
           style={styles.backButton}
-          onPress={() => router.replace('/(tabs)')}
+          onPress={() => router.replace('/(tabs)/home')}
           activeOpacity={0.7}
         >
           <IconSymbol

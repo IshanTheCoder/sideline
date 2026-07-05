@@ -56,7 +56,7 @@ export default function CallbackScreen() {
 
             if (session) {
               console.log('✅ Session established for user:', session.user.email);
-              router.replace('/(tabs)');
+              router.replace('/(tabs)/home');
               return;
             } else {
               console.error('❌ No session after OAuth callback');
@@ -118,7 +118,7 @@ export default function CallbackScreen() {
           }
 
           console.log('✅ Session established for user:', data?.user?.email);
-          router.replace('/(tabs)');
+          router.replace('/(tabs)/home');
         } else {
           console.error('❌ No tokens found in callback');
           router.replace({

@@ -9,28 +9,28 @@ const TUTORIAL_STEPS = [
   {
     title: 'Welcome to Sideline!',
     body: 'This is your home base. Start recordings, view recent games, and access every feature from here.',
-    route: '/(tabs)',
+    route: '/(tabs)/home',
     targetKey: null,
     tooltipPosition: 'center',
   },
   {
     title: 'Start Recording',
     body: "Tap here to record during a game. You'll set up game details first.",
-    route: '/(tabs)',
+    route: '/(tabs)/home',
     targetKey: 'home:startRecording',
     tooltipPosition: 'bottom',
   },
   {
     title: 'Recent Games',
     body: 'Your recorded games show up here sorted by date. Tap any game to review it.',
-    route: '/(tabs)',
+    route: '/(tabs)/home',
     targetKey: 'home:recentGames',
     tooltipPosition: 'top',
   },
   {
     title: 'Navigation Menu',
     body: 'Open the menu to jump between Home, Roster, Recording, Review, and Settings.',
-    route: '/(tabs)',
+    route: '/(tabs)/home',
     targetKey: 'home:hamburger',
     tooltipPosition: 'bottom',
   },
@@ -72,7 +72,7 @@ const TUTORIAL_STEPS = [
   {
     title: "You're All Set!",
     body: "Sideline is ready to help you coach smarter. Happy coaching! 🏐",
-    route: '/(tabs)',
+    route: '/(tabs)/home',
     targetKey: null,
     tooltipPosition: 'center',
   },
@@ -161,7 +161,7 @@ export function TutorialProvider({ children }) {
     } catch {
       // Non-blocking
     }
-    router.replace('/(tabs)');
+    router.replace('/(tabs)/home');
   }, [router, clearTargets]);
 
   const startTutorial = useCallback(() => {
@@ -169,7 +169,7 @@ export function TutorialProvider({ children }) {
     prevRouteRef.current = null;
     setCurrentStepIndex(0);
     setIsTutorialActive(true);
-    router.replace('/(tabs)');
+    router.replace('/(tabs)/home');
   }, [router, clearTargets]);
 
   const nextStep = useCallback(() => {

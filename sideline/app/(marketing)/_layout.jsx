@@ -28,12 +28,15 @@ export default function MarketingLayout() {
 
       <header className="mk-nav">
         <div className="mk-container mk-nav-inner">
-          <a className="mk-logo" href="/">Sideline</a>
+          <a className="mk-logo" href="/">
+            <img className="mk-logo-mark" src="/sideline-whistle.png" alt="" width="34" height="34" />
+            Sideline
+          </a>
           <nav className="mk-navlinks" aria-label="Site">
             <a className="mk-nav-hidesm" href="/#how-it-works">How it works</a>
             <a href="/about">About</a>
             <a href="/blog">Blog</a>
-            <a className="mk-btn" href="/welcome">Try Sideline</a>
+            <a className="mk-btn" href="/app">Try Sideline</a>
           </nav>
         </div>
       </header>
@@ -48,7 +51,7 @@ export default function MarketingLayout() {
               <p>Voice-first coaching notes. Made in New Jersey.</p>
             </div>
             <ul className="mk-footer-links">
-              <li><a href="/welcome">Open the app</a></li>
+              <li><a href="/app">Open the app</a></li>
               <li><a href="/about">About</a></li>
               <li><a href="/blog">Blog</a></li>
               <li><a href={`mailto:${CONTACT_EMAIL}`}>Contact</a></li>

@@ -86,9 +86,9 @@ body:has(.mk-root) #root {
 
 .mk-eyebrow {
   font-family: var(--sans);
-  font-size: 0.72rem;
-  font-weight: 600;
-  letter-spacing: 0.16em;
+  font-size: 0.92rem;
+  font-weight: 700;
+  letter-spacing: 0.15em;
   text-transform: uppercase;
   color: var(--sage);
   margin-bottom: 1.1rem;
@@ -117,11 +117,19 @@ body:has(.mk-root) #root {
   padding-bottom: 18px;
 }
 .mk-logo {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
   font-family: var(--serif);
   font-size: 1.35rem;
   font-weight: 600;
   color: var(--ink) !important;
   letter-spacing: 0.01em;
+}
+.mk-logo-mark {
+  width: 34px;
+  height: 34px;
+  object-fit: contain;
 }
 .mk-navlinks {
   display: flex;

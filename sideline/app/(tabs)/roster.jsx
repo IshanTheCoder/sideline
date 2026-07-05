@@ -392,7 +392,7 @@ export default function RosterScreen() {
   return (
     <ThemedView style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity style={styles.backButton} onPress={() => router.replace('/(tabs)')} activeOpacity={0.7} accessibilityLabel="Back">
+        <TouchableOpacity style={styles.backButton} onPress={() => router.replace('/(tabs)/home')} activeOpacity={0.7} accessibilityLabel="Back">
           <IconSymbol name="chevron.left" size={28} color={Colors[colorScheme ?? 'light'].text} />
         </TouchableOpacity>
         <ThemedText type="title" style={styles.title}>

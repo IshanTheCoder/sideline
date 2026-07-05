@@ -58,7 +58,7 @@ function RootLayoutNav() {
     } else if (user && inAuthGroup) {
       // User is signed in but still in auth group, redirect to main app
       console.log('🔄 Redirecting to tabs (user signed in)');
-      router.replace('/(tabs)');
+      router.replace('/(tabs)/home');
     }
   }, [user, loading, segments]);
 
