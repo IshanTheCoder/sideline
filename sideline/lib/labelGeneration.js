@@ -229,9 +229,14 @@ function parseStructuredResponse(content) {
  * @param {{ playerNames?: string[] }} [options] - roster names for spelling accuracy
  * @returns {Promise<{label: string|null, skillCategory?: string|null, position?: string|null, playPattern?: string|null, feedbackType?: string|null, error: Error|null}>}
  */
-export async function generateLabel(transcriptionText, options = {}) {
+async function generateLabelWithDeps(transcriptionText, options = {}, deps = {}) {
+  const {
+    groqChatImpl = groqChat,
+    getGroqApiKeyImpl = getGroqApiKey,
+  } = deps;
+
   try {
-    if (!getGroqApiKey()) {
+    if (!getGroqApiKeyImpl()) {
       return {
         label: null,
         error: new Error('Groq API key not configured'),
@@ -262,7 +267,7 @@ export async function generateLabel(transcriptionText, options = {}) {
       ? `Create a label and metadata for this coaching recording. Start the label with any player names mentioned. Reply with JSON only:\n\n${transcriptionText}`
       : `Create a label and metadata for this recording. IMPORTANT: If any player names appear in the transcription, the label MUST start with those names. Reply with JSON only:\n\n${transcriptionText}`;
 
-    const result = await groqChat({
+    const result = await groqChatImpl({
       messages: [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userPrompt },
@@ -325,6 +330,16 @@ export async function generateLabel(transcriptionText, options = {}) {
       error: error instanceof Error ? error : new Error(String(error)),
     };
   }
+}
+
+export function createLabelGenerator(deps = {}) {
+  return {
+    generateLabel: (transcriptionText, options) => generateLabelWithDeps(transcriptionText, options, deps),
+  };
+}
+
+export async function generateLabel(transcriptionText, options = {}) {
+  return generateLabelWithDeps(transcriptionText, options);
 }
 
 /**

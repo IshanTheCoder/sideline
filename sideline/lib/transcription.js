@@ -142,9 +142,21 @@ function buildWhisperPrompt(playerNames = []) {
  * @param {{ playerNames?: string[] }} [options] - optional roster names for better accuracy
  * @returns the transcription text, or an error if Whisper struck out
  */
-export async function transcribeAudio(audioUrl, options = {}) {
+async function transcribeAudioWithDeps(audioUrl, options = {}, deps = {}) {
+  const {
+    apiKey = groqApiKey,
+    platformOS = Platform.OS,
+    downloadAudioFile: downloadAudioFileImpl = downloadAudioFile,
+    fetchImpl = fetch,
+    FormDataCtor = FormData,
+    AbortControllerCtor = AbortController,
+    setTimeoutFn = setTimeout,
+    clearTimeoutFn = clearTimeout,
+    fileSystem = FileSystem,
+  } = deps;
+
   try {
-    if (!groqApiKey) {
+    if (!apiKey) {
       return {
         transcription: null,
         error: new Error('Groq API key not configured'),
@@ -153,16 +165,16 @@ export async function transcribeAudio(audioUrl, options = {}) {
 
     console.log('Starting transcription for audio:', audioUrl);
 
-    const audioFile = await downloadAudioFile(audioUrl);
+    const audioFile = await downloadAudioFileImpl(audioUrl);
     console.log('Audio file downloaded');
 
     const whisperPrompt = buildWhisperPrompt(options.playerNames);
 
 
-    if (Platform.OS !== 'web' && audioFile.uri) {
+    if (platformOS !== 'web' && audioFile.uri) {
       console.log('Sending to Groq Whisper API (React Native)...');
 
-      const formData = new FormData();
+      const formData = new FormDataCtor();
       formData.append('file', {
         uri: audioFile.uri,
         name: audioFile.name,
@@ -172,20 +184,20 @@ export async function transcribeAudio(audioUrl, options = {}) {
       formData.append('language', 'en');
       formData.append('prompt', whisperPrompt);
 
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 60000); // 60s — audio files can be large
+      const controller = new AbortControllerCtor();
+      const timeoutId = setTimeoutFn(() => controller.abort(), 60000); // 60s — audio files can be large
       let response;
       try {
-        response = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
+        response = await fetchImpl('https://api.groq.com/openai/v1/audio/transcriptions', {
           method: 'POST',
           headers: {
-            'Authorization': `Bearer ${groqApiKey}`,
+            'Authorization': `Bearer ${apiKey}`,
           },
           body: formData,
           signal: controller.signal,
         });
       } finally {
-        clearTimeout(timeoutId);
+        clearTimeoutFn(timeoutId);
       }
 
       if (!response.ok) {
@@ -198,7 +210,7 @@ export async function transcribeAudio(audioUrl, options = {}) {
 
       // clean up the temp file — we're not digital hoarders
       try {
-        await FileSystem.deleteAsync(audioFile.uri);
+        await fileSystem.deleteAsync(audioFile.uri);
         console.log('🗑️ Temporary file cleaned up');
       } catch (err) {
         console.warn('Failed to delete temporary file:', err);
@@ -210,26 +222,26 @@ export async function transcribeAudio(audioUrl, options = {}) {
       // web path — straightforward fetch, no RN weirdness to worry about
       console.log('Sending to Groq Whisper API (Web)...');
 
-      const formData = new FormData();
+      const formData = new FormDataCtor();
       formData.append('file', audioFile);
       formData.append('model', 'whisper-large-v3-turbo');
       formData.append('language', 'en');
       formData.append('prompt', whisperPrompt);
 
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 60000); // 60s — audio files can be large
+      const controller = new AbortControllerCtor();
+      const timeoutId = setTimeoutFn(() => controller.abort(), 60000); // 60s — audio files can be large
       let response;
       try {
-        response = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
+        response = await fetchImpl('https://api.groq.com/openai/v1/audio/transcriptions', {
           method: 'POST',
           headers: {
-            'Authorization': `Bearer ${groqApiKey}`,
+            'Authorization': `Bearer ${apiKey}`,
           },
           body: formData,
           signal: controller.signal,
         });
       } finally {
-        clearTimeout(timeoutId);
+        clearTimeoutFn(timeoutId);
       }
 
       if (!response.ok) {
@@ -265,6 +277,16 @@ export async function transcribeAudio(audioUrl, options = {}) {
       error: new Error(errorMessage),
     };
   }
+}
+
+export function createTranscriptionClient(deps = {}) {
+  return {
+    transcribeAudio: (audioUrl, options) => transcribeAudioWithDeps(audioUrl, options, deps),
+  };
+}
+
+export async function transcribeAudio(audioUrl, options = {}) {
+  return transcribeAudioWithDeps(audioUrl, options);
 }
 
 /**
