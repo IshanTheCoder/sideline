@@ -39,7 +39,20 @@ const isMissingColumnError = (error, column) => {
  * @param {string} userId - who owns this recording
  * @returns {Promise<{success: boolean, transcription: string|null, error: Error|null}>}
  */
-export async function processRecording(recordingId, userId) {
+async function processRecordingWithDeps(recordingId, userId, deps = {}) {
+  const {
+    supabase: supabaseClient = supabase,
+    createSignedRecordingUrl: createSignedRecordingUrlImpl = createSignedRecordingUrl,
+    transcribeAudio: transcribeAudioImpl = transcribeAudio,
+    generateLabel: generateLabelImpl = generateLabel,
+    serializeAiLabels: serializeAiLabelsImpl = serializeAiLabels,
+    applyVolleyballTranscriptionCorrections: applyCorrectionsImpl = applyVolleyballTranscriptionCorrections,
+    getPlayersForGameSession: getPlayersForGameSessionImpl = getPlayersForGameSession,
+    buildRosterNameCorrections: buildRosterNameCorrectionsImpl = buildRosterNameCorrections,
+    buildRosterNumberCorrections: buildRosterNumberCorrectionsImpl = buildRosterNumberCorrections,
+    getCustomBucketsForPrompt: getCustomBucketsForPromptImpl = getCustomBucketsForPrompt,
+  } = deps;
+
   try {
     console.log('🔄 Starting recording processing for ID:', recordingId);
 
@@ -47,7 +60,8 @@ export async function processRecording(recordingId, userId) {
     console.log('📥 Fetching recording from database...');
     const { data: recording, error: fetchError } = await fetchRecordingForProcessing(
       recordingId,
-      userId
+      userId,
+      supabaseClient
     );
 
     if (fetchError || !recording) {
@@ -61,13 +75,13 @@ export async function processRecording(recordingId, userId) {
     }
 
     // mark as in-progress immediately so UI can show correct state
-    await updateRecordingData(recordingId, userId, { status: 'processing' });
+    await updateRecordingData(recordingId, userId, { status: 'processing' }, supabaseClient);
 
     // step 2: extract the audio URL — can't transcribe silence
     const audioUrl = recording.audio_url;
     if (!audioUrl) {
       console.error('❌ Recording has no audio URL');
-      await updateRecordingData(recordingId, userId, { status: 'failed' });
+      await updateRecordingData(recordingId, userId, { status: 'failed' }, supabaseClient);
       return {
         success: false,
         transcription: null,
@@ -81,7 +95,7 @@ export async function processRecording(recordingId, userId) {
     // step 2.5: fetch the roster early — we need names for BOTH Whisper and post-processing
     let rosterPlayers = [];
     if (recording.game_session_id) {
-      const { players } = await getPlayersForGameSession(recording.game_session_id);
+      const { players } = await getPlayersForGameSessionImpl(recording.game_session_id);
       rosterPlayers = players;
       if (rosterPlayers.length > 0) {
         console.log(`📋 Loaded roster: ${rosterPlayers.length} players`);
@@ -91,7 +105,7 @@ export async function processRecording(recordingId, userId) {
     // step 2.6: storage is private so we need a signed URL (like a concert wristband)
     // use shared URL parser so this still works if URL shape changes (public URL, raw path, etc)
     let downloadUrl = audioUrl;
-    const { url: signedUrl, error: signedUrlError } = await createSignedRecordingUrl(audioUrl, 3600);
+    const { url: signedUrl, error: signedUrlError } = await createSignedRecordingUrlImpl(audioUrl, 3600);
 
     if (signedUrlError || !signedUrl) {
       console.error('❌ Failed to create signed URL:', signedUrlError);
@@ -103,11 +117,11 @@ export async function processRecording(recordingId, userId) {
 
     const playerNames = rosterPlayers.map((p) => p.name).filter(Boolean);
     console.log('🎤 Starting transcription...');
-    const { transcription, error: transcriptionError } = await transcribeAudio(downloadUrl, { playerNames });
+    const { transcription, error: transcriptionError } = await transcribeAudioImpl(downloadUrl, { playerNames });
 
     if (transcriptionError || !transcription) {
       console.error('❌ Transcription failed:', transcriptionError);
-      await updateRecordingData(recordingId, userId, { status: 'failed' });
+      await updateRecordingData(recordingId, userId, { status: 'failed' }, supabaseClient);
       return {
         success: false,
         transcription: null,
@@ -118,10 +132,10 @@ export async function processRecording(recordingId, userId) {
 
     console.log('✅ Transcription completed:', transcription.substring(0, 100) + '...');
 
-    const numberCorrections = buildRosterNumberCorrections(transcription, rosterPlayers);
-    const nameCorrections = buildRosterNameCorrections(transcription, rosterPlayers.map((p) => p.name));
+    const numberCorrections = buildRosterNumberCorrectionsImpl(transcription, rosterPlayers);
+    const nameCorrections = buildRosterNameCorrectionsImpl(transcription, rosterPlayers.map((p) => p.name));
     // apply number substitutions first so "number four" → "Sarah" before name fuzzy-match runs
-    const correctedTranscription = applyVolleyballTranscriptionCorrections(
+    const correctedTranscription = applyCorrectionsImpl(
       transcription,
       [...numberCorrections, ...nameCorrections]
     );
@@ -133,9 +147,9 @@ export async function processRecording(recordingId, userId) {
 
     // step 4: generate an AI label — pass full roster so the AI can resolve any remaining
     // "number X" references it sees in the (already-corrected) transcription
-    const customBuckets = await getCustomBucketsForPrompt(userId);
+    const customBuckets = await getCustomBucketsForPromptImpl(userId);
     console.log('🏷️  Generating AI label (volleyball)...');
-    const labelResult = await generateLabel(correctedTranscription, { players: rosterPlayers, customBuckets });
+    const labelResult = await generateLabelImpl(correctedTranscription, { players: rosterPlayers, customBuckets });
 
     let aiLabel = null;
     if (labelResult.error || !labelResult.label) {
@@ -145,7 +159,7 @@ export async function processRecording(recordingId, userId) {
       console.log('✅ Label generated:', labelResult.label);
       const mentioned = findMentionedPlayers(correctedTranscription, rosterPlayers);
       const resolvedPosition = mentioned.length > 1 ? 'multiple_players' : (labelResult.position ?? undefined);
-      aiLabel = serializeAiLabels(labelResult.label, {
+      aiLabel = serializeAiLabelsImpl(labelResult.label, {
         skillCategory: labelResult.skillCategory ?? undefined,
         position: resolvedPosition,
         playPattern: labelResult.playPattern ?? undefined,
@@ -161,12 +175,12 @@ export async function processRecording(recordingId, userId) {
       transcription: correctedTranscription,
       ai_labels: aiLabel,
       status: 'processed',
-    });
+    }, supabaseClient);
 
     if (updateError) {
       console.error('❌ Failed to update recording:', updateError);
       // best-effort: try to at least mark it failed so UI doesn't show it as stuck
-      await updateRecordingData(recordingId, userId, { status: 'failed' }).catch(() => {});
+      await updateRecordingData(recordingId, userId, { status: 'failed' }, supabaseClient).catch(() => {});
       return {
         success: false,
         transcription: correctedTranscription,
@@ -185,7 +199,7 @@ export async function processRecording(recordingId, userId) {
   } catch (error) {
     console.error('❌ Unexpected error processing recording:', error);
     // best-effort status update so the recording doesn't stay stuck in 'new' or 'processing'
-    await updateRecordingData(recordingId, userId, { status: 'failed' }).catch(() => {});
+    await updateRecordingData(recordingId, userId, { status: 'failed' }, supabaseClient).catch(() => {});
     return {
       success: false,
       transcription: null,
@@ -195,15 +209,25 @@ export async function processRecording(recordingId, userId) {
   }
 }
 
+export function createRecordingProcessor(deps = {}) {
+  return {
+    processRecording: (recordingId, userId) => processRecordingWithDeps(recordingId, userId, deps),
+  };
+}
+
+export async function processRecording(recordingId, userId) {
+  return processRecordingWithDeps(recordingId, userId);
+}
+
 /**
  * grabs one recording from the DB — just the fields needed for the pipeline
  * @param {string} recordingId - which recording to fetch
  * @param {string} userId - the owner's ID (access control)
  * @returns {Promise<{data: object|null, error: Error|null}>}
  */
-async function fetchRecordingForProcessing(recordingId, userId) {
+async function fetchRecordingForProcessing(recordingId, userId, supabaseClient = supabase) {
   try {
-    let { data, error } = await supabase
+    let { data, error } = await supabaseClient
       .from('recordings')
       .select('id, audio_url, status, transcription, ai_labels, game_session_id')
       .eq('id', recordingId)
@@ -212,7 +236,7 @@ async function fetchRecordingForProcessing(recordingId, userId) {
 
     // backward compat — user_id column might not exist in older DBs, try without
     if (error && isMissingColumnError(error, 'user_id')) {
-      const retry = await supabase
+      const retry = await supabaseClient
         .from('recordings')
         .select('id, audio_url, status, transcription, ai_labels, game_session_id')
         .eq('id', recordingId)
@@ -235,9 +259,9 @@ async function fetchRecordingForProcessing(recordingId, userId) {
  * @param {object} updates - the fields to overwrite (transcription, ai_labels, status)
  * @returns {Promise<{error: Error|null}>}
  */
-async function updateRecordingData(recordingId, userId, updates) {
+async function updateRecordingData(recordingId, userId, updates, supabaseClient = supabase) {
   try {
-    let { error } = await supabase
+    let { error } = await supabaseClient
       .from('recordings')
       .update(updates)
       .eq('id', recordingId)
@@ -245,7 +269,7 @@ async function updateRecordingData(recordingId, userId, updates) {
 
     // backward compat — if user_id column doesn't exist, retry without it
     if (error && isMissingColumnError(error, 'user_id')) {
-      const retry = await supabase
+      const retry = await supabaseClient
         .from('recordings')
         .update(updates)
         .eq('id', recordingId);
