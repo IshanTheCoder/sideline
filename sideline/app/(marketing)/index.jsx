@@ -1,9 +1,9 @@
-// Marketing homepage (/) — hero with a real structured-note example,
-// how-it-works, an editorial "built for the sideline" band, and the founders
-// section. Statically rendered for SEO; the app itself lives at /home.
+// Marketing homepage (/) — hero with a live cycling demo of the note card
+// (voice notes type out and organize themselves), how-it-works, an editorial
+// "built for the sideline" band, and the founders section. Statically
+// rendered for SEO; the web app lives at /app.
 import Head from 'expo-router/head';
-import { useRouter } from 'expo-router';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Platform } from 'react-native';
 import { useAuth } from '@/contexts/AuthContext';
 import { SITE_URL, CONTACT_EMAIL } from './_layout';
@@ -27,9 +27,37 @@ const JSON_LD = {
   },
 };
 
-function MicIcon() {
+// The rotating demo: real observations a coach would actually say
+const DEMO_NOTES = [
+  {
+    quote: 'Block closing late on the outside',
+    time: '0:04',
+    player: '#7 (Sarah K.)',
+    skill: 'Blocking — timing',
+    priority: 'High',
+    game: 'vs. Ridge, Set 2',
+  },
+  {
+    quote: 'Libero drifting too deep in serve receive',
+    time: '0:05',
+    player: '#12 (Maya R.)',
+    skill: 'Serve receive — positioning',
+    priority: 'Medium',
+    game: 'vs. Metuchen, Set 1',
+  },
+  {
+    quote: 'Setter tempo too fast on outside sets',
+    time: '0:03',
+    player: '#4 (Priya S.)',
+    skill: 'Setting — tempo',
+    priority: 'High',
+    game: 'Tuesday practice',
+  },
+];
+
+function MicIcon({ live }) {
   return (
-    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#75975e" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <svg className={live ? 'mk-mic mk-mic-live' : 'mk-mic'} width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#75975e" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <rect x="9" y="3" width="6" height="11" rx="3" />
       <path d="M5 11a7 7 0 0 0 14 0" />
       <path d="M12 18v3" />
@@ -39,7 +67,7 @@ function MicIcon() {
 
 function EarIcon() {
   return (
-    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#75975e" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#75975e" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <path d="M4 12h2" />
       <path d="M4 8h4" />
       <path d="M4 16h4" />
@@ -51,7 +79,7 @@ function EarIcon() {
 
 function ClipboardIcon() {
   return (
-    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#75975e" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#75975e" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <rect x="5" y="4" width="14" height="17" rx="2" />
       <path d="M9 4.5V3h6v1.5" />
       <path d="M9 10h6" />
@@ -61,38 +89,160 @@ function ClipboardIcon() {
   );
 }
 
+function BigMicIcon() {
+  return (
+    <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#75975e" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <rect x="9" y="3" width="6" height="11" rx="3" />
+      <path d="M5 11a7 7 0 0 0 14 0" />
+      <path d="M12 18v3" />
+    </svg>
+  );
+}
+
 // Simple line drawing of half a volleyball court, annotated the way a coach
-// would mark it up — the founders-section visual.
+// would mark it up — the founders-section visual. Pieces pop in on scroll.
 function CourtSketch() {
   return (
     <svg className="mk-court" viewBox="0 0 380 300" fill="none" role="img" aria-label="Hand-drawn diagram of a volleyball court with a coaching note pointing at the libero's position">
       <rect x="40" y="30" width="300" height="240" rx="3" stroke="#979797" strokeWidth="1.5" />
       <line x1="40" y1="30" x2="340" y2="30" stroke="#4a6340" strokeWidth="3" />
       <line x1="40" y1="110" x2="340" y2="110" stroke="#979797" strokeWidth="1.2" strokeDasharray="6 6" />
-      <circle cx="120" cy="215" r="9" stroke="#75975e" strokeWidth="1.8" />
-      <circle cx="230" cy="170" r="9" stroke="#c9c4b6" strokeWidth="1.6" />
-      <circle cx="290" cy="220" r="9" stroke="#c9c4b6" strokeWidth="1.6" />
-      <path d="M120 204 C 118 185, 122 172, 128 160" stroke="#75975e" strokeWidth="1.6" strokeDasharray="4 5" strokeLinecap="round" />
-      <path d="M128 160 l -7 2 M128 160 l -1 7" stroke="#75975e" strokeWidth="1.6" strokeLinecap="round" />
-      <text x="52" y="292" fill="#6b6b6b" fontFamily="'Source Serif 4', Georgia, serif" fontStyle="italic" fontSize="15">
-        &ldquo;libero drifting too deep&rdquo;
-      </text>
-      <path d="M112 284 C 108 265, 110 245, 117 228" stroke="#c4785b" strokeWidth="1.3" strokeDasharray="1 4" strokeLinecap="round" />
+      <g className="mk-court-pop">
+        <circle cx="120" cy="215" r="9" stroke="#75975e" strokeWidth="1.8" />
+        <circle cx="230" cy="170" r="9" stroke="#c9c4b6" strokeWidth="1.6" />
+        <circle cx="290" cy="220" r="9" stroke="#c9c4b6" strokeWidth="1.6" />
+      </g>
+      <g className="mk-court-pop mk-court-pop-2">
+        <path d="M120 204 C 118 185, 122 172, 128 160" stroke="#75975e" strokeWidth="1.6" strokeDasharray="4 5" strokeLinecap="round" />
+        <path d="M128 160 l -7 2 M128 160 l -1 7" stroke="#75975e" strokeWidth="1.6" strokeLinecap="round" />
+      </g>
+      <g className="mk-court-pop mk-court-pop-3">
+        <text x="52" y="292" fill="#565650" fontFamily="'Source Serif 4', Georgia, serif" fontStyle="italic" fontSize="16">
+          &ldquo;libero drifting too deep&rdquo;
+        </text>
+        <path d="M112 284 C 108 265, 110 245, 117 228" stroke="#c4785b" strokeWidth="1.3" strokeDasharray="1 4" strokeLinecap="round" />
+      </g>
     </svg>
+  );
+}
+
+// The signature moment: a note card that demos the app. Voice notes type out
+// like a live transcription, then the structured fields assemble themselves.
+// Statically rendered fully-formed (first note) so crawlers and no-JS
+// visitors see a complete card; cycling starts after hydration.
+function NoteCardDemo() {
+  const [idx, setIdx] = useState(0);
+  const [charCount, setCharCount] = useState(DEMO_NOTES[0].quote.length);
+  const [cycling, setCycling] = useState(false);
+  const note = DEMO_NOTES[idx];
+  const typing = charCount < note.quote.length;
+
+  // Hold the first card for a beat after load, then start the loop
+  useEffect(() => {
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return undefined;
+    const t = setTimeout(() => setCycling(true), 4200);
+    return () => clearTimeout(t);
+  }, []);
+
+  // Type the quote out character by character
+  useEffect(() => {
+    if (!cycling) return undefined;
+    setCharCount(0);
+    const iv = setInterval(() => {
+      setCharCount((c) => {
+        if (c >= DEMO_NOTES[idx].quote.length) {
+          clearInterval(iv);
+          return c;
+        }
+        return c + 1;
+      });
+    }, 42);
+    return () => clearInterval(iv);
+  }, [idx, cycling]);
+
+  // Once fully typed, hold, then move to the next note
+  useEffect(() => {
+    if (!cycling || typing) return undefined;
+    const t = setTimeout(() => setIdx((i) => (i + 1) % DEMO_NOTES.length), 4600);
+    return () => clearTimeout(t);
+  }, [cycling, typing, idx]);
+
+  const shownQuote = cycling ? note.quote.slice(0, charCount) : note.quote;
+
+  return (
+    <div>
+      <figure className="mk-notecard" aria-label="Live example of voice notes turning into structured coaching notes">
+        <div className="mk-notecard-quote mk-rise">
+          <MicIcon live={cycling && typing} />
+          <div>
+            <p className="mk-notecard-quote-text">
+              &ldquo;{shownQuote}
+              {cycling && typing ? <span className="mk-caret" aria-hidden="true" /> : <>&rdquo;</>}
+            </p>
+            <p className="mk-notecard-time">
+              {cycling && typing ? 'Listening…' : `Voice note · ${note.time}`}
+            </p>
+          </div>
+        </div>
+        <div className="mk-notecard-flow mk-rise mk-rise-1" aria-hidden="true">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M12 4v16" /><path d="M6 14l6 6 6-6" />
+          </svg>
+        </div>
+        {cycling && typing ? (
+          <div className="mk-notecard-rows mk-notecard-rows-pending" aria-hidden="true">
+            <div className="mk-notecard-row"><span className="mk-notecard-label">Player</span><span className="mk-skeleton" /></div>
+            <div className="mk-notecard-row"><span className="mk-notecard-label">Skill</span><span className="mk-skeleton mk-skeleton-w2" /></div>
+            <div className="mk-notecard-row"><span className="mk-notecard-label">Priority</span><span className="mk-skeleton mk-skeleton-w3" /></div>
+            <div className="mk-notecard-row"><span className="mk-notecard-label">Game</span><span className="mk-skeleton mk-skeleton-w2" /></div>
+          </div>
+        ) : (
+          <div className="mk-notecard-rows" key={`${idx}-${cycling}`}>
+            <div className="mk-notecard-row mk-rise mk-rise-2">
+              <span className="mk-notecard-label">Player</span>
+              <span className="mk-notecard-value">{note.player}</span>
+            </div>
+            <div className="mk-notecard-row mk-rise mk-rise-3">
+              <span className="mk-notecard-label">Skill</span>
+              <span className="mk-notecard-value">{note.skill}</span>
+            </div>
+            <div className="mk-notecard-row mk-rise mk-rise-4">
+              <span className="mk-notecard-label">Priority</span>
+              <span className="mk-notecard-value">
+                <span className={note.priority === 'High' ? 'mk-badge-high' : 'mk-badge-med'}>{note.priority}</span>
+              </span>
+            </div>
+            <div className="mk-notecard-row mk-rise mk-rise-5">
+              <span className="mk-notecard-label">Game</span>
+              <span className="mk-notecard-value">{note.game}</span>
+            </div>
+          </div>
+        )}
+      </figure>
+      <div className="mk-notecard-foot mk-rise mk-rise-6">
+        <p className="mk-notecard-caption">A five-second voice note, organized before the set ends.</p>
+        <div className="mk-dots" role="tablist" aria-label="Example notes">
+          {DEMO_NOTES.map((n, i) => (
+            <button
+              key={n.quote}
+              type="button"
+              className={i === idx ? 'mk-dot mk-dot-on' : 'mk-dot'}
+              aria-label={`Show example ${i + 1}`}
+              onClick={() => {
+                setCycling(true);
+                if (i !== idx) setIdx(i);
+              }}
+            />
+          ))}
+        </div>
+      </div>
+    </div>
   );
 }
 
 export default function MarketingHome() {
   const { user, loading } = useAuth();
-  const router = useRouter();
-
-  // Signed-in coaches typing the root URL want the app, not the pitch —
-  // send them straight to their home tab.
-  useEffect(() => {
-    if (!loading && user) {
-      router.replace('/(tabs)/home');
-    }
-  }, [user, loading, router]);
+  const signedIn = !loading && !!user;
 
   if (Platform.OS !== 'web') return null;
 
@@ -123,52 +273,17 @@ export default function MarketingHome() {
               Sideline records your voice notes and turns them into structured, searchable
               feedback — by player, by skill, by game.
             </p>
-            <a className="mk-btn mk-btn-lg" href="/app">Start recording</a>
-            <p className="mk-hero-cta-note">Works in the browser, on the phone already in your hand.</p>
-          </div>
-
-          <div>
-            <figure className="mk-notecard" aria-label="Example of a voice note turned into a structured coaching note">
-              <div className="mk-notecard-quote mk-rise">
-                <MicIcon />
-                <div>
-                  <p className="mk-notecard-quote-text">&ldquo;Block closing late on the outside&rdquo;</p>
-                  <p className="mk-notecard-time">Voice note · 0:04</p>
-                </div>
-              </div>
-              <div className="mk-notecard-flow mk-rise mk-rise-1" aria-hidden="true">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M12 4v16" /><path d="M6 14l6 6 6-6" />
-                </svg>
-              </div>
-              <div className="mk-notecard-rows">
-                <div className="mk-notecard-row mk-rise mk-rise-2">
-                  <span className="mk-notecard-label">Player</span>
-                  <span className="mk-notecard-value">#7 (Sarah K.)</span>
-                </div>
-                <div className="mk-notecard-row mk-rise mk-rise-3">
-                  <span className="mk-notecard-label">Skill</span>
-                  <span className="mk-notecard-value">Blocking — timing</span>
-                </div>
-                <div className="mk-notecard-row mk-rise mk-rise-4">
-                  <span className="mk-notecard-label">Priority</span>
-                  <span className="mk-notecard-value"><span className="mk-badge-high">High</span></span>
-                </div>
-                <div className="mk-notecard-row mk-rise mk-rise-5">
-                  <span className="mk-notecard-label">Game</span>
-                  <span className="mk-notecard-value">vs. Ridge, Set 2</span>
-                </div>
-              </div>
-            </figure>
-            <p className="mk-notecard-caption mk-rise mk-rise-6">
-              A five-second voice note, organized before the set ends.
+            <a className="mk-btn mk-btn-lg" href="/app">{signedIn ? 'Open Sideline' : 'Start recording'}</a>
+            <p className="mk-hero-cta-note">
+              {signedIn ? 'You’re signed in — pick up where you left off.' : 'No clipboard. No typing. Just say what you saw.'}
             </p>
           </div>
+          <NoteCardDemo />
         </div>
       </section>
 
       {/* how it works */}
-      <section className="mk-section" id="how-it-works" style={{ paddingTop: 0 }}>
+      <section className="mk-section mk-reveal" id="how-it-works" style={{ paddingTop: 0 }}>
         <div className="mk-container">
           <p className="mk-eyebrow">How it works</p>
           <h2 className="mk-section-title">Three moments. None of them involve a keyboard.</h2>
@@ -179,7 +294,7 @@ export default function MarketingHome() {
 
           <div className="mk-moments">
             <div className="mk-moment">
-              <MicIcon />
+              <BigMicIcon />
               <h3>Tap and talk.</h3>
               <p>
                 During a timeout, between sets, on the bus home. Just say what you noticed,
@@ -210,7 +325,7 @@ export default function MarketingHome() {
       </section>
 
       {/* built for the sideline */}
-      <section className="mk-band mk-section">
+      <section className="mk-band mk-section mk-reveal">
         <div className="mk-container">
           <p className="mk-eyebrow">Built for the sideline</p>
           <p className="mk-band-text">
@@ -223,7 +338,7 @@ export default function MarketingHome() {
       </section>
 
       {/* founders */}
-      <section className="mk-section">
+      <section className="mk-section mk-reveal">
         <div className="mk-container mk-founders-grid">
           <div>
             <p className="mk-eyebrow">Who&rsquo;s building this</p>

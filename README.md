@@ -1,6 +1,10 @@
 # Sideline: https://sideline-ai.pages.dev
 Sideline is an AI-powered coaching assistant built for sports teams, starting with volleyball. It helps coaches capture in-game observations through voice notes, then automatically transcribes, organizes, and summarizes them into actionable post-game feedback.
 
+## Links
+- **Website:** https://sideline-ai.pages.dev — marketing site, [about page](https://sideline-ai.pages.dev/about), and [blog](https://sideline-ai.pages.dev/blog)
+- **Web app:** https://sideline-ai.pages.dev/app — opens the app (signed-in users go straight to their home tab)
+
 ## The Problem
 During games, coaches notice dozens of important details:
 - poor positioning  
@@ -44,7 +48,7 @@ Sideline converts this into structured post-game notes.
 
 ## Tech Stack
 ### Frontend
-- React/Next.js
+- React Native / Expo (expo-router) — one codebase for iOS, Android, and web
 
 ### Backend/Database
 - Supabase
@@ -54,7 +58,18 @@ Sideline converts this into structured post-game notes.
 - Groq API (summaries/LLM processing)
 
 ### Hosting
-- Cloudflare Pages
+- Cloudflare Pages (static web export, deployed automatically on push to `main`)
+
+## Repo Layout
+- `sideline/` — the Expo app
+  - `sideline/app/(tabs)/` — the app itself (home tab lives at `/home` on web)
+  - `sideline/app/(auth)/` — welcome, login, signup
+  - `sideline/app/(marketing)/` — the public marketing site (`/`, `/about`, `/blog`), plain HTML/CSS pages statically rendered for SEO
+  - `sideline/app/app.jsx` — `/app`, the stable "open the web app" entry URL
+  - `sideline/public/` — `robots.txt`, `sitemap.xml`, and static assets
+- `WEBSITE_DESIGN_SPEC.md` — design spec the marketing site was built from
+
+To build the web bundle locally: `cd sideline && npx expo export --platform web` (output in `sideline/dist/`).
 
 ## Why We Built This
 We noticed coaches process huge amounts of information in real time, but most of it gets lost after the match.

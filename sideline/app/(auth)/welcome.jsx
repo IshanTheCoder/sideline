@@ -17,6 +17,17 @@ export default function WelcomeScreen() {
 
   return (
     <ThemedView style={styles.container}>
+      {/* Web only: escape hatch back to the marketing site */}
+      {Platform.OS === 'web' && (
+        <TouchableOpacity
+          style={styles.backToSite}
+          onPress={() => { window.location.href = '/'; }}
+          activeOpacity={0.7}
+          accessibilityLabel="Back to the Sideline website"
+        >
+          <Text style={styles.backToSiteText}>← Back to site</Text>
+        </TouchableOpacity>
+      )}
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
@@ -69,6 +80,19 @@ export default function WelcomeScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  backToSite: {
+    position: 'absolute',
+    top: 18,
+    left: 18,
+    zIndex: 10,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+  },
+  backToSiteText: {
+    color: '#8FAF7E',
+    fontSize: 15,
+    fontWeight: '600',
   },
   scrollContent: {
     flexGrow: 1,
