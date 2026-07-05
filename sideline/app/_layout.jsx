@@ -38,7 +38,11 @@ function RootLayoutNav() {
     if (loading) return;
 
     const inAuthGroup = segments[0] === '(auth)';
-    
+    const inMarketingGroup = segments[0] === '(marketing)';
+
+    // Marketing pages are public — never redirect visitors reading the site
+    if (inMarketingGroup) return;
+
     console.log('🔍 Root Layout Navigation Check:', {
       hasUser: !!user,
       userEmail: user?.email,
@@ -57,6 +61,12 @@ function RootLayoutNav() {
       router.replace('/(tabs)');
     }
   }, [user, loading, segments]);
+
+  // Marketing pages render as a plain document — no auth gate, no app shell,
+  // no mobile-width column. This keeps the static export crawlable.
+  if (segments[0] === '(marketing)') {
+    return <Slot />;
+  }
 
   // Show loading screen while checking auth state
   if (loading || !fontsLoaded) {

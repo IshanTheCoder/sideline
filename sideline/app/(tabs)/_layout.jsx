@@ -7,6 +7,10 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
+export const unstable_settings = {
+  initialRouteName: 'home',
+};
+
 export default function TabLayout() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
@@ -24,9 +28,9 @@ export default function TabLayout() {
           borderTopColor: colorScheme === 'dark' ? '#2A2A2A' : '#E8E8E8',
         } : undefined,
       }}>
-      {/* home sweet home — the main landing tab */}
+      {/* home sweet home — the main landing tab (lives at /home; / belongs to the marketing site) */}
       <Tabs.Screen
-        name="index"
+        name="home"
         options={{
           title: 'Home',
           tabBarIcon: ({ color }) => <IconSymbol size={28} name="house.fill" color={color} />,

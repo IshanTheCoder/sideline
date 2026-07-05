@@ -1,0 +1,19 @@
+User-agent: *
+Allow: /
+
+# App routes — nothing for crawlers here
+Disallow: /home
+Disallow: /welcome
+Disallow: /login
+Disallow: /signup
+Disallow: /callback
+Disallow: /reset-password
+Disallow: /record
+Disallow: /record-details
+Disallow: /review
+Disallow: /roster
+Disallow: /settings
+Disallow: /explore
+Disallow: /modal
+
+Sitemap: https://sideline-ai.pages.dev/sitemap.xml

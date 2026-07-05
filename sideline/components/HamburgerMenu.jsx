@@ -68,7 +68,7 @@ export default function HamburgerMenu({ visible, onClose, onSignOut }) {
       id: 'home',
       label: 'Home',
       icon: 'house.fill',
-      onPress: () => handleNavigation('/(tabs)/', { replace: true }),
+      onPress: () => handleNavigation('/(tabs)/home', { replace: true }),
       color: Colors[colorScheme ?? 'light'].tint,
     },
     {
