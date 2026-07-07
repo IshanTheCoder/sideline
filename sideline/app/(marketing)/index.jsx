@@ -100,57 +100,30 @@ function BigMicIcon() {
   );
 }
 
-// The hero background: a large volleyball spiker mid-jump, reaching up to a
-// terracotta ball. Flat sports-pictogram style built from round-capped
-// strokes and filled shapes, sitting behind the hero text at low opacity.
-// GSAP fades it in on load; it renders fully visible for crawlers, no-JS
-// visitors, and anyone with reduced motion enabled.
+// The hero background: a volleyball spiker mid-jump (clean silhouette cut
+// from the reference art, served from /public). GSAP raises him in from the
+// bottom of the hero on load, like he's jumping into frame; the static
+// (fully visible) state is untouched until GSAP loads, so crawlers, no-JS
+// visitors, and reduced-motion users always see the finished hero.
 function HeroPlayer() {
   return (
     <div className="mk-hero-player" aria-hidden="true">
-      <svg className="mk-hero-player-svg" viewBox="0 0 520 620" fill="none">
-        <circle cx="402" cy="58" r="36" fill="#C4785B" />
-        <g stroke="#55584a" fill="#55584a">
-          {/* reaching arm */}
-          <path d="M285 208 C 298 188, 312 170, 326 152" strokeWidth="22" strokeLinecap="round" fill="none" />
-          <path d="M324 154 C 338 138, 352 120, 364 104" strokeWidth="17" strokeLinecap="round" fill="none" />
-          <circle cx="370" cy="96" r="12" stroke="none" />
-          {/* cocked arm */}
-          <path d="M222 212 C 200 206, 178 198, 162 190" strokeWidth="21" strokeLinecap="round" fill="none" />
-          <path d="M162 188 C 166 168, 174 146, 184 132" strokeWidth="17" strokeLinecap="round" fill="none" />
-          <circle cx="187" cy="126" r="14" stroke="none" />
-          {/* head + neck */}
-          <circle cx="250" cy="148" r="27" stroke="none" />
-          <path d="M250 170 L256 196" strokeWidth="17" strokeLinecap="round" fill="none" />
-          {/* torso: wide shoulders, arched back, real hips */}
-          <path d="M290 200 C 300 238, 292 280, 274 318 C 268 332, 264 342, 262 352 L216 346 C 212 312, 214 272, 222 238 C 225 222, 221 212, 217 206 C 240 194, 268 192, 290 200 Z" stroke="none" />
-          {/* front leg: thigh drives forward, shin tucks back, toe down */}
-          <path d="M256 348 C 272 370, 290 396, 300 418" strokeWidth="30" strokeLinecap="round" fill="none" />
-          <path d="M300 418 C 298 446, 290 470, 282 490" strokeWidth="19" strokeLinecap="round" fill="none" />
-          <path d="M282 492 C 288 504, 292 514, 292 526" strokeWidth="14" strokeLinecap="round" fill="none" />
-          {/* rear leg: deep knee fold, heel trailing behind */}
-          <path d="M226 346 C 212 372, 196 396, 184 414" strokeWidth="27" strokeLinecap="round" fill="none" />
-          <path d="M184 414 C 190 440, 196 462, 200 482" strokeWidth="17" strokeLinecap="round" fill="none" />
-          <path d="M200 484 C 198 498, 194 508, 186 518" strokeWidth="13" strokeLinecap="round" fill="none" />
-        </g>
-      </svg>
+      <img className="mk-hero-player-img" src="/spiker.png" alt="" width="687" height="1068" />
     </div>
   );
 }
 
-// Half a volleyball court, annotated the way a coach would mark it up:
-// cream court with a sage border, player circles with a soft sage fill,
-// a dashed coaching arrow, and a faint terracotta drift path. On scroll,
-// GSAP drifts the libero circle down that path over 1.5s, acting out the
-// observation in the quote. Static (undrifted) for reduced motion and no-JS.
-function CourtSketch() {
-  const svgRef = useRef(null);
+// The founders-section visual: a libero digging a ball (clean silhouette
+// cut from the reference art, served from /public), with the observation a
+// coach would say about it as the caption. Fades up once on scroll; static
+// for reduced motion and no-JS.
+function DigFigure() {
+  const rootRef = useRef(null);
 
   useEffect(() => {
     if (Platform.OS !== 'web' || prefersReducedMotion()) return undefined;
-    const svg = svgRef.current;
-    const libero = svg?.querySelector('.mk-court-libero');
-    if (!libero) return undefined;
+    const root = rootRef.current;
+    if (!root) return undefined;
 
     let trigger;
     let tween;
@@ -158,11 +131,11 @@ function CourtSketch() {
     loadMarketingGsap().then((gsap) => {
       if (cancelled || !gsap) return;
       trigger = window.ScrollTrigger.create({
-        trigger: svg,
-        start: 'top 78%',
+        trigger: root,
+        start: 'top 80%',
         once: true,
         onEnter: () => {
-          tween = gsap.to(libero, { x: -8, y: 40, duration: 1.5, ease: 'power1.inOut' });
+          tween = gsap.fromTo(root, { opacity: 0, y: 30 }, { opacity: 1, y: 0, duration: 0.9, ease: 'power2.out' });
         },
       });
     });
@@ -174,20 +147,10 @@ function CourtSketch() {
   }, []);
 
   return (
-    <svg ref={svgRef} className="mk-court" viewBox="0 0 380 330" fill="none" role="img" aria-label="Diagram of a volleyball court with a coaching note about the libero drifting too deep">
-      <rect x="40" y="26" width="300" height="232" rx="4" fill="#f5f3ee" stroke="#75975e" strokeWidth="1.5" />
-      <line x1="40" y1="26" x2="340" y2="26" stroke="#4a6340" strokeWidth="3" strokeLinecap="round" />
-      <line x1="40" y1="102" x2="340" y2="102" stroke="#75975e" strokeWidth="1.2" strokeDasharray="7 7" strokeLinecap="round" opacity="0.5" />
-      <circle cx="232" cy="150" r="11" fill="#75975e" fillOpacity="0.2" stroke="#c9c4b6" strokeWidth="1.5" />
-      <circle cx="292" cy="204" r="11" fill="#75975e" fillOpacity="0.2" stroke="#c9c4b6" strokeWidth="1.5" />
-      <path d="M120 172 C 122 156, 128 142, 138 130" stroke="#75975e" strokeWidth="1.8" strokeDasharray="5 7" strokeLinecap="round" fill="none" />
-      <path d="M138 130 l -8 1.5 M138 130 l -2.5 7.5" stroke="#75975e" strokeWidth="1.8" strokeLinecap="round" />
-      <path d="M120 200 C 119 214, 116 226, 112 236" stroke="#C4785B" strokeWidth="1.6" strokeDasharray="1.5 6" strokeLinecap="round" opacity="0.4" fill="none" />
-      <circle className="mk-court-libero" cx="120" cy="188" r="11" fill="#75975e" fillOpacity="0.2" stroke="#75975e" strokeWidth="1.8" />
-      <text x="40" y="314" fill="#565650" fontFamily="'Source Serif 4', Georgia, serif" fontStyle="italic" fontSize="17">
-        &ldquo;libero drifting too deep&rdquo;
-      </text>
-    </svg>
+    <figure ref={rootRef} className="mk-dig">
+      <img src="/digger.png" alt="Silhouette of a volleyball player digging a ball" width="504" height="428" />
+      <figcaption className="mk-dig-caption">&ldquo;libero drifting too deep&rdquo;</figcaption>
+    </figure>
   );
 }
 
@@ -313,92 +276,45 @@ const WAVE_NOTE = {
   priority: 'Medium',
 };
 
-// Builds the voice-to-note timeline: the six bars oscillate like a live
-// waveform for ~1s, then the outer four reshape into the card's frame (the
-// two at the edges stretch into the side borders; two rotate 90° into the
-// top and bottom) while the middle pair fades. The real card crossfades in
-// underneath. Transforms and opacity only; no layout, no canvas.
-function buildWaveTimeline(gsap, card, bars) {
-  const cardRect = card.getBoundingClientRect();
-  const rects = bars.map((b) => b.getBoundingClientRect());
-  const barW = rects[0].width;
-  const barH = rects[0].height;
-  // GSAP x/y are deltas from each bar's resting center to a border midpoint.
-  const moveTo = (i, targetX, targetY) => ({
-    x: targetX - (rects[i].left + rects[i].right) / 2,
-    y: targetY - (rects[i].top + rects[i].bottom) / 2,
-  });
-  const midX = cardRect.left + cardRect.width / 2;
-  const midY = cardRect.top + cardRect.height / 2;
-  const frame = {
-    left: { ...moveTo(0, cardRect.left + barW / 2, midY), rotation: 0, scaleY: cardRect.height / barH },
-    top: { ...moveTo(1, midX, cardRect.top + barW / 2), rotation: 90, scaleY: cardRect.width / barH },
-    bottom: { ...moveTo(4, midX, cardRect.bottom - barW / 2), rotation: 90, scaleY: cardRect.width / barH },
-    right: { ...moveTo(5, cardRect.right - barW / 2, midY), rotation: 0, scaleY: cardRect.height / barH },
-  };
-
-  const tl = gsap.timeline({ defaults: { transformOrigin: '50% 50%' } });
-  // ~1s of "listening": each bar re-rolls a random height every beat
-  tl.to(bars, {
-    scaleY: 'random(0.3, 2.3)',
-    duration: 0.14,
-    ease: 'sine.inOut',
-    repeat: 6,
-    repeatRefresh: true,
-    stagger: { each: 0.02, from: 'random' },
-  });
-  tl.to(bars, { scaleY: 1, duration: 0.16, ease: 'sine.out' });
-  // the waveform becomes the card frame
-  tl.add('morph');
-  tl.to(bars[0], { ...frame.left, duration: 0.6, ease: 'power3.inOut' }, 'morph');
-  tl.to(bars[1], { ...frame.top, duration: 0.6, ease: 'power3.inOut' }, 'morph');
-  tl.to(bars[4], { ...frame.bottom, duration: 0.6, ease: 'power3.inOut' }, 'morph');
-  tl.to(bars[5], { ...frame.right, duration: 0.6, ease: 'power3.inOut' }, 'morph');
-  tl.to([bars[2], bars[3]], { scaleY: 0.2, opacity: 0, duration: 0.3, ease: 'power2.in' }, 'morph');
-  // the frame hands off to the real card
-  tl.to(card, { opacity: 1, duration: 0.45, ease: 'power1.out' }, 'morph+=0.45');
-  tl.fromTo(
-    card.querySelectorAll('.mk-wavecard-quote, .mk-notecard-row'),
-    { opacity: 0, y: 6 },
-    { opacity: 1, y: 0, duration: 0.35, ease: 'power2.out', stagger: 0.06 },
-    'morph+=0.5'
-  );
-  tl.to(bars, { opacity: 0, duration: 0.3, ease: 'power1.out' }, 'morph+=0.6');
-  return tl;
-}
-
-// The "how it works" moment: a sound waveform that collapses into the
-// structured note card when scrolled into view (GSAP ScrollTrigger, once).
-// Statically rendered as the finished card; the bars only appear after JS
-// arms the animation, so crawlers, no-JS visitors, and reduced-motion users
-// always see the complete card.
+// The "how it works" moment: when the card scrolls into view the quote
+// settles in first, then the structured fields cascade in one by one, with
+// the card lifting into place (GSAP ScrollTrigger, once). Statically
+// rendered as the finished card, and only animated once GSAP has actually
+// loaded, so crawlers, no-JS visitors, and reduced-motion users always see
+// the complete card.
 function WaveToNote() {
   const rootRef = useRef(null);
 
   useEffect(() => {
     if (Platform.OS !== 'web' || prefersReducedMotion()) return undefined;
     const root = rootRef.current;
-    if (!root) return undefined;
-    const card = root.querySelector('.mk-wavecard-card');
-    const bars = Array.from(root.querySelectorAll('.mk-wavecard-bar'));
-    if (!card || bars.length === 0) return undefined;
+    const card = root?.querySelector('.mk-wavecard-card');
+    if (!card) return undefined;
 
     let trigger;
     let tl;
     let cancelled = false;
-    root.classList.add('is-armed');
     loadMarketingGsap().then((gsap) => {
-      if (cancelled) return;
-      if (!gsap) {
-        root.classList.remove('is-armed'); // CDN failed; show the static card
-        return;
-      }
+      if (cancelled || !gsap) return;
       trigger = window.ScrollTrigger.create({
         trigger: root,
-        start: 'top 75%',
+        start: 'top 78%',
         once: true,
         onEnter: () => {
-          tl = buildWaveTimeline(gsap, card, bars);
+          tl = gsap.timeline();
+          tl.fromTo(card, { opacity: 0, y: 26 }, { opacity: 1, y: 0, duration: 0.55, ease: 'power2.out' });
+          tl.fromTo(
+            card.querySelector('.mk-wavecard-quote'),
+            { opacity: 0, y: 10 },
+            { opacity: 1, y: 0, duration: 0.4, ease: 'power2.out' },
+            '-=0.2'
+          );
+          tl.fromTo(
+            card.querySelectorAll('.mk-notecard-row'),
+            { opacity: 0, y: 10 },
+            { opacity: 1, y: 0, duration: 0.4, ease: 'power2.out', stagger: 0.14 },
+            '-=0.1'
+          );
         },
       });
     });
@@ -406,36 +322,28 @@ function WaveToNote() {
       cancelled = true;
       if (trigger) trigger.kill();
       if (tl) tl.kill();
-      root.classList.remove('is-armed');
     };
   }, []);
 
   return (
     <div className="mk-wavecard" ref={rootRef}>
-      <div className="mk-wavecard-stage">
-        <div className="mk-wavecard-bars" aria-hidden="true">
-          {[0, 1, 2, 3, 4, 5].map((i) => (
-            <span key={i} className="mk-wavecard-bar" />
-          ))}
-        </div>
-        <figure className="mk-wavecard-card" aria-label="A five-second voice note shown as the structured note it becomes">
-          <p className="mk-wavecard-quote">&ldquo;{WAVE_NOTE.quote}&rdquo;</p>
-          <div className="mk-wavecard-rows">
-            <div className="mk-notecard-row">
-              <span className="mk-notecard-label">Player</span>
-              <span className="mk-notecard-value">{WAVE_NOTE.player}</span>
-            </div>
-            <div className="mk-notecard-row">
-              <span className="mk-notecard-label">Skill</span>
-              <span className="mk-notecard-value">{WAVE_NOTE.skill}</span>
-            </div>
-            <div className="mk-notecard-row">
-              <span className="mk-notecard-label">Priority</span>
-              <span className="mk-notecard-value"><span className="mk-badge-med">{WAVE_NOTE.priority}</span></span>
-            </div>
+      <figure className="mk-wavecard-card" aria-label="A five-second voice note shown as the structured note it becomes">
+        <p className="mk-wavecard-quote">&ldquo;{WAVE_NOTE.quote}&rdquo;</p>
+        <div className="mk-wavecard-rows">
+          <div className="mk-notecard-row">
+            <span className="mk-notecard-label">Player</span>
+            <span className="mk-notecard-value">{WAVE_NOTE.player}</span>
           </div>
-        </figure>
-      </div>
+          <div className="mk-notecard-row">
+            <span className="mk-notecard-label">Skill</span>
+            <span className="mk-notecard-value">{WAVE_NOTE.skill}</span>
+          </div>
+          <div className="mk-notecard-row">
+            <span className="mk-notecard-label">Priority</span>
+            <span className="mk-notecard-value"><span className="mk-badge-med">{WAVE_NOTE.priority}</span></span>
+          </div>
+        </div>
+      </figure>
       <p className="mk-wavecard-caption">Said out loud during a rally. Filed before the next one.</p>
     </div>
   );
@@ -446,14 +354,14 @@ export default function MarketingHome() {
   const signedIn = !loading && !!user;
   const heroRef = useRef(null);
 
-  // Hero load animation: the background spiker rises and fades in. The
-  // static (fully visible) state is never touched until GSAP has actually
-  // loaded, so crawlers, no-JS visitors, reduced-motion users, and anyone
-  // on a connection where the CDN is slow or blocked always see a complete
-  // hero.
+  // Hero load animation: the background spiker jumps in from the bottom of
+  // the hero. The static (fully visible) state is never touched until GSAP
+  // has actually loaded, so crawlers, no-JS visitors, reduced-motion users,
+  // and anyone on a connection where the CDN is slow or blocked always see
+  // a complete hero.
   useEffect(() => {
     if (Platform.OS !== 'web' || prefersReducedMotion()) return undefined;
-    const player = heroRef.current?.querySelector('.mk-hero-player-svg');
+    const player = heroRef.current?.querySelector('.mk-hero-player-img');
     if (!player) return undefined;
 
     let tween;
@@ -462,8 +370,8 @@ export default function MarketingHome() {
       if (cancelled || !gsap) return;
       tween = gsap.fromTo(
         player,
-        { opacity: 0, y: 28, scale: 0.985 },
-        { opacity: 1, y: 0, scale: 1, duration: 1.2, ease: 'power2.out', delay: 0.1 }
+        { opacity: 0, y: 180 },
+        { opacity: 1, y: 0, duration: 1.4, ease: 'power3.out', delay: 0.15 }
       );
     });
     return () => {
@@ -514,7 +422,7 @@ export default function MarketingHome() {
       </section>
 
       {/* how it works */}
-      <section className="mk-section" id="how-it-works" style={{ paddingTop: 0 }}>
+      <section className="mk-section mk-section-how" id="how-it-works">
         <div className="mk-container">
           <p className="mk-eyebrow">How it works</p>
           <h2 className="mk-section-title">Three moments. None of them involve a keyboard.</h2>
@@ -571,7 +479,7 @@ export default function MarketingHome() {
       </section>
 
       {/* founders */}
-      <section className="mk-section">
+      <section className="mk-section mk-section-founders">
         <div className="mk-container mk-founders-grid">
           <div>
             <p className="mk-eyebrow">Who&rsquo;s building this</p>
@@ -589,7 +497,7 @@ export default function MarketingHome() {
               We&rsquo;ll set you up, and we&rsquo;ll actually read your feedback.
             </p>
           </div>
-          <CourtSketch />
+          <DigFigure />
         </div>
       </section>
     </main>

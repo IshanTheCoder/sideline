@@ -186,32 +186,40 @@ body:has(.mk-root) #root {
 .mk-hero {
   position: relative;
   overflow: hidden;
-  padding: 224px 0 80px;
+  padding: 200px 0 80px;
 }
 @media (min-width: 900px) {
   .mk-hero { padding: 120px 0 124px; }
 }
+/* hero content hugs the left edge of the page more than the other sections */
+.mk-hero .mk-container { max-width: 1280px; }
 .mk-hero-grid { position: relative; z-index: 1; }
 
-/* the background spiker: large, behind the hero text, quiet enough that the
-   headline stays fully readable on top of it. On mobile the hero's top
-   padding leaves the figure's upper body (ball, arms, head) in open space
-   above the headline. */
+/* the background spiker, jumping up into frame on load. Quiet enough that
+   the headline stays fully readable on top of him. On mobile he owns the
+   headroom above the headline (the card stacks below); on desktop he's
+   anchored to the bottom of the hero, left of the text. */
 .mk-hero-player {
   position: absolute;
   z-index: 0;
-  top: 14px;
+  top: 20px;
   left: 50%;
-  transform: translateX(-50%);
-  width: min(94vw, 480px);
-  opacity: 0.22;
+  transform: translateX(-46%);
+  width: min(72vw, 300px);
+  opacity: 0.26;
   pointer-events: none;
+}
+.mk-hero-player img {
+  width: 100%;
+  height: auto;
 }
 @media (min-width: 900px) {
   .mk-hero-player {
-    top: 4px;
-    transform: translateX(-72%);
-    width: 500px;
+    top: auto;
+    bottom: -40px;
+    left: 30%;
+    transform: translateX(-50%);
+    width: 400px;
   }
 }
 .mk-hero-grid {
@@ -403,6 +411,16 @@ body:has(.mk-root) #root {
 
 /* ---------- how it works ---------- */
 
+/* each homepage section gets its own background so they read as distinct
+   bands: cream hero, white how-it-works, sage-wash editorial band, deeper
+   cream founders */
+.mk-section-how {
+  background: var(--surface);
+  border-top: 1px solid var(--hairline);
+  border-bottom: 1px solid var(--hairline);
+}
+.mk-section-founders { background: #edeade; }
+
 .mk-moments {
   display: grid;
   grid-template-columns: 1fr;
@@ -440,34 +458,14 @@ body:has(.mk-root) #root {
   color: var(--sage-deep);
 }
 
-/* ---------- voice-to-note morph (how it works) ----------
-   Statically rendered as the finished card. When JS arms the animation
-   (.is-armed), the card hides and the waveform bars take its place; GSAP
-   then morphs the bars into the card frame and crossfades the card back in.
-   Reduced-motion and no-JS visitors only ever see the finished card. */
+/* ---------- the assembling note card (how it works) ----------
+   Statically rendered as the finished card; GSAP animates the quote and
+   rows in on scroll. Reduced-motion and no-JS visitors only ever see the
+   finished card. */
 
 .mk-wavecard {
   max-width: 420px;
   margin: 72px auto 0;
-}
-.mk-wavecard-stage { position: relative; }
-.mk-wavecard-bars {
-  position: absolute;
-  inset: 0;
-  display: none;
-  align-items: center;
-  justify-content: center;
-  gap: 12px;
-  pointer-events: none;
-}
-.mk-wavecard.is-armed .mk-wavecard-bars { display: flex; }
-.mk-wavecard.is-armed .mk-wavecard-card { opacity: 0; }
-.mk-wavecard-bar {
-  width: 5px;
-  height: 44px;
-  border-radius: 3px;
-  background: var(--sage);
-  will-change: transform;
 }
 .mk-wavecard-card {
   background: var(--surface);
@@ -492,17 +490,11 @@ body:has(.mk-root) #root {
   color: var(--ink-2);
   margin-top: 16px;
 }
-@media (prefers-reduced-motion: reduce) {
-  .mk-wavecard .mk-wavecard-bars { display: none !important; }
-  .mk-wavecard .mk-wavecard-card { opacity: 1 !important; }
-}
 
 /* ---------- editorial band (built for the sideline) ---------- */
 
 .mk-band {
-  background: var(--surface);
-  border-top: 1px solid var(--hairline);
-  border-bottom: 1px solid var(--hairline);
+  background: var(--sage-wash);
 }
 .mk-band-text {
   font-family: var(--serif);
@@ -532,7 +524,16 @@ body:has(.mk-root) #root {
   color: var(--ink-2);
   font-size: 0.96rem;
 }
-.mk-court { width: 100%; max-width: 380px; margin: 0 auto; }
+.mk-dig { width: 100%; max-width: 400px; margin: 0 auto; }
+.mk-dig img { width: 100%; height: auto; }
+.mk-dig-caption {
+  font-family: var(--serif);
+  font-style: italic;
+  font-size: 1.08rem;
+  color: var(--ink-2);
+  text-align: center;
+  margin-top: 18px;
+}
 
 /* ---------- footer ---------- */
 
