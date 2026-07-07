@@ -458,14 +458,34 @@ body:has(.mk-root) #root {
   color: var(--sage-deep);
 }
 
-/* ---------- the assembling note card (how it works) ----------
-   Statically rendered as the finished card; GSAP animates the quote and
-   rows in on scroll. Reduced-motion and no-JS visitors only ever see the
-   finished card. */
+/* ---------- voice-to-note morph (how it works) ----------
+   Statically rendered as the finished card. When JS arms the animation
+   (.is-armed), the card hides and the waveform bars take its place; GSAP
+   then morphs the bars into the card frame and crossfades the card back in.
+   Reduced-motion and no-JS visitors only ever see the finished card. */
 
 .mk-wavecard {
   max-width: 420px;
   margin: 72px auto 0;
+}
+.mk-wavecard-stage { position: relative; }
+.mk-wavecard-bars {
+  position: absolute;
+  inset: 0;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  pointer-events: none;
+}
+.mk-wavecard.is-armed .mk-wavecard-bars { display: flex; }
+.mk-wavecard.is-armed .mk-wavecard-card { opacity: 0; }
+.mk-wavecard-bar {
+  width: 5px;
+  height: 44px;
+  border-radius: 3px;
+  background: var(--sage);
+  will-change: transform;
 }
 .mk-wavecard-card {
   background: var(--surface);
@@ -489,6 +509,10 @@ body:has(.mk-root) #root {
   font-style: italic;
   color: var(--ink-2);
   margin-top: 16px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .mk-wavecard .mk-wavecard-bars { display: none !important; }
+  .mk-wavecard .mk-wavecard-card { opacity: 1 !important; }
 }
 
 /* ---------- editorial band (built for the sideline) ---------- */
@@ -526,14 +550,6 @@ body:has(.mk-root) #root {
 }
 .mk-dig { width: 100%; max-width: 400px; margin: 0 auto; }
 .mk-dig img { width: 100%; height: auto; }
-.mk-dig-caption {
-  font-family: var(--serif);
-  font-style: italic;
-  font-size: 1.08rem;
-  color: var(--ink-2);
-  text-align: center;
-  margin-top: 18px;
-}
 
 /* ---------- footer ---------- */
 

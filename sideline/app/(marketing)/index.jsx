@@ -114,9 +114,8 @@ function HeroPlayer() {
 }
 
 // The founders-section visual: a libero digging a ball (clean silhouette
-// cut from the reference art, served from /public), with the observation a
-// coach would say about it as the caption. Fades up once on scroll; static
-// for reduced motion and no-JS.
+// cut from the reference art, served from /public). Fades up once on
+// scroll; static for reduced motion and no-JS.
 function DigFigure() {
   const rootRef = useRef(null);
 
@@ -149,7 +148,6 @@ function DigFigure() {
   return (
     <figure ref={rootRef} className="mk-dig">
       <img src="/digger.png" alt="Silhouette of a volleyball player digging a ball" width="504" height="428" />
-      <figcaption className="mk-dig-caption">&ldquo;libero drifting too deep&rdquo;</figcaption>
     </figure>
   );
 }
@@ -276,45 +274,92 @@ const WAVE_NOTE = {
   priority: 'Medium',
 };
 
-// The "how it works" moment: when the card scrolls into view the quote
-// settles in first, then the structured fields cascade in one by one, with
-// the card lifting into place (GSAP ScrollTrigger, once). Statically
-// rendered as the finished card, and only animated once GSAP has actually
-// loaded, so crawlers, no-JS visitors, and reduced-motion users always see
-// the complete card.
+// Builds the voice-to-note timeline: the six bars oscillate like a live
+// waveform for ~1s, then the outer four reshape into the card's frame (the
+// two at the edges stretch into the side borders; two rotate 90° into the
+// top and bottom) while the middle pair fades. The real card crossfades in
+// underneath. Transforms and opacity only; no layout, no canvas.
+function buildWaveTimeline(gsap, card, bars) {
+  const cardRect = card.getBoundingClientRect();
+  const rects = bars.map((b) => b.getBoundingClientRect());
+  const barW = rects[0].width;
+  const barH = rects[0].height;
+  // GSAP x/y are deltas from each bar's resting center to a border midpoint.
+  const moveTo = (i, targetX, targetY) => ({
+    x: targetX - (rects[i].left + rects[i].right) / 2,
+    y: targetY - (rects[i].top + rects[i].bottom) / 2,
+  });
+  const midX = cardRect.left + cardRect.width / 2;
+  const midY = cardRect.top + cardRect.height / 2;
+  const frame = {
+    left: { ...moveTo(0, cardRect.left + barW / 2, midY), rotation: 0, scaleY: cardRect.height / barH },
+    top: { ...moveTo(1, midX, cardRect.top + barW / 2), rotation: 90, scaleY: cardRect.width / barH },
+    bottom: { ...moveTo(4, midX, cardRect.bottom - barW / 2), rotation: 90, scaleY: cardRect.width / barH },
+    right: { ...moveTo(5, cardRect.right - barW / 2, midY), rotation: 0, scaleY: cardRect.height / barH },
+  };
+
+  const tl = gsap.timeline({ defaults: { transformOrigin: '50% 50%' } });
+  // ~1s of "listening": each bar re-rolls a random height every beat
+  tl.to(bars, {
+    scaleY: 'random(0.3, 2.3)',
+    duration: 0.14,
+    ease: 'sine.inOut',
+    repeat: 6,
+    repeatRefresh: true,
+    stagger: { each: 0.02, from: 'random' },
+  });
+  tl.to(bars, { scaleY: 1, duration: 0.16, ease: 'sine.out' });
+  // the waveform becomes the card frame
+  tl.add('morph');
+  tl.to(bars[0], { ...frame.left, duration: 0.6, ease: 'power3.inOut' }, 'morph');
+  tl.to(bars[1], { ...frame.top, duration: 0.6, ease: 'power3.inOut' }, 'morph');
+  tl.to(bars[4], { ...frame.bottom, duration: 0.6, ease: 'power3.inOut' }, 'morph');
+  tl.to(bars[5], { ...frame.right, duration: 0.6, ease: 'power3.inOut' }, 'morph');
+  tl.to([bars[2], bars[3]], { scaleY: 0.2, opacity: 0, duration: 0.3, ease: 'power2.in' }, 'morph');
+  // the frame hands off to the real card
+  tl.to(card, { opacity: 1, duration: 0.45, ease: 'power1.out' }, 'morph+=0.45');
+  tl.fromTo(
+    card.querySelectorAll('.mk-wavecard-quote, .mk-notecard-row'),
+    { opacity: 0, y: 6 },
+    { opacity: 1, y: 0, duration: 0.35, ease: 'power2.out', stagger: 0.06 },
+    'morph+=0.5'
+  );
+  tl.to(bars, { opacity: 0, duration: 0.3, ease: 'power1.out' }, 'morph+=0.6');
+  return tl;
+}
+
+// The "how it works" moment: a sound waveform that collapses into the
+// structured note card when scrolled into view (GSAP ScrollTrigger, once).
+// Statically rendered as the finished card; the bars only appear after JS
+// arms the animation, so crawlers, no-JS visitors, and reduced-motion users
+// always see the complete card.
 function WaveToNote() {
   const rootRef = useRef(null);
 
   useEffect(() => {
     if (Platform.OS !== 'web' || prefersReducedMotion()) return undefined;
     const root = rootRef.current;
-    const card = root?.querySelector('.mk-wavecard-card');
-    if (!card) return undefined;
+    if (!root) return undefined;
+    const card = root.querySelector('.mk-wavecard-card');
+    const bars = Array.from(root.querySelectorAll('.mk-wavecard-bar'));
+    if (!card || bars.length === 0) return undefined;
 
     let trigger;
     let tl;
     let cancelled = false;
+    root.classList.add('is-armed');
     loadMarketingGsap().then((gsap) => {
-      if (cancelled || !gsap) return;
+      if (cancelled) return;
+      if (!gsap) {
+        root.classList.remove('is-armed'); // CDN failed; show the static card
+        return;
+      }
       trigger = window.ScrollTrigger.create({
         trigger: root,
-        start: 'top 78%',
+        start: 'top 75%',
         once: true,
         onEnter: () => {
-          tl = gsap.timeline();
-          tl.fromTo(card, { opacity: 0, y: 26 }, { opacity: 1, y: 0, duration: 0.55, ease: 'power2.out' });
-          tl.fromTo(
-            card.querySelector('.mk-wavecard-quote'),
-            { opacity: 0, y: 10 },
-            { opacity: 1, y: 0, duration: 0.4, ease: 'power2.out' },
-            '-=0.2'
-          );
-          tl.fromTo(
-            card.querySelectorAll('.mk-notecard-row'),
-            { opacity: 0, y: 10 },
-            { opacity: 1, y: 0, duration: 0.4, ease: 'power2.out', stagger: 0.14 },
-            '-=0.1'
-          );
+          tl = buildWaveTimeline(gsap, card, bars);
         },
       });
     });
@@ -322,28 +367,36 @@ function WaveToNote() {
       cancelled = true;
       if (trigger) trigger.kill();
       if (tl) tl.kill();
+      root.classList.remove('is-armed');
     };
   }, []);
 
   return (
     <div className="mk-wavecard" ref={rootRef}>
-      <figure className="mk-wavecard-card" aria-label="A five-second voice note shown as the structured note it becomes">
-        <p className="mk-wavecard-quote">&ldquo;{WAVE_NOTE.quote}&rdquo;</p>
-        <div className="mk-wavecard-rows">
-          <div className="mk-notecard-row">
-            <span className="mk-notecard-label">Player</span>
-            <span className="mk-notecard-value">{WAVE_NOTE.player}</span>
-          </div>
-          <div className="mk-notecard-row">
-            <span className="mk-notecard-label">Skill</span>
-            <span className="mk-notecard-value">{WAVE_NOTE.skill}</span>
-          </div>
-          <div className="mk-notecard-row">
-            <span className="mk-notecard-label">Priority</span>
-            <span className="mk-notecard-value"><span className="mk-badge-med">{WAVE_NOTE.priority}</span></span>
-          </div>
+      <div className="mk-wavecard-stage">
+        <div className="mk-wavecard-bars" aria-hidden="true">
+          {[0, 1, 2, 3, 4, 5].map((i) => (
+            <span key={i} className="mk-wavecard-bar" />
+          ))}
         </div>
-      </figure>
+        <figure className="mk-wavecard-card" aria-label="A five-second voice note shown as the structured note it becomes">
+          <p className="mk-wavecard-quote">&ldquo;{WAVE_NOTE.quote}&rdquo;</p>
+          <div className="mk-wavecard-rows">
+            <div className="mk-notecard-row">
+              <span className="mk-notecard-label">Player</span>
+              <span className="mk-notecard-value">{WAVE_NOTE.player}</span>
+            </div>
+            <div className="mk-notecard-row">
+              <span className="mk-notecard-label">Skill</span>
+              <span className="mk-notecard-value">{WAVE_NOTE.skill}</span>
+            </div>
+            <div className="mk-notecard-row">
+              <span className="mk-notecard-label">Priority</span>
+              <span className="mk-notecard-value"><span className="mk-badge-med">{WAVE_NOTE.priority}</span></span>
+            </div>
+          </div>
+        </figure>
+      </div>
       <p className="mk-wavecard-caption">Said out loud during a rally. Filed before the next one.</p>
     </div>
   );
