@@ -1,7 +1,7 @@
 User-agent: *
 Allow: /
 
-# App routes — nothing for crawlers here
+# App routes: nothing for crawlers here
 Disallow: /app
 Disallow: /home
 Disallow: /welcome

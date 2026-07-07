@@ -1,5 +1,5 @@
 /*
- * Marketing site design system — "the thoughtful coach's notebook."
+ * Marketing site design system: "the thoughtful coach's notebook."
  * Every rule is scoped under .mk-root so nothing leaks into the app's
  * react-native-web styles. Loaded globally by Metro on web; ignored on native.
  */
@@ -119,17 +119,11 @@ body:has(.mk-root) #root {
 .mk-logo {
   display: inline-flex;
   align-items: center;
-  gap: 10px;
   font-family: var(--serif);
-  font-size: 1.8rem;
-  font-weight: 700;
+  font-size: 1.6rem;
+  font-weight: 600;
   color: var(--ink) !important;
   letter-spacing: 0.01em;
-}
-.mk-logo-mark {
-  width: 44px;
-  height: 44px;
-  object-fit: contain;
 }
 .mk-navlinks {
   display: flex;
@@ -167,6 +161,7 @@ body:has(.mk-root) #root {
   box-shadow: 0 4px 14px rgba(74, 99, 64, 0.25);
 }
 .mk-btn-lg { font-size: 1rem; padding: 12px 24px; }
+.mk-btn-sm { font-size: 0.84rem; padding: 6px 14px; border-radius: 7px; }
 
 /* ---------- sections ---------- */
 
@@ -188,9 +183,33 @@ body:has(.mk-root) #root {
 
 /* ---------- hero ---------- */
 
-.mk-hero { padding: 64px 0 72px; }
+.mk-hero {
+  position: relative;
+  overflow: hidden;
+  padding: 80px 0;
+}
 @media (min-width: 900px) {
-  .mk-hero { padding: 104px 0 120px; }
+  .mk-hero { padding: 110px 0 124px; }
+}
+.mk-hero-grid { position: relative; z-index: 1; }
+
+/* volleyball spiker silhouette: faint background texture, never over text */
+.mk-hero-spiker {
+  position: absolute;
+  z-index: 0;
+  right: -36px;
+  top: 4px;
+  width: 240px;
+  opacity: 0.08;
+  pointer-events: none;
+}
+@media (min-width: 900px) {
+  .mk-hero-spiker {
+    right: 2%;
+    top: 32px;
+    width: 400px;
+    opacity: 0.1;
+  }
 }
 .mk-hero-grid {
   display: grid;
@@ -205,20 +224,28 @@ body:has(.mk-root) #root {
   font-size: clamp(2.2rem, 5vw, 3.4rem);
   line-height: 1.12;
   max-width: 12em;
-  margin-bottom: 0.5em;
+  margin-bottom: 24px;
   text-wrap: balance;
 }
 .mk-hero-sub {
   font-size: 1.08rem;
   color: var(--ink-2);
   max-width: 30em;
-  margin-bottom: 2rem;
+  margin-bottom: 32px;
 }
 .mk-hero-cta-note {
   font-size: 0.98rem;
   font-weight: 500;
   color: var(--ink-2);
-  margin-top: 0.9rem;
+  margin-top: 16px;
+}
+
+/* the serve-trajectory line GSAP draws on load (see index.jsx). Rendered
+   fully drawn by default; the draw state is applied by JS only. */
+.mk-serve-arc {
+  width: min(100%, 440px);
+  height: auto;
+  margin-bottom: 22px;
 }
 
 /* ---------- the note card (hero visual) ---------- */
@@ -417,6 +444,63 @@ body:has(.mk-root) #root {
   color: var(--sage-deep);
 }
 
+/* ---------- voice-to-note morph (how it works) ----------
+   Statically rendered as the finished card. When JS arms the animation
+   (.is-armed), the card hides and the waveform bars take its place; GSAP
+   then morphs the bars into the card frame and crossfades the card back in.
+   Reduced-motion and no-JS visitors only ever see the finished card. */
+
+.mk-wavecard {
+  max-width: 420px;
+  margin: 72px auto 0;
+}
+.mk-wavecard-stage { position: relative; }
+.mk-wavecard-bars {
+  position: absolute;
+  inset: 0;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  pointer-events: none;
+}
+.mk-wavecard.is-armed .mk-wavecard-bars { display: flex; }
+.mk-wavecard.is-armed .mk-wavecard-card { opacity: 0; }
+.mk-wavecard-bar {
+  width: 5px;
+  height: 44px;
+  border-radius: 3px;
+  background: var(--sage);
+  will-change: transform;
+}
+.mk-wavecard-card {
+  background: var(--surface);
+  border: 1px solid var(--hairline);
+  border-radius: 14px;
+  padding: 24px 26px;
+  box-shadow: 0 1px 2px rgba(28, 28, 26, 0.04), 0 12px 32px rgba(28, 28, 26, 0.06);
+}
+.mk-wavecard-quote {
+  font-family: var(--serif);
+  font-style: italic;
+  font-size: 1.12rem;
+  line-height: 1.4;
+  color: var(--ink);
+  margin-bottom: 18px;
+}
+.mk-wavecard-rows { display: grid; gap: 10px; }
+.mk-wavecard-caption {
+  text-align: center;
+  font-size: 0.92rem;
+  font-style: italic;
+  color: var(--ink-2);
+  margin-top: 16px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .mk-wavecard .mk-wavecard-bars { display: none !important; }
+  .mk-wavecard .mk-wavecard-card { opacity: 1 !important; }
+}
+
 /* ---------- editorial band (built for the sideline) ---------- */
 
 .mk-band {
@@ -536,28 +620,10 @@ body:has(.mk-root) #root {
   margin-bottom: 2.2em;
 }
 
-/* ---------- scroll reveals ----------
-   Gated behind .mk-js (set on hydration) so crawlers and no-JS visitors
-   always see fully visible content. Each section reveals once. */
-.mk-js .mk-reveal {
-  opacity: 0;
-  transform: translateY(20px);
-  transition: opacity 700ms ease, transform 700ms ease;
-}
-.mk-js .mk-reveal.is-in {
-  opacity: 1;
-  transform: none;
-}
-
-/* court sketch pieces pop in after the founders section reveals */
-.mk-js .mk-reveal .mk-court-pop { opacity: 0; }
-.mk-js .mk-reveal.is-in .mk-court-pop { animation: mk-rise 0.6s ease-out 0.5s both; }
-.mk-js .mk-reveal.is-in .mk-court-pop-2 { animation-delay: 1s; }
-.mk-js .mk-reveal.is-in .mk-court-pop-3 { animation-delay: 1.5s; }
-
+/* Movement is earned: the hero serve-arc draw, the voice-to-note morph, and
+   the court sketch's libero drift are the only animated moments. No scroll
+   reveals, no parallax; everything else is static. */
 @media (prefers-reduced-motion: reduce) {
-  .mk-js .mk-reveal { opacity: 1; transform: none; transition: none; }
-  .mk-js .mk-reveal .mk-court-pop { opacity: 1; animation: none; }
   .mk-caret, .mk-mic-live, .mk-skeleton { animation: none; }
 }
 
