@@ -100,41 +100,41 @@ function BigMicIcon() {
   );
 }
 
-// The hero's one flourish: a single line tracing a serve trajectory. A slow
-// toss rising from the left, a peak past midcourt, then a steep, fast spike
-// down on the right. GSAP draws it on load (see the effect in MarketingHome);
-// it renders fully drawn for crawlers, no-JS visitors, and anyone with
-// reduced motion enabled.
-function ServeArc() {
+// The hero background: a large volleyball spiker mid-jump, reaching up to a
+// terracotta ball. Flat sports-pictogram style built from round-capped
+// strokes and filled shapes, sitting behind the hero text at low opacity.
+// GSAP fades it in on load; it renders fully visible for crawlers, no-JS
+// visitors, and anyone with reduced motion enabled.
+function HeroPlayer() {
   return (
-    <svg className="mk-serve-arc" viewBox="0 0 440 150" fill="none" aria-hidden="true">
-      <path
-        className="mk-serve-arc-path"
-        d="M8 132 C 72 92, 150 34, 252 20 C 286 15, 312 22, 326 38 L 360 142"
-        stroke="#75975e"
-        strokeWidth="2"
-        strokeLinecap="round"
-      />
-    </svg>
-  );
-}
-
-// Flat volleyball spiker silhouette, sports-pictogram style: thick
-// round-capped strokes for the limbs, filled circles for head and ball.
-// Sits behind the hero at 10% opacity as background texture.
-function SpikerSilhouette() {
-  return (
-    <svg className="mk-hero-spiker" viewBox="0 0 220 260" fill="none" aria-hidden="true">
-      <g stroke="#75975e" strokeLinecap="round" fill="none">
-        <path d="M102 78 C 110 98, 108 118, 100 136" strokeWidth="22" />
-        <path d="M105 84 C 118 74, 134 58, 150 42" strokeWidth="14" />
-        <path d="M98 86 C 86 88, 74 80, 70 64" strokeWidth="13" />
-        <path d="M100 134 C 114 152, 118 168, 108 184 C 100 196, 88 202, 78 204" strokeWidth="16" />
-        <path d="M97 136 C 90 160, 88 180, 98 196 C 104 205, 112 210, 120 213" strokeWidth="16" />
-      </g>
-      <circle cx="100" cy="58" r="14" fill="#75975e" />
-      <circle cx="166" cy="26" r="13" fill="#75975e" />
-    </svg>
+    <div className="mk-hero-player" aria-hidden="true">
+      <svg className="mk-hero-player-svg" viewBox="0 0 520 620" fill="none">
+        <circle cx="402" cy="58" r="36" fill="#C4785B" />
+        <g stroke="#55584a" fill="#55584a">
+          {/* reaching arm */}
+          <path d="M285 208 C 298 188, 312 170, 326 152" strokeWidth="22" strokeLinecap="round" fill="none" />
+          <path d="M324 154 C 338 138, 352 120, 364 104" strokeWidth="17" strokeLinecap="round" fill="none" />
+          <circle cx="370" cy="96" r="12" stroke="none" />
+          {/* cocked arm */}
+          <path d="M222 212 C 200 206, 178 198, 162 190" strokeWidth="21" strokeLinecap="round" fill="none" />
+          <path d="M162 188 C 166 168, 174 146, 184 132" strokeWidth="17" strokeLinecap="round" fill="none" />
+          <circle cx="187" cy="126" r="14" stroke="none" />
+          {/* head + neck */}
+          <circle cx="250" cy="148" r="27" stroke="none" />
+          <path d="M250 170 L256 196" strokeWidth="17" strokeLinecap="round" fill="none" />
+          {/* torso: wide shoulders, arched back, real hips */}
+          <path d="M290 200 C 300 238, 292 280, 274 318 C 268 332, 264 342, 262 352 L216 346 C 212 312, 214 272, 222 238 C 225 222, 221 212, 217 206 C 240 194, 268 192, 290 200 Z" stroke="none" />
+          {/* front leg: thigh drives forward, shin tucks back, toe down */}
+          <path d="M256 348 C 272 370, 290 396, 300 418" strokeWidth="30" strokeLinecap="round" fill="none" />
+          <path d="M300 418 C 298 446, 290 470, 282 490" strokeWidth="19" strokeLinecap="round" fill="none" />
+          <path d="M282 492 C 288 504, 292 514, 292 526" strokeWidth="14" strokeLinecap="round" fill="none" />
+          {/* rear leg: deep knee fold, heel trailing behind */}
+          <path d="M226 346 C 212 372, 196 396, 184 414" strokeWidth="27" strokeLinecap="round" fill="none" />
+          <path d="M184 414 C 190 440, 196 462, 200 482" strokeWidth="17" strokeLinecap="round" fill="none" />
+          <path d="M200 484 C 198 498, 194 508, 186 518" strokeWidth="13" strokeLinecap="round" fill="none" />
+        </g>
+      </svg>
+    </div>
   );
 }
 
@@ -446,35 +446,31 @@ export default function MarketingHome() {
   const signedIn = !loading && !!user;
   const heroRef = useRef(null);
 
-  // Hero load animation: the serve-trajectory line draws itself over 1.5s,
-  // then the headline fades in. The static (fully drawn, fully visible)
-  // state is never touched until GSAP has actually loaded, so crawlers,
-  // no-JS visitors, reduced-motion users, and anyone on a connection where
-  // the CDN is slow or blocked always see a complete hero.
+  // Hero load animation: the background spiker rises and fades in. The
+  // static (fully visible) state is never touched until GSAP has actually
+  // loaded, so crawlers, no-JS visitors, reduced-motion users, and anyone
+  // on a connection where the CDN is slow or blocked always see a complete
+  // hero.
   useEffect(() => {
     if (Platform.OS !== 'web' || prefersReducedMotion()) return undefined;
-    const hero = heroRef.current;
-    const path = hero?.querySelector('.mk-serve-arc-path');
-    const headline = hero?.querySelector('h1');
-    if (!path || !headline) return undefined;
+    const player = heroRef.current?.querySelector('.mk-hero-player-svg');
+    if (!player) return undefined;
 
-    let tl;
+    let tween;
     let cancelled = false;
     loadMarketingGsap().then((gsap) => {
       if (cancelled || !gsap) return;
-      const length = path.getTotalLength();
-      tl = gsap.timeline();
-      tl.set(path, { strokeDasharray: length, strokeDashoffset: length });
-      tl.to(path, { strokeDashoffset: 0, duration: 1.5, ease: 'power1.inOut' });
-      tl.fromTo(headline, { opacity: 0, y: 10 }, { opacity: 1, y: 0, duration: 0.6, ease: 'power2.out' }, '-=0.05');
+      tween = gsap.fromTo(
+        player,
+        { opacity: 0, y: 28, scale: 0.985 },
+        { opacity: 1, y: 0, scale: 1, duration: 1.2, ease: 'power2.out', delay: 0.1 }
+      );
     });
     return () => {
       cancelled = true;
-      if (tl) tl.kill();
-      path.style.strokeDasharray = '';
-      path.style.strokeDashoffset = '';
-      headline.style.opacity = '';
-      headline.style.transform = '';
+      if (tween) tween.kill();
+      player.style.opacity = '';
+      player.style.transform = '';
     };
   }, []);
 
@@ -499,19 +495,18 @@ export default function MarketingHome() {
 
       {/* hero */}
       <section className="mk-hero" ref={heroRef}>
-        <SpikerSilhouette />
+        <HeroPlayer />
         <div className="mk-container mk-hero-grid">
           <div>
-            <ServeArc />
             <p className="mk-eyebrow">Voice-first coaching notes</p>
             <h1>Remember everything you noticed during the game.</h1>
             <p className="mk-hero-sub">
-              Sideline records your voice notes and turns them into structured, searchable
-              feedback. Organized by player, by skill, by game.
+              Sideline turns your five-second voice notes into structured, searchable
+              feedback, organized by player, skill, and game.
             </p>
             <a className="mk-btn mk-btn-lg" href="/app">{signedIn ? 'Open Sideline' : 'Start recording'}</a>
             <p className="mk-hero-cta-note">
-              {signedIn ? 'You’re signed in. Pick up where you left off.' : 'For boys’ and girls’ teams. No clipboard. No typing. Just say what you saw.'}
+              {signedIn ? 'You’re signed in. Pick up where you left off.' : 'No clipboard. No typing. Just say what you saw.'}
             </p>
           </div>
           <NoteCardDemo />
