@@ -2,6 +2,8 @@ import {
   AlertCircle,
   Calendar,
   Camera,
+  ChartColumn,
+  ChartPie,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
@@ -15,6 +17,7 @@ import {
   Filter,
   Home,
   Info,
+  Lightbulb,
   List,
   Lock,
   LogOut,
@@ -85,6 +88,9 @@ const MAPPING = {
   'person.2': Users,
   plus: Plus,
   'questionmark.circle': CircleQuestionMark,
+  lightbulb: Lightbulb,
+  'chart.pie': ChartPie,
+  'chart.bar': ChartColumn,
 };
 
 /**

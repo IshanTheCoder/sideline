@@ -123,7 +123,11 @@ async function processRecordingWithDeps(recordingId, userId, deps = {}) {
 
     const playerNames = rosterPlayers.map((p) => p.name).filter(Boolean);
     console.log('🎤 Starting transcription...');
-    const { transcription, error: transcriptionError } = await transcribeAudioImpl(downloadUrl, { playerNames });
+    // pass full roster objects so the Whisper prompt gets names AND jersey numbers
+    const { transcription, error: transcriptionError } = await transcribeAudioImpl(downloadUrl, {
+      playerNames,
+      players: rosterPlayers,
+    });
 
     if (transcriptionError || !transcription) {
       console.error('❌ Transcription failed:', transcriptionError);

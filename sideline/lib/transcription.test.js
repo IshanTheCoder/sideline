@@ -12,7 +12,7 @@ vi.mock('react-native', () => ({
   Platform: { OS: 'web' },
 }));
 
-import { createTranscriptionClient } from './transcription';
+import { createTranscriptionClient, buildWhisperPrompt } from './transcription';
 
 describe('createTranscriptionClient', () => {
   beforeEach(() => {
@@ -70,9 +70,10 @@ describe('createTranscriptionClient', () => {
     );
     expect(formEntries).toEqual([
       ['file', expect.any(File)],
-      ['model', 'whisper-large-v3-turbo'],
+      ['model', 'whisper-large-v3'],
       ['language', 'en'],
-      ['prompt', expect.stringContaining('Player names: Sarah, Ishan')],
+      ['temperature', '0'],
+      ['prompt', expect.stringContaining('Players: Sarah Johnson, Ishan Patel')],
     ]);
   });
 
@@ -83,5 +84,42 @@ describe('createTranscriptionClient', () => {
 
     expect(result.transcription).toBeNull();
     expect(result.error.message).toBe('Groq API key not configured');
+  });
+});
+
+describe('buildWhisperPrompt', () => {
+  it('returns base volleyball vocabulary with no roster', () => {
+    const prompt = buildWhisperPrompt();
+    expect(prompt).toContain('serve receive');
+    expect(prompt).toContain('libero');
+    expect(prompt).not.toContain('Players:');
+  });
+
+  it('prefers full roster objects and includes jersey numbers', () => {
+    const prompt = buildWhisperPrompt(
+      ['Sarah'],
+      [
+        { name: 'Sarah Johnson', number: 4 },
+        { name: 'Ishan Patel', number: '12' },
+        { name: 'Maya Chen' }, // no number — name only
+      ]
+    );
+    expect(prompt).toContain('Players: Sarah Johnson number 4, Ishan Patel number 12, Maya Chen');
+  });
+
+  it('falls back to bare names when no roster objects are given', () => {
+    const prompt = buildWhisperPrompt(['Sarah Johnson', 'Ishan Patel']);
+    expect(prompt).toContain('Players: Sarah Johnson, Ishan Patel');
+  });
+
+  it('dedupes entries and skips blank names', () => {
+    const prompt = buildWhisperPrompt([], [
+      { name: 'Sarah Johnson', number: 4 },
+      { name: 'Sarah Johnson', number: 4 },
+      { name: '  ' },
+      { name: null },
+    ]);
+    const matches = prompt.match(/Sarah Johnson/g);
+    expect(matches).toHaveLength(1);
   });
 });

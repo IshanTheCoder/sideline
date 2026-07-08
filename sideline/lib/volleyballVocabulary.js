@@ -179,6 +179,16 @@ export const TRANSCRIPTION_CORRECTIONS = [
   [/\broll\s+shot\b/gi, 'roll shot'],
   [/\bjump\s+serve\b/gi, 'jump serve'],
   [/\bfloat\s+serve\b/gi, 'float serve'],
+  // loud-gym greatest hits — crowd noise turns these into word salad
+  [/\bside\s*out\b/gi, 'side out'],
+  [/\bover\s*pass\b/gi, 'overpass'],
+  [/\bshank(ed)?\s+it\b/gi, 'shanked it'],
+  [/\bjoust\b/gi, 'joust'],
+  [/\btooled?\s+the\s+block\b/gi, 'tooled the block'],
+  [/\bsee?m\s+read\b/gi, 'seam read'],
+  [/\bquick\s+said\b/gi, 'quick set'],
+  [/\bback\s+said\b/gi, 'back set'],
+  [/\btight\s+said\b/gi, 'tight set'],
 ];
 
 /**

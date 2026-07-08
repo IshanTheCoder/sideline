@@ -1,7 +1,9 @@
 const groqApiKey = process.env.EXPO_PUBLIC_GROQ_API_KEY;
 
+// llama-3.3-70b-versatile was deprecated 2026-07-08 (decommission 2026-08-16);
+// openai/gpt-oss-120b is Groq's recommended replacement
 const MODELS = [
-  'llama-3.3-70b-versatile',
+  'openai/gpt-oss-120b',
   'meta-llama/llama-4-scout-17b-16e-instruct',
   'llama-3.1-8b-instant',
 ];
@@ -10,6 +12,17 @@ let activeModel = MODELS[0];
 
 export function getGroqApiKey() {
   return groqApiKey;
+}
+
+// gpt-oss models are reasoning models: their hidden reasoning tokens count toward
+// max_tokens, so an unpadded budget truncates the actual answer mid-JSON. Keep
+// effort low (we want extraction, not deliberation) and add headroom. Fallback
+// llama models get the caller's params untouched — they reject reasoning_effort.
+function buildRequestBody(model, messages, max_tokens, temperature) {
+  if (model.startsWith('openai/gpt-oss')) {
+    return { model, messages, temperature, max_tokens: max_tokens + 800, reasoning_effort: 'low' };
+  }
+  return { model, messages, max_tokens, temperature };
 }
 
 async function tryRequest(model, messages, max_tokens, temperature) {
@@ -23,7 +36,7 @@ async function tryRequest(model, messages, max_tokens, temperature) {
         'Authorization': `Bearer ${groqApiKey}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ model, messages, max_tokens, temperature }),
+      body: JSON.stringify(buildRequestBody(model, messages, max_tokens, temperature)),
       signal: controller.signal,
     });
   } finally {

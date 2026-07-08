@@ -31,6 +31,23 @@ function normalizeLabel(s) {
   return s.trim().replace(/\s+/g, ' ').slice(0, 80);
 }
 
+// fixed color per skill category so chips stay consistent across games
+const SKILL_CHIP_COLORS = {
+  serving: '#4A90D9',
+  passing: '#50C878',
+  setting: '#7B68EE',
+  attacking: '#E74C3C',
+  blocking: '#F4A460',
+  defense: '#1ABC9C',
+  transition: '#9B59B6',
+  communication: '#F39C12',
+  positioning: '#5D8AA8',
+  strategy: '#E56947',
+};
+
+// priority 1 = cost us points (red), 2 = clear correction (amber), 3 = minor note (gray)
+const PRIORITY_COLORS = { 1: '#E74C3C', 2: '#F39C12', 3: '#95A5A6' };
+
 export default function PostGameSummaryScreen() {
   const { id } = useLocalSearchParams();
   const router = useRouter();
@@ -40,7 +57,7 @@ export default function PostGameSummaryScreen() {
   const [rosterNames, setRosterNames] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [synthesizedThemes, setSynthesizedThemes] = useState([]);
+  const [takeaways, setTakeaways] = useState([]); // { text, skill, players, priority }[]
   const [postGameSummary, setPostGameSummary] = useState('');
   const [synthesisLoading, setSynthesisLoading] = useState(false);
 
@@ -176,7 +193,7 @@ export default function PostGameSummaryScreen() {
   }, [opponentRecordings]);
 
   useEffect(() => {
-    setSynthesizedThemes([]);
+    setTakeaways([]);
     setPostGameSummary('');
     setPlayerSummaries([]);
     setScoutingPoints([]);
@@ -190,8 +207,8 @@ export default function PostGameSummaryScreen() {
     let cancelled = false;
     setSynthesisLoading(true);
     const run = async () => {
-      const [themesRes, summaryRes, playerRes, scoutingRes] = await Promise.all([
-        noticedMostInput.length > 0 ? synthesizeNoticedMost(noticedMostInput) : Promise.resolve({ themes: [], error: null }),
+      const [themesRes, summaryRes, playerRes] = await Promise.all([
+        noticedMostInput.length > 0 ? synthesizeNoticedMost(noticedMostInput) : Promise.resolve({ takeaways: [], themes: [], error: null }),
         matchFlow.length > 0 ? synthesizePostGameSummary(matchFlow) : Promise.resolve({ summary: '', error: null }),
         playerNotesInput.length > 0 && rosterNames.length > 0
           ? synthesizePlayerSummaries(playerNotesInput, rosterNames)
@@ -201,7 +218,7 @@ export default function PostGameSummaryScreen() {
           : Promise.resolve({ points: [], error: null }),
       ]);
       if (cancelled) return;
-      setSynthesizedThemes(themesRes.themes ?? []);
+      setTakeaways(themesRes.takeaways ?? []);
       setPostGameSummary(summaryRes.summary ?? '');
       setPlayerSummaries(playerRes.summaries ?? []);
       setScoutingPoints(scoutingRes.points ?? []);
@@ -210,6 +227,33 @@ export default function PostGameSummaryScreen() {
     run();
     return () => { cancelled = true; };
   }, [gameId, recordings]);
+
+  // Focus Areas: pure computation from label metadata — works even when the LLM
+  // is down, and gives the coach a ranked "what ate my attention" view at a glance
+  const focusAreas = useMemo(() => {
+    const entries = Object.entries(volleyballStats.bySkill).sort((a, b) => b[1] - a[1]);
+    if (!entries.length) return [];
+    const total = entries.reduce((sum, [, n]) => sum + n, 0);
+    return entries.slice(0, 3).map(([skill, count]) => ({
+      skill,
+      label: SKILL_CATEGORY_LABELS[skill] ?? skill,
+      count,
+      share: total > 0 ? count / total : 0,
+    }));
+  }, [volleyballStats.bySkill]);
+
+  // note count per player, from taggedPlayers metadata — powers the badge on player cards
+  const playerNoteCounts = useMemo(() => {
+    const counts = {};
+    for (const rec of recordings) {
+      const parsed = parseAiLabels(rec.ai_labels ?? null);
+      for (const name of parsed.taggedPlayers ?? []) {
+        const first = name.split(' ')[0];
+        counts[first] = (counts[first] ?? 0) + 1;
+      }
+    }
+    return counts;
+  }, [recordings]);
 
   const windowWidth = Dimensions.get('window').width;
   const [containerWidth, setContainerWidth] = useState(
@@ -463,24 +507,78 @@ export default function PostGameSummaryScreen() {
             </View>
           )}
 
+          {/* Focus Areas — computed locally, never blocked on the LLM */}
+          {focusAreas.length > 0 && (
+            <View style={styles.section}>
+              <ThemedText style={[styles.sectionHeading, { opacity: 0.7 }]}>
+                FOCUS AREAS
+              </ThemedText>
+              {focusAreas.map((fa) => (
+                <View
+                  key={`fa-${fa.skill}`}
+                  style={[styles.focusRow, { backgroundColor: isDark ? '#2A2A2A' : '#F0F0F0' }]}
+                >
+                  <View style={styles.focusHeader}>
+                    <ThemedText style={styles.focusLabel}>{fa.label}</ThemedText>
+                    <ThemedText style={styles.focusCount}>
+                      {fa.count} {fa.count === 1 ? 'note' : 'notes'}
+                    </ThemedText>
+                  </View>
+                  <View style={[styles.focusBarTrack, { backgroundColor: isDark ? '#3A3A3A' : '#E0E0E0' }]}>
+                    <View
+                      style={[
+                        styles.focusBarFill,
+                        {
+                          width: `${Math.max(6, Math.round(fa.share * 100))}%`,
+                          backgroundColor: SKILL_CHIP_COLORS[fa.skill] ?? '#888',
+                        },
+                      ]}
+                    />
+                  </View>
+                </View>
+              ))}
+            </View>
+          )}
+
           {!synthesisLoading && (
             <View style={styles.section}>
               <ThemedText style={[styles.sectionHeading, { opacity: 0.7 }]}>
                 COACHING TAKEAWAYS
               </ThemedText>
-              {(synthesizedThemes.length > 0 || noticedMost.length > 0) ? (
-                (synthesizedThemes.length > 0 ? synthesizedThemes : noticedMost.map((m) => m.text)).map((text, i) => (
+              {(takeaways.length > 0 || noticedMost.length > 0) ? (
+                (takeaways.length > 0
+                  ? takeaways
+                  : noticedMost.map((m) => ({ text: m.text, skill: null, players: [], priority: 2 }))
+                ).map((tk, i) => (
                   <View
-                    key={`theme-${i}`}
+                    key={`tk-${i}`}
                     style={[
-                      styles.card,
+                      styles.takeawayCard,
                       { backgroundColor: colorScheme === 'dark' ? '#2A2A2A' : '#F0F0F0' },
                     ]}
                   >
-                    <View style={[styles.themeBullet, { backgroundColor: Colors[colorScheme ?? 'light'].tint }]} />
-                    <ThemedText style={styles.cardText} numberOfLines={3}>
-                      {text}
-                    </ThemedText>
+                    <View style={styles.takeawayTopRow}>
+                      <View style={[styles.themeBullet, { backgroundColor: PRIORITY_COLORS[tk.priority] ?? PRIORITY_COLORS[2] }]} />
+                      <ThemedText style={styles.cardText} numberOfLines={3}>
+                        {tk.text}
+                      </ThemedText>
+                    </View>
+                    {(tk.skill || tk.players.length > 0) && (
+                      <View style={styles.chipRow}>
+                        {tk.skill && (
+                          <View style={[styles.chip, { backgroundColor: `${SKILL_CHIP_COLORS[tk.skill] ?? '#888'}22`, borderColor: SKILL_CHIP_COLORS[tk.skill] ?? '#888' }]}>
+                            <ThemedText style={[styles.chipText, { color: SKILL_CHIP_COLORS[tk.skill] ?? '#888' }]}>
+                              {SKILL_CATEGORY_LABELS[tk.skill] ?? tk.skill}
+                            </ThemedText>
+                          </View>
+                        )}
+                        {tk.players.map((p) => (
+                          <View key={`p-${p}`} style={[styles.chip, styles.playerChip, { borderColor: isDark ? '#555' : '#CCC' }]}>
+                            <ThemedText style={styles.chipText}>{p}</ThemedText>
+                          </View>
+                        ))}
+                      </View>
+                    )}
                   </View>
                 ))
               ) : (
@@ -512,6 +610,13 @@ export default function PostGameSummaryScreen() {
                     <ThemedText style={styles.cardText} numberOfLines={2}>
                       {ps.summary}
                     </ThemedText>
+                    {playerNoteCounts[ps.name] > 0 && (
+                      <View style={[styles.noteCountBadge, { backgroundColor: isDark ? '#3A3A3A' : '#E4E4E4' }]}>
+                        <ThemedText style={styles.noteCountText}>
+                          {playerNoteCounts[ps.name]} {playerNoteCounts[ps.name] === 1 ? 'note' : 'notes'}
+                        </ThemedText>
+                      </View>
+                    )}
                   </View>
                 ))
               ) : (
@@ -633,6 +738,76 @@ const styles = StyleSheet.create({
     height: 8,
     borderRadius: 4,
     marginTop: 6,
+  },
+  takeawayCard: {
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderRadius: 12,
+    marginBottom: 10,
+    gap: 8,
+  },
+  takeawayTopRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
+  },
+  chipRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginLeft: 20,
+  },
+  chip: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 10,
+    borderWidth: 1,
+  },
+  playerChip: {
+    backgroundColor: 'transparent',
+  },
+  chipText: {
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  focusRow: {
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderRadius: 12,
+    marginBottom: 8,
+    gap: 8,
+  },
+  focusHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  focusLabel: {
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  focusCount: {
+    fontSize: 13,
+    opacity: 0.6,
+  },
+  focusBarTrack: {
+    height: 6,
+    borderRadius: 3,
+    overflow: 'hidden',
+  },
+  focusBarFill: {
+    height: 6,
+    borderRadius: 3,
+  },
+  noteCountBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 10,
+  },
+  noteCountText: {
+    fontSize: 11,
+    fontWeight: '600',
+    opacity: 0.7,
   },
   card: {
     flexDirection: 'row',

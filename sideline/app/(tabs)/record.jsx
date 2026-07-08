@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { Animated, ScrollView, StyleSheet, View, TouchableOpacity, ActivityIndicator, Platform } from 'react-native';
 import { showAlert } from '@/lib/alert';
 import { Audio } from 'expo-av';
+import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
 import * as Crypto from 'expo-crypto';
@@ -22,6 +23,51 @@ import {
   serializeRecordingNotes,
 } from '@/lib/recording';
 import { processRecording } from '@/lib/recordingProcessing';
+import { parseAiLabels } from '@/lib/volleyballVocabulary';
+
+// Speech-tuned recording profile: mono + 128kbps AAC. Whisper downmixes to mono
+// anyway, so stereo just doubles the upload on gym wifi for zero accuracy gain.
+// 44.1kHz keeps full voice detail for noisy-environment transcription.
+const SPEECH_RECORDING_OPTIONS = {
+  isMeteringEnabled: false,
+  android: {
+    extension: '.m4a',
+    outputFormat: Audio.AndroidOutputFormat?.MPEG_4 ?? 2,
+    audioEncoder: Audio.AndroidAudioEncoder?.AAC ?? 3,
+    sampleRate: 44100,
+    numberOfChannels: 1,
+    bitRate: 128000,
+  },
+  ios: {
+    extension: '.m4a',
+    outputFormat: Audio.IOSOutputFormat?.MPEG4AAC ?? 'aac ',
+    audioQuality: Audio.IOSAudioQuality?.MAX ?? 127,
+    sampleRate: 44100,
+    numberOfChannels: 1,
+    bitRate: 128000,
+    linearPCMBitDepth: 16,
+    linearPCMIsBigEndian: false,
+    linearPCMIsFloat: false,
+  },
+  web: {
+    mimeType: 'audio/webm',
+    bitsPerSecond: 128000,
+  },
+};
+
+// vibration cues so the coach knows recording started/stopped without looking
+// at the screen mid-rally — no-ops safely on web
+const hapticStart = () => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+const hapticStop = () => Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+
+// rotating one-liners that surface features coaches don't discover on their own
+const COACH_TIPS = [
+  'Say a jersey number — "number 4, great dig" tags the player automatically',
+  'Mention players by name and the summary groups notes per player',
+  'Tap a set button before recording — charts break down feedback by set',
+  'Speak within arm\'s reach of the phone — crowd noise is filtered out',
+  'After the game, check Review → Summary for AI coaching takeaways',
+];
 
 export default function RecordScreen() {
   const router = useRouter();
@@ -41,6 +87,8 @@ export default function RecordScreen() {
   const [selectedSet, setSelectedSet] = useState('Set 1');
   const [selectedSetOffsetSeconds, setSelectedSetOffsetSeconds] = useState(null);
   const [processingCount, setProcessingCount] = useState(0);
+  const [lastNote, setLastNote] = useState(null); // { label, transcription } — most recent processed note, shown inline
+  const [tipIndex, setTipIndex] = useState(0);
   const [toast, setToast] = useState(null); // { type: 'success'|'error', message: string } — the little popup banner
   const toastOpacity = useRef(new Animated.Value(0)).current;
   const toastTimer = useRef(null);
@@ -84,6 +132,15 @@ export default function RecordScreen() {
       return () => clearTimeout(timer);
     }, [isTutorialActive, registerTarget])
   );
+
+  // rotate the coaching tip every 10s while idle — keeps discovery passive, not naggy
+  useEffect(() => {
+    if (isRecording) return;
+    const interval = setInterval(() => {
+      setTipIndex((i) => (i + 1) % COACH_TIPS.length);
+    }, 10000);
+    return () => clearInterval(interval);
+  }, [isRecording]);
 
   // ticks up every second while recording — like a stopwatch
   useEffect(() => {
@@ -147,16 +204,16 @@ export default function RecordScreen() {
         return;
       }
 
-      // spin up a new recording
-      const { recording } = await Audio.Recording.createAsync(
-        Audio.RecordingOptionsPresets.HIGH_QUALITY,
-        (status) => {
-          // callback fires while recording is live
-          if (status.isRecording) {
-            // yep, we're rolling
-          }
-        }
-      );
+      // spin up a new recording — speech-tuned profile first, stock preset as safety net
+      let recording;
+      try {
+        ({ recording } = await Audio.Recording.createAsync(SPEECH_RECORDING_OPTIONS));
+      } catch (presetError) {
+        console.warn('Speech recording profile failed, falling back to HIGH_QUALITY:', presetError);
+        ({ recording } = await Audio.Recording.createAsync(Audio.RecordingOptionsPresets.HIGH_QUALITY));
+      }
+
+      hapticStart();
 
       if (activeSession?.startedAt) {
         const offsetSeconds = Math.max(
@@ -205,6 +262,7 @@ export default function RecordScreen() {
       try {
         await recordingRef.current.stopAndUnloadAsync();
         uri = recordingRef.current.getURI();
+        hapticStop();
       } catch (stopError) {
         console.error('Failed to stop recording:', stopError);
         showToast('error', 'Could not read recording file. Please try again.');
@@ -284,6 +342,13 @@ export default function RecordScreen() {
             .then((result) => {
               if (result.success) {
                 showToast('success', 'Transcription complete');
+                // surface the finished note inline so the coach can glance-confirm
+                // it heard them right without leaving the record screen mid-game
+                const { displayLabel } = parseAiLabels(result.label ?? null);
+                setLastNote({
+                  label: displayLabel || null,
+                  transcription: result.transcription || null,
+                });
               } else {
                 console.error('Transcription failed:', result.error?.message);
               }
@@ -483,6 +548,7 @@ export default function RecordScreen() {
 
   const resetSessionDetails = () => {
     clearActiveSession();
+    setLastNote(null);
   };
 
   const getSelectedSetMarker = () => {
@@ -650,6 +716,29 @@ export default function RecordScreen() {
             </ThemedText>
           )}
         </View>
+
+        {/* most recent processed note — glance-confirm without leaving the screen */}
+        {lastNote && !isRecording && (
+          <View style={styles.lastNoteCard}>
+            <ThemedText style={styles.lastNoteHeading}>LAST NOTE</ThemedText>
+            {lastNote.label ? (
+              <ThemedText style={styles.lastNoteLabel}>{lastNote.label}</ThemedText>
+            ) : null}
+            {lastNote.transcription ? (
+              <ThemedText style={styles.lastNoteTranscription} numberOfLines={3}>
+                “{lastNote.transcription}”
+              </ThemedText>
+            ) : null}
+          </View>
+        )}
+
+        {/* rotating discovery tip — one line, changes every 10s */}
+        {!isRecording && (
+          <View style={styles.tipRow}>
+            <IconSymbol name="lightbulb" size={14} color={iconColor} />
+            <ThemedText style={styles.tipText}>{COACH_TIPS[tipIndex]}</ThemedText>
+          </View>
+        )}
       </ScrollView>
     </ThemedView>
   );
@@ -833,5 +922,43 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '500',
     opacity: 0.9,
+  },
+  lastNoteCard: {
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(128, 128, 128, 0.2)',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    marginBottom: 16,
+    gap: 4,
+  },
+  lastNoteHeading: {
+    fontSize: 11,
+    fontWeight: '600',
+    letterSpacing: 0.5,
+    opacity: 0.5,
+  },
+  lastNoteLabel: {
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  lastNoteTranscription: {
+    fontSize: 13,
+    opacity: 0.7,
+    fontStyle: 'italic',
+  },
+  tipRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingBottom: 8,
+  },
+  tipText: {
+    fontSize: 13,
+    opacity: 0.55,
+    textAlign: 'center',
+    flexShrink: 1,
   },
 });
