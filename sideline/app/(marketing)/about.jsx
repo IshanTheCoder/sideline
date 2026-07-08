@@ -1,12 +1,13 @@
-// About page (/about). Short builder framing: who we are, what Sideline
-// does, how it differs from film-and-roster tools, and how to reach us.
+// About page (/about). Builder framing: who we are, where Sideline started,
+// the problem it solves, what it does, how it differs from film-and-roster
+// tools and plain voice memos, and how to reach us.
 import Head from 'expo-router/head';
 import { Platform } from 'react-native';
 import { SITE_URL, CONTACT_EMAIL } from './_layout';
 
-const TITLE = 'About Sideline. Tools that reduce the cognitive workload of coaches.';
+const TITLE = 'About Sideline. Helping coaches stay focused when it matters.';
 const DESCRIPTION =
-  'Sideline is a voice-first note-taking tool for volleyball coaches. It captures in-game observations in the moment so nothing gets lost before practice.';
+  'Sideline is a voice-first note-taking tool for volleyball coaches, built by two students from New Jersey. It captures in-game observations in the moment so nothing gets lost before practice.';
 
 const JSON_LD = {
   '@context': 'https://schema.org',
@@ -20,6 +21,10 @@ const JSON_LD = {
     url: SITE_URL,
     email: CONTACT_EMAIL,
     foundingLocation: 'New Jersey, United States',
+    founder: [
+      { '@type': 'Person', name: 'Ishan Sarda' },
+      { '@type': 'Person', name: 'Sidhant Damarapati' },
+    ],
   },
 };
 
@@ -46,12 +51,29 @@ export default function AboutPage() {
       <div className="mk-container">
         <div className="mk-prose">
           <p className="mk-eyebrow">About</p>
-          <h1>We build tools that reduce the cognitive workload of coaches.</h1>
+          <h1>We&rsquo;re helping coaches stay focused when it matters.</h1>
 
           <p>
-            We are Sid and Ishan. During live play, coaches notice dozens of things they
-            need to remember. Most of those observations disappear before practice the
-            next day. Sideline captures them in the moment so nothing gets lost.
+            We&rsquo;re Ishan and Sid, students at West Windsor-Plainsboro High School
+            South in New Jersey. We love sports, we love AI, and we love using technology
+            to solve real problems.
+          </p>
+
+          <h2>Where this started</h2>
+          <p>
+            Sideline started at a volleyball game. We were watching from the stands and
+            counting everything happening at once: footwork, tempo, rotations, etc. We kept coming back to the same
+            question: how does one person keep track of all of this? After the match we
+            asked the coach, and he told us he loses most of what he notices before he can
+            do anything about it. That was all we needed to start building.
+          </p>
+
+          <h2>The problem</h2>
+          <p>
+            During live play, coaches notice dozens of things worth fixing. The rally
+            doesn&rsquo;t stop for note-taking, so those observations live in memory, and
+            memory doesn&rsquo;t survive a five-set match. By the next practice, most of
+            what a coach saw is gone.
           </p>
 
           <h2>What Sideline does</h2>
@@ -64,15 +86,20 @@ export default function AboutPage() {
 
           <h2>How that&rsquo;s different</h2>
           <p>
-            Film tools like Hudl work days after the game. Roster tools like TeamSnap
-            handle schedules, not observations. Sideline is built for the actual moment
-            of coaching: the ten seconds between noticing something and losing it.
+            A voice memos app gets you halfway there, then leaves you with forty unlabeled
+            recordings to replay at midnight. Sideline transcribes and organizes each note
+            the moment you record it. Film tools like Hudl work days after the game. Roster
+            tools like TeamSnap handle schedules, not observations. Sideline is built for
+            the actual moment of coaching: the ten seconds between noticing something and
+            losing it.
           </p>
 
           <h2>Get in touch</h2>
           <p>
-            We&rsquo;re looking for our first ten volleyball coaches to run Sideline for a
-            season, boys&rsquo; and girls&rsquo; programs alike. If that&rsquo;s you, email{' '}
+            Sideline has already run games with our school&rsquo;s team at WW-P South, a
+            top-five program in the state. Now we&rsquo;re looking for our first ten
+            volleyball coaches to run it for a season, boys&rsquo; and girls&rsquo; programs
+            alike. If that&rsquo;s you, email{' '}
             <a className="mk-link-underline" href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a>.
             Every email gets read by one of the two people who built this.
           </p>

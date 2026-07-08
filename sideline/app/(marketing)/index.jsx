@@ -469,6 +469,7 @@ export default function MarketingHome() {
             <p className="mk-hero-cta-note">
               {signedIn ? 'You’re signed in. Pick up where you left off.' : 'No clipboard. No typing. Just say what you saw.'}
             </p>
+            <p className="mk-hero-proof">Already used by a top-five team in New Jersey.</p>
           </div>
           <NoteCardDemo />
         </div>
@@ -525,7 +526,7 @@ export default function MarketingHome() {
           <p className="mk-band-text">
             You just noticed your setter&rsquo;s tempo is off, but the next rally is already
             starting. With Sideline, you tap, talk for five seconds, and get back to coaching.
-            Your observation is saved, transcribed, and organized <em>before the set ends</em>,
+            Your observation is saved, transcribed, and organized <em>before the next point even starts</em>,
             not scribbled on a clipboard you&rsquo;ll never decode, not lost by the third rotation.
           </p>
         </div>
@@ -536,12 +537,10 @@ export default function MarketingHome() {
         <div className="mk-container mk-founders-grid">
           <div>
             <p className="mk-eyebrow">Who&rsquo;s building this</p>
-            <h2 className="mk-section-title">We&rsquo;re Sid and Ishan.</h2>
+            <h2 className="mk-section-title">We&rsquo;re Ishan and Sid.</h2>
             <p className="mk-section-sub">
-              We build tools that reduce the cognitive workload of coaches. During live play,
-              coaches notice dozens of things they need to remember, and most of those
-              observations disappear before practice the next day. Sideline captures them
-              in the moment so nothing gets lost.
+              Two students from New Jersey helping coaches stay focused when it matters.
+              Read more <a className="mk-link-underline" href="/about">about us</a>.
             </p>
             <p className="mk-founders-note">
               We&rsquo;re looking for our first ten volleyball coaches to try Sideline this

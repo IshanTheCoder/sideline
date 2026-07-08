@@ -86,12 +86,12 @@ body:has(.mk-root) #root {
 
 .mk-eyebrow {
   font-family: var(--sans);
-  font-size: clamp(1.1rem, 2.2vw, 1.4rem);
-  font-weight: 700;
-  letter-spacing: 0.12em;
+  font-size: 0.85rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--sage);
-  margin-bottom: 1.25rem;
+  margin-bottom: 1rem;
 }
 
 .mk-root a { color: var(--sage-deep); text-decoration: none; }
@@ -246,10 +246,18 @@ body:has(.mk-root) #root {
   margin-bottom: 40px;
 }
 .mk-hero-cta-note {
-  font-size: 0.98rem;
+  font-size: 0.95rem;
   font-weight: 500;
   color: var(--ink-2);
-  margin-top: 20px;
+  margin-top: 40px;
+}
+.mk-hero-grid .mk-btn-lg {
+  margin: 32px 0;
+}
+.mk-hero-proof {
+  font-size: 0.9rem;
+  color: var(--ink-3);
+  margin-top: 10px;
 }
 
 /* ---------- the note card (hero visual) ---------- */
@@ -419,7 +427,13 @@ body:has(.mk-root) #root {
   border-top: 1px solid var(--hairline);
   border-bottom: 1px solid var(--hairline);
 }
-.mk-section-founders { background: #edeade; }
+.mk-section-founders {
+  background: #edeade;
+  padding: 56px 0;
+}
+@media (min-width: 900px) {
+  .mk-section-founders { padding: 80px 0; }
+}
 
 .mk-moments {
   display: grid;
@@ -546,7 +560,7 @@ body:has(.mk-root) #root {
   margin-top: 28px;
   padding-top: 24px;
   color: var(--ink-2);
-  font-size: 0.96rem;
+  font-size: 0.95rem;
 }
 .mk-dig { width: 100%; max-width: 400px; margin: 0 auto; }
 .mk-dig img { width: 100%; height: auto; }

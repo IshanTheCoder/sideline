@@ -55,7 +55,7 @@ export default function MarketingLayout() {
               <li><a href={`mailto:${CONTACT_EMAIL}`}>Contact</a></li>
             </ul>
           </div>
-          <p className="mk-footer-fine">© 2026 Sideline. Built by Sid and Ishan.</p>
+          <p className="mk-footer-fine">© 2026 Sideline. Built by Ishan Sarda and Sidhant Damarapati.</p>
         </div>
       </footer>
     </div>
