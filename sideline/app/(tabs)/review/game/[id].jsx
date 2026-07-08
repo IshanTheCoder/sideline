@@ -1020,7 +1020,7 @@ export default function GameRecordingsScreen() {
               activeOpacity={0.7}
               accessibilityLabel="View Post-Game Analysis"
             >
-              <IconSymbol name="chart.bar.xaxis" size={18} color="#FFFFFF" />
+              <IconSymbol name="chart.bar" size={18} color="#FFFFFF" />
               <ThemedText style={styles.generateLabelsButtonText}>
                 View Post-Game Analysis
               </ThemedText>

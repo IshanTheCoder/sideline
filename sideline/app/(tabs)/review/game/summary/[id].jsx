@@ -207,22 +207,29 @@ export default function PostGameSummaryScreen() {
     let cancelled = false;
     setSynthesisLoading(true);
     const run = async () => {
-      const [themesRes, summaryRes, playerRes] = await Promise.all([
-        noticedMostInput.length > 0 ? synthesizeNoticedMost(noticedMostInput) : Promise.resolve({ takeaways: [], themes: [], error: null }),
-        matchFlow.length > 0 ? synthesizePostGameSummary(matchFlow) : Promise.resolve({ summary: '', error: null }),
-        playerNotesInput.length > 0 && rosterNames.length > 0
-          ? synthesizePlayerSummaries(playerNotesInput, rosterNames)
-          : Promise.resolve({ summaries: [], error: null }),
-        opponentNotesInput.length > 0
-          ? synthesizeOpponentScoutingReport(opponentNotesInput, opponentName ?? '')
-          : Promise.resolve({ points: [], error: null }),
-      ]);
-      if (cancelled) return;
-      setTakeaways(themesRes.takeaways ?? []);
-      setPostGameSummary(summaryRes.summary ?? '');
-      setPlayerSummaries(playerRes.summaries ?? []);
-      setScoutingPoints(scoutingRes.points ?? []);
-      setSynthesisLoading(false);
+      try {
+        const [themesRes, summaryRes, playerRes, scoutingRes] = await Promise.all([
+          noticedMostInput.length > 0 ? synthesizeNoticedMost(noticedMostInput) : Promise.resolve({ takeaways: [], themes: [], error: null }),
+          matchFlow.length > 0 ? synthesizePostGameSummary(matchFlow) : Promise.resolve({ summary: '', error: null }),
+          playerNotesInput.length > 0 && rosterNames.length > 0
+            ? synthesizePlayerSummaries(playerNotesInput, rosterNames)
+            : Promise.resolve({ summaries: [], error: null }),
+          opponentNotesInput.length > 0
+            ? synthesizeOpponentScoutingReport(opponentNotesInput, opponentName ?? '')
+            : Promise.resolve({ points: [], error: null }),
+        ]);
+        if (cancelled) return;
+        setTakeaways(themesRes.takeaways ?? []);
+        setPostGameSummary(summaryRes.summary ?? '');
+        setPlayerSummaries(playerRes.summaries ?? []);
+        setScoutingPoints(scoutingRes.points ?? []);
+      } catch (err) {
+        console.error('Synthesis failed:', err);
+      } finally {
+        // always clear the spinner, even if a synth call throws — otherwise the
+        // screen gets stuck on "Synthesizing insights..." forever
+        if (!cancelled) setSynthesisLoading(false);
+      }
     };
     run();
     return () => { cancelled = true; };
@@ -410,37 +417,6 @@ export default function PostGameSummaryScreen() {
               {`vs. ${opponentName}${matchType ? ` · ${matchType}` : ''}`}
             </ThemedText>
           ) : null}
-
-          {/* Scouting report — coach's observations about the opposing team */}
-          {!synthesisLoading && (
-            <View style={styles.section}>
-              <ThemedText style={[styles.sectionHeading, styles.scoutingHeading]}>
-                {opponentName ? `SCOUTING: ${opponentName.toUpperCase()}` : 'OPPONENT NOTES'}
-              </ThemedText>
-              {(scoutingPoints.length > 0 || opponentNoticedMost.length > 0) ? (
-                (scoutingPoints.length > 0 ? scoutingPoints : opponentNoticedMost).map((text, i) => (
-                  <View
-                    key={`scout-${i}`}
-                    style={[
-                      styles.card,
-                      styles.scoutingCard,
-                      { backgroundColor: colorScheme === 'dark' ? '#2A2A2A' : '#F0F0F0' },
-                    ]}
-                  >
-                    <View style={[styles.themeBullet, { backgroundColor: '#E56947' }]} />
-                    <ThemedText style={styles.cardText} numberOfLines={3}>
-                      {text}
-                    </ThemedText>
-                  </View>
-                ))
-              ) : (
-                <View style={[styles.insufficientData, { backgroundColor: isDark ? '#2A2A2A' : '#F5F5F5' }]}>
-                  <IconSymbol name="eye" size={24} color={isDark ? '#666' : '#999'} />
-                  <ThemedText style={styles.insufficientDataText}>No opponent notes yet</ThemedText>
-                </View>
-              )}
-            </View>
-          )}
 
           {/* Analytics charts */}
           <View style={styles.section}>
@@ -639,6 +615,37 @@ export default function PostGameSummaryScreen() {
                 <View style={[styles.insufficientData, { backgroundColor: isDark ? '#2A2A2A' : '#F5F5F5' }]}>
                   <IconSymbol name="doc.text" size={24} color={isDark ? '#666' : '#999'} />
                   <ThemedText style={styles.insufficientDataText}>Not enough information</ThemedText>
+                </View>
+              )}
+            </View>
+          )}
+
+          {/* Scouting report — coach's observations about the opposing team (extra section) */}
+          {!synthesisLoading && (
+            <View style={styles.section}>
+              <ThemedText style={[styles.sectionHeading, styles.scoutingHeading]}>
+                {opponentName ? `SCOUTING: ${opponentName.toUpperCase()}` : 'OPPONENT NOTES'}
+              </ThemedText>
+              {(scoutingPoints.length > 0 || opponentNoticedMost.length > 0) ? (
+                (scoutingPoints.length > 0 ? scoutingPoints : opponentNoticedMost).map((text, i) => (
+                  <View
+                    key={`scout-${i}`}
+                    style={[
+                      styles.card,
+                      styles.scoutingCard,
+                      { backgroundColor: colorScheme === 'dark' ? '#2A2A2A' : '#F0F0F0' },
+                    ]}
+                  >
+                    <View style={[styles.themeBullet, { backgroundColor: '#E56947' }]} />
+                    <ThemedText style={styles.cardText} numberOfLines={3}>
+                      {text}
+                    </ThemedText>
+                  </View>
+                ))
+              ) : (
+                <View style={[styles.insufficientData, { backgroundColor: isDark ? '#2A2A2A' : '#F5F5F5' }]}>
+                  <IconSymbol name="eye" size={24} color={isDark ? '#666' : '#999'} />
+                  <ThemedText style={styles.insufficientDataText}>No opponent notes yet</ThemedText>
                 </View>
               )}
             </View>
