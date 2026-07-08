@@ -126,7 +126,10 @@ describe('createRecordingProcessor', () => {
     expect(result.transcription).toBe('Sarah Johnson needs better serve receive communication');
     expect(callOrder).toEqual([
       ['signed-url', 'https://storage.example/raw-audio.m4a', 3600],
-      ['transcribe', 'https://signed.example/audio.m4a', { playerNames: ['Sarah Johnson'] }],
+      ['transcribe', 'https://signed.example/audio.m4a', {
+        playerNames: ['Sarah Johnson'],
+        players: [{ name: 'Sarah Johnson', number: '4' }],
+      }],
       ['label', 'Sarah Johnson needs better serve receive communication', {
         players: [{ name: 'Sarah Johnson', number: '4' }],
         customBuckets: { skill: ['hustle'] },

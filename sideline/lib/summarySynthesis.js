@@ -6,6 +6,11 @@
 
 import { groqChat, getGroqApiKey } from './groqClient';
 
+const VALID_SKILLS = new Set([
+  'serving', 'passing', 'setting', 'attacking', 'blocking',
+  'defense', 'transition', 'communication', 'positioning', 'strategy',
+]);
+
 const NOTICED_MOST_SYSTEM = `You are a volleyball coaching assistant that produces specific, actionable practice priorities. Given in-game recording labels and transcriptions from a single match, produce 3–6 concrete coaching takeaways.
 
 CRITICAL RULES:
@@ -14,8 +19,13 @@ CRITICAL RULES:
 - Ground every point in the labels/transcriptions provided. Do NOT invent feedback the coach never gave.
 - Do NOT use vague motivational language like "trust instincts", "stay focused", "keep energy up", "build confidence".
 - Include player first names when the labels mention them — e.g. "Ishan needs to hold setter position closer to net".
-- Each takeaway should be 6–15 words, phrased as a specific observation or action item.
-- Output a JSON array of strings only, no other text.`;
+- The "text" of each takeaway should be 6–15 words, phrased as a specific observation or action item.
+- Output a JSON array of objects only, no other text. Each object has:
+  - "text": the takeaway (string)
+  - "skill": ONE of serving, passing, setting, attacking, blocking, defense, transition, communication, positioning, strategy — or null if none fits
+  - "players": array of player first names this takeaway is about (empty array if team-wide)
+  - "priority": 1 if the coach flagged it repeatedly or it cost points, 2 for a clear correction, 3 for a minor note
+- Example: [{"text": "Tighten serve-receive platform angle on float serves", "skill": "passing", "players": ["Maya"], "priority": 1}]`;
 
 const MATCH_FLOW_SYSTEM = `You are a volleyball coaching assistant. Given in-game feedback labels and transcriptions from a single match, write a short post-game summary paragraph.
 
@@ -31,15 +41,41 @@ CRITICAL RULES:
 - Output a single JSON string (the paragraph). No other text. Example: "First sentence. Second sentence. Third sentence. Fourth sentence"`;
 
 /**
+ * Normalizes one raw takeaway from the model into { text, skill, players, priority }.
+ * Accepts both the new object shape and legacy plain strings, so an older/dumber
+ * model response degrades gracefully instead of blanking the section.
+ * @param {unknown} raw
+ * @returns {{ text: string, skill: string|null, players: string[], priority: number }|null}
+ */
+export function normalizeTakeaway(raw) {
+  if (typeof raw === 'string') {
+    const text = raw.trim().slice(0, 150);
+    return text ? { text, skill: null, players: [], priority: 2 } : null;
+  }
+  if (!raw || typeof raw !== 'object') return null;
+  const text = typeof raw.text === 'string' ? raw.text.trim().slice(0, 150) : '';
+  if (!text) return null;
+  const skillRaw = typeof raw.skill === 'string' ? raw.skill.trim().toLowerCase() : '';
+  const skill = VALID_SKILLS.has(skillRaw) ? skillRaw : null;
+  const players = Array.isArray(raw.players)
+    ? raw.players.filter((p) => typeof p === 'string' && p.trim()).map((p) => p.trim().slice(0, 40)).slice(0, 6)
+    : [];
+  const priorityNum = Number(raw.priority);
+  const priority = priorityNum >= 1 && priorityNum <= 3 ? Math.round(priorityNum) : 2;
+  return { text, skill, players, priority };
+}
+
+/**
  * @param {{ displayLabel: string, transcription?: string }[]} items - labels + optional raw transcriptions from the game
- * @returns {Promise<{ themes: string[], error: Error|null }>}
+ * @returns {Promise<{ takeaways: { text: string, skill: string|null, players: string[], priority: number }[], themes: string[], error: Error|null }>}
+ *   `themes` (plain strings) is kept for backward compatibility with older callers.
  */
 export async function synthesizeNoticedMost(items) {
   if (!getGroqApiKey()) {
-    return { themes: [], error: new Error('Missing Groq API key') };
+    return { takeaways: [], themes: [], error: new Error('Missing Groq API key') };
   }
   if (!items?.length) {
-    return { themes: [], error: null };
+    return { takeaways: [], themes: [], error: null };
   }
 
   const input = items
@@ -47,7 +83,7 @@ export async function synthesizeNoticedMost(items) {
     .map((i) => (i.transcription ? `Label: ${i.displayLabel}\nTranscription: ${i.transcription}` : i.displayLabel))
     .join('\n---\n');
 
-  const userPrompt = `From these in-game notes, produce 3–6 specific, actionable coaching takeaways the coach can use at the next practice. Reference specific skills, players, and situations — no vague motivational phrases. Reply with ONLY a JSON array of strings.\n\n${input}`;
+  const userPrompt = `From these in-game notes, produce 3–6 specific, actionable coaching takeaways the coach can use at the next practice. Reference specific skills, players, and situations — no vague motivational phrases. Reply with ONLY a JSON array of objects with keys text, skill, players, priority.\n\n${input}`;
 
   try {
     const data = await groqChat({
@@ -55,21 +91,24 @@ export async function synthesizeNoticedMost(items) {
         { role: 'system', content: NOTICED_MOST_SYSTEM },
         { role: 'user', content: userPrompt },
       ],
-      max_tokens: 480,
+      max_tokens: 700,
       temperature: 0.3,
     });
 
     const content = data.choices?.[0]?.message?.content?.trim();
-    if (!content) return { themes: [], error: new Error('Empty Groq response') };
+    if (!content) return { takeaways: [], themes: [], error: new Error('Empty Groq response') };
 
     const parsed = parseJsonArray(content);
-    const themes = Array.isArray(parsed)
-      ? parsed.filter((t) => typeof t === 'string' && t.trim()).map((t) => t.trim().slice(0, 150))
+    const takeaways = Array.isArray(parsed)
+      ? parsed.map(normalizeTakeaway).filter(Boolean).slice(0, 6)
       : [];
-    return { themes: themes.slice(0, 6), error: null };
+    // most urgent first — priority 1 means "cost us points"
+    takeaways.sort((a, b) => a.priority - b.priority);
+    return { takeaways, themes: takeaways.map((t) => t.text), error: null };
   } catch (err) {
     console.error('synthesizeNoticedMost error:', err);
     return {
+      takeaways: [],
       themes: [],
       error: err instanceof Error ? err : new Error(String(err)),
     };

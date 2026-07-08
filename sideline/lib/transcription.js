@@ -120,20 +120,40 @@ async function downloadAudioFile(audioUrl) {
 
 /**
  * Builds a Whisper prompt that includes volleyball terminology and, when available,
- * the actual roster names so Whisper can recognise them more accurately.
+ * the actual roster so Whisper can recognise names and jersey numbers more accurately.
+ * Whisper treats the prompt as preceding conversation context, so full names + numbers
+ * teach it the exact spellings before it hears a word — the single biggest accuracy
+ * lever we have in a loud gym.
  * @param {string[]} [playerNames] - optional list of player names from the roster
+ * @param {Array<{name?: string, number?: string|number}>} [players] - optional full roster
+ *   objects; when provided these win over playerNames (they carry jersey numbers too)
  * @returns {string}
  */
-function buildWhisperPrompt(playerNames = []) {
+export function buildWhisperPrompt(playerNames = [], players = []) {
   const base =
     'volleyball coaching note: serve receive, spike, block, setter, libero, rotation, dig, kill, ' +
-    'free ball, down ball, outside hitter, middle blocker, opposite hitter, pancake, pipe, floater';
-  if (!playerNames.length) return base;
-  const firstNames = [...new Set(
-    playerNames.map((n) => (n || '').trim().split(/\s+/)[0]).filter(Boolean)
-  )];
-  if (!firstNames.length) return base;
-  return `${base}. Player names: ${firstNames.join(', ')}`;
+    'free ball, down ball, outside hitter, middle blocker, opposite hitter, pancake, pipe, floater, ' +
+    'tip, roll shot, joust, shank, overpass, side out, 5-1, 6-2';
+
+  // prefer full roster objects (names + jersey numbers); fall back to bare names
+  let entries = [];
+  if (players?.length) {
+    entries = players
+      .map((p) => {
+        const name = (p?.name || '').trim();
+        if (!name) return null;
+        const num = p?.number != null && String(p.number).trim() !== '' ? ` number ${String(p.number).trim()}` : '';
+        return `${name}${num}`;
+      })
+      .filter(Boolean);
+  } else if (playerNames?.length) {
+    entries = playerNames.map((n) => (n || '').trim()).filter(Boolean);
+  }
+  if (!entries.length) return base;
+
+  // Whisper prompts cap at ~224 tokens — a full roster fits comfortably, but dedupe anyway
+  const unique = [...new Set(entries)];
+  return `${base}. Players: ${unique.join(', ')}`;
 }
 
 /**
@@ -168,7 +188,7 @@ async function transcribeAudioWithDeps(audioUrl, options = {}, deps = {}) {
     const audioFile = await downloadAudioFileImpl(audioUrl);
     console.log('Audio file downloaded');
 
-    const whisperPrompt = buildWhisperPrompt(options.playerNames);
+    const whisperPrompt = buildWhisperPrompt(options.playerNames, options.players);
 
 
     if (platformOS !== 'web' && audioFile.uri) {
@@ -180,8 +200,12 @@ async function transcribeAudioWithDeps(audioUrl, options = {}, deps = {}) {
         name: audioFile.name,
         type: audioFile.type,
       });
-      formData.append('model', 'whisper-large-v3-turbo');
+      // whisper-large-v3 (not turbo): meaningfully better in noisy gyms, and since
+      // processing runs in the background the extra latency costs the coach nothing.
+      // temperature 0 = deterministic decoding, less hallucination on crowd noise.
+      formData.append('model', 'whisper-large-v3');
       formData.append('language', 'en');
+      formData.append('temperature', '0');
       formData.append('prompt', whisperPrompt);
 
       const controller = new AbortControllerCtor();
@@ -224,8 +248,10 @@ async function transcribeAudioWithDeps(audioUrl, options = {}, deps = {}) {
 
       const formData = new FormDataCtor();
       formData.append('file', audioFile);
-      formData.append('model', 'whisper-large-v3-turbo');
+      // same settings as the native path — see comment there for the why
+      formData.append('model', 'whisper-large-v3');
       formData.append('language', 'en');
+      formData.append('temperature', '0');
       formData.append('prompt', whisperPrompt);
 
       const controller = new AbortControllerCtor();
