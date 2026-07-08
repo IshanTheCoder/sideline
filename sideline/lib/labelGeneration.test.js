@@ -36,6 +36,7 @@ describe('createLabelGenerator', () => {
       playPattern: 'serve receive',
       feedbackType: 'technique',
       ruleNote: null,
+      isOpponentNote: false,
       error: null,
     });
     expect(groqChatImpl).toHaveBeenCalledWith(expect.objectContaining({

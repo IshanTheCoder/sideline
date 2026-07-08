@@ -58,6 +58,24 @@ export const getOrCreateDefaultTeam = async (userId) => {
   }
 };
 
+// look up just the opponent's name for a game session — used to give the AI
+// context so it can tell "our team" notes apart from "scout the other team" notes.
+// Best-effort: returns '' on any error so callers can degrade gracefully.
+export const getOpponentNameForGameSession = async (gameSessionId) => {
+  if (!gameSessionId) return { opponentName: '', error: null };
+  try {
+    const { data, error } = await supabase
+      .from('game_sessions')
+      .select('opponent_name')
+      .eq('id', gameSessionId)
+      .single();
+    if (error) return { opponentName: '', error };
+    return { opponentName: data?.opponent_name ?? '', error: null };
+  } catch (error) {
+    return { opponentName: '', error };
+  }
+};
+
 // set up a fresh game session — time to ball out, it's game day
 export const createGameSession = async ({ userId, opponentName, date, location, matchType }) => {
   try {

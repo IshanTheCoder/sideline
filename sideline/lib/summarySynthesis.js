@@ -199,6 +199,64 @@ export async function synthesizePlayerSummaries(excerpts, rosterNames = []) {
   }
 }
 
+const OPPONENT_SCOUTING_SYSTEM = `You are a volleyball scouting assistant. Given a coach's in-game observations about the OPPOSING team from a single match, produce 3–6 concrete, actionable scouting points the coach can use to exploit that opponent next time.
+
+CRITICAL RULES:
+- Every point must describe a specific opponent tendency, weakness, or matchup to attack (e.g. "Serve zone 1 — their libero struggles to pass deep floats", "Their middle is slow to close the block on slides").
+- Ground every point ONLY in the observations provided. Do NOT invent tendencies the coach never mentioned.
+- Frame points as how to exploit or what to watch for — not as feedback for your own players.
+- Do NOT use vague filler like "play hard" or "stay focused".
+- Each point should be 6–16 words, phrased as a specific tactical action or observation.
+- Output a JSON array of strings only, no other text.`;
+
+/**
+ * @param {{ displayLabel: string, transcription?: string }[]} items - opponent-tagged labels + optional transcriptions
+ * @param {string} [opponentName] - name of the opposing team, for context
+ * @returns {Promise<{ points: string[], error: Error|null }>}
+ */
+export async function synthesizeOpponentScoutingReport(items, opponentName = '') {
+  if (!getGroqApiKey()) {
+    return { points: [], error: new Error('Missing Groq API key') };
+  }
+  if (!items?.length) {
+    return { points: [], error: null };
+  }
+
+  const input = items
+    .slice(0, 25)
+    .map((i) => (i.transcription ? `Label: ${i.displayLabel}\nTranscription: ${i.transcription}` : i.displayLabel))
+    .join('\n---\n');
+
+  const opponentLine = opponentName ? `The opposing team is "${opponentName}". ` : '';
+  const userPrompt = `${opponentLine}From these in-game observations about the opposing team, produce 3–6 specific, actionable scouting points to exploit them next time. Reference specific skills, situations, and tendencies — no vague phrases. Reply with ONLY a JSON array of strings.\n\n${input}`;
+
+  try {
+    const data = await groqChat({
+      messages: [
+        { role: 'system', content: OPPONENT_SCOUTING_SYSTEM },
+        { role: 'user', content: userPrompt },
+      ],
+      max_tokens: 480,
+      temperature: 0.3,
+    });
+
+    const content = data.choices?.[0]?.message?.content?.trim();
+    if (!content) return { points: [], error: new Error('Empty Groq response') };
+
+    const parsed = parseJsonArray(content);
+    const points = Array.isArray(parsed)
+      ? parsed.filter((t) => typeof t === 'string' && t.trim()).map((t) => t.trim().slice(0, 150))
+      : [];
+    return { points: points.slice(0, 6), error: null };
+  } catch (err) {
+    console.error('synthesizeOpponentScoutingReport error:', err);
+    return {
+      points: [],
+      error: err instanceof Error ? err : new Error(String(err)),
+    };
+  }
+}
+
 function parseJsonObject(raw) {
   if (!raw || typeof raw !== 'string') return null;
   let str = raw.trim();

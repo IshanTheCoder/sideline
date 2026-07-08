@@ -133,6 +133,7 @@ export default function RecordingDetailScreen() {
         skillCategory: result.skillCategory ?? undefined,
         position: result.position ?? undefined,
         feedbackType: result.feedbackType ?? undefined,
+        isOpponentNote: result.isOpponentNote === true,
       });
       await updateRecording(user.id, recordingId, { ai_labels: aiLabels });
       if (!cancelled) setRecording((p) => (p ? { ...p, ai_labels: aiLabels } : p));
@@ -201,6 +202,7 @@ export default function RecordingDetailScreen() {
       feedbackType: editFeedback === '' ? undefined : (editFeedback || undefined),
       ruleNote: parsed.ruleNote || undefined,
       taggedPlayers: taggedPlayerNames.length ? taggedPlayerNames : (parsed.taggedPlayers?.length ? parsed.taggedPlayers : undefined),
+      isOpponentNote: parsed.isOpponentNote === true,
     });
     const { error: err } = await updateRecording(user.id, recordingId, { ai_labels: aiLabels });
     setSavingField(null);
