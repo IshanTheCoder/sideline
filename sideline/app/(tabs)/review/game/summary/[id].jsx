@@ -24,7 +24,7 @@ import {
   SKILL_CATEGORY_LABELS,
 } from '@/lib/volleyballVocabulary';
 import { fetchRosterForUser } from '@/lib/roster';
-import { synthesizeNoticedMost, synthesizePostGameSummary, synthesizePlayerSummaries } from '@/lib/summarySynthesis';
+import { synthesizeNoticedMost, synthesizePostGameSummary, synthesizePlayerSummaries, synthesizeOpponentScoutingReport } from '@/lib/summarySynthesis';
 
 function normalizeLabel(s) {
   if (!s || typeof s !== 'string') return '';
@@ -107,9 +107,19 @@ export default function PostGameSummaryScreen() {
 
   const volleyballStats = useMemo(() => aggregateVolleyballStats(recordings), [recordings]);
 
+  // Split notes into observations about our own team vs. scouting notes about the opponent.
+  const ownRecordings = useMemo(
+    () => recordings.filter((rec) => !parseAiLabels(rec.ai_labels ?? null).isOpponentNote),
+    [recordings]
+  );
+  const opponentRecordings = useMemo(
+    () => recordings.filter((rec) => parseAiLabels(rec.ai_labels ?? null).isOpponentNote),
+    [recordings]
+  );
+
   const noticedMost = useMemo(() => {
     const count = {};
-    for (const rec of recordings) {
+    for (const rec of ownRecordings) {
       const parsed = parseAiLabels(rec.ai_labels ?? null);
       const label = normalizeLabel(parsed.displayLabel);
       if (!label) continue;
@@ -119,11 +129,11 @@ export default function PostGameSummaryScreen() {
       .sort((a, b) => b[1] - a[1])
       .slice(0, 6)
       .map(([text, count]) => ({ text, count }));
-  }, [recordings]);
+  }, [ownRecordings]);
 
   const playerNotesInput = useMemo(() => {
     const items = [];
-    for (const rec of recordings) {
+    for (const rec of ownRecordings) {
       const parsed = parseAiLabels(rec.ai_labels ?? null);
       const label = normalizeLabel(parsed.displayLabel);
       const transcription = (rec.transcription || '').trim();
@@ -131,22 +141,23 @@ export default function PostGameSummaryScreen() {
       if (transcription && transcription !== label) items.push(transcription);
     }
     return [...new Set(items)];
-  }, [recordings]);
+  }, [ownRecordings]);
 
   const [playerSummaries, setPlayerSummaries] = useState([]);
+  const [scoutingPoints, setScoutingPoints] = useState([]);
 
   const matchFlow = useMemo(() => {
-    return recordings
+    return ownRecordings
       .map((rec) => {
         const parsed = parseAiLabels(rec.ai_labels ?? null);
         return normalizeLabel(parsed.displayLabel) || 'Note';
       })
       .filter(Boolean)
       .slice(0, 10);
-  }, [recordings]);
+  }, [ownRecordings]);
 
   const noticedMostInput = useMemo(() => {
-    return recordings
+    return ownRecordings
       .map((rec) => {
         const parsed = parseAiLabels(rec.ai_labels ?? null);
         const displayLabel = normalizeLabel(parsed.displayLabel);
@@ -154,34 +165,71 @@ export default function PostGameSummaryScreen() {
         return { displayLabel, transcription: rec.transcription ?? '' };
       })
       .filter(Boolean);
-  }, [recordings]);
+  }, [ownRecordings]);
+
+  const opponentNotesInput = useMemo(() => {
+    return opponentRecordings
+      .map((rec) => {
+        const parsed = parseAiLabels(rec.ai_labels ?? null);
+        const displayLabel = normalizeLabel(parsed.displayLabel);
+        if (!displayLabel) return null;
+        return { displayLabel, transcription: rec.transcription ?? '' };
+      })
+      .filter(Boolean);
+  }, [opponentRecordings]);
+
+  // Fallback shown when AI synthesis is unavailable: raw opponent labels by frequency.
+  const opponentNoticedMost = useMemo(() => {
+    const count = {};
+    for (const rec of opponentRecordings) {
+      const label = normalizeLabel(parseAiLabels(rec.ai_labels ?? null).displayLabel);
+      if (!label) continue;
+      count[label] = (count[label] ?? 0) + 1;
+    }
+    return Object.entries(count)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 6)
+      .map(([text]) => text);
+  }, [opponentRecordings]);
 
   useEffect(() => {
     setTakeaways([]);
     setPostGameSummary('');
     setPlayerSummaries([]);
+    setScoutingPoints([]);
   }, [gameId]);
 
   useEffect(() => {
-    if (!noticedMostInput.length && !matchFlow.length && !playerNotesInput.length) {
+    if (!noticedMostInput.length && !matchFlow.length && !playerNotesInput.length && !opponentNotesInput.length) {
       setSynthesisLoading(false);
       return;
     }
     let cancelled = false;
     setSynthesisLoading(true);
     const run = async () => {
-      const [themesRes, summaryRes, playerRes] = await Promise.all([
-        noticedMostInput.length > 0 ? synthesizeNoticedMost(noticedMostInput) : Promise.resolve({ takeaways: [], themes: [], error: null }),
-        matchFlow.length > 0 ? synthesizePostGameSummary(matchFlow) : Promise.resolve({ summary: '', error: null }),
-        playerNotesInput.length > 0 && rosterNames.length > 0
-          ? synthesizePlayerSummaries(playerNotesInput, rosterNames)
-          : Promise.resolve({ summaries: [], error: null }),
-      ]);
-      if (cancelled) return;
-      setTakeaways(themesRes.takeaways ?? []);
-      setPostGameSummary(summaryRes.summary ?? '');
-      setPlayerSummaries(playerRes.summaries ?? []);
-      setSynthesisLoading(false);
+      try {
+        const [themesRes, summaryRes, playerRes, scoutingRes] = await Promise.all([
+          noticedMostInput.length > 0 ? synthesizeNoticedMost(noticedMostInput) : Promise.resolve({ takeaways: [], themes: [], error: null }),
+          matchFlow.length > 0 ? synthesizePostGameSummary(matchFlow) : Promise.resolve({ summary: '', error: null }),
+          playerNotesInput.length > 0 && rosterNames.length > 0
+            ? synthesizePlayerSummaries(playerNotesInput, rosterNames)
+            : Promise.resolve({ summaries: [], error: null }),
+          opponentNotesInput.length > 0
+            ? synthesizeOpponentScoutingReport(opponentNotesInput, opponentName ?? '')
+            : Promise.resolve({ points: [], error: null }),
+        ]);
+        if (cancelled) return;
+        setTakeaways(themesRes.takeaways ?? []);
+        setPostGameSummary(summaryRes.summary ?? '');
+        setPlayerSummaries(playerRes.summaries ?? []);
+        setScoutingPoints(scoutingRes.points ?? []);
+      } catch (err) {
+        console.error('Synthesis failed:', err);
+      } finally {
+        // always clear the spinner, even if a synth call throws — otherwise the
+        // screen gets stuck on "Synthesizing insights..." forever
+        if (!cancelled) setSynthesisLoading(false);
+      }
     };
     run();
     return () => { cancelled = true; };
@@ -426,7 +474,7 @@ export default function PostGameSummaryScreen() {
             )}
           </View>
 
-          {synthesisLoading && (noticedMostInput.length > 0 || matchFlow.length > 0) && (
+          {synthesisLoading && (noticedMostInput.length > 0 || matchFlow.length > 0 || opponentNotesInput.length > 0) && (
             <View style={styles.section}>
               <View style={[styles.synthesisLoadingRow, { backgroundColor: colorScheme === 'dark' ? '#2A2A2A' : '#F0F0F0' }]}>
                 <ActivityIndicator size="small" color={Colors[colorScheme ?? 'light'].tint} />
@@ -571,6 +619,37 @@ export default function PostGameSummaryScreen() {
               )}
             </View>
           )}
+
+          {/* Scouting report — coach's observations about the opposing team (extra section) */}
+          {!synthesisLoading && (
+            <View style={styles.section}>
+              <ThemedText style={[styles.sectionHeading, styles.scoutingHeading]}>
+                {opponentName ? `SCOUTING: ${opponentName.toUpperCase()}` : 'OPPONENT NOTES'}
+              </ThemedText>
+              {(scoutingPoints.length > 0 || opponentNoticedMost.length > 0) ? (
+                (scoutingPoints.length > 0 ? scoutingPoints : opponentNoticedMost).map((text, i) => (
+                  <View
+                    key={`scout-${i}`}
+                    style={[
+                      styles.card,
+                      styles.scoutingCard,
+                      { backgroundColor: colorScheme === 'dark' ? '#2A2A2A' : '#F0F0F0' },
+                    ]}
+                  >
+                    <View style={[styles.themeBullet, { backgroundColor: '#E56947' }]} />
+                    <ThemedText style={styles.cardText} numberOfLines={3}>
+                      {text}
+                    </ThemedText>
+                  </View>
+                ))
+              ) : (
+                <View style={[styles.insufficientData, { backgroundColor: isDark ? '#2A2A2A' : '#F5F5F5' }]}>
+                  <IconSymbol name="eye" size={24} color={isDark ? '#666' : '#999'} />
+                  <ThemedText style={styles.insufficientDataText}>No opponent notes yet</ThemedText>
+                </View>
+              )}
+            </View>
+          )}
         </ScrollView>
       )}
     </ThemedView>
@@ -638,6 +717,14 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     letterSpacing: 0.5,
     marginBottom: 12,
+  },
+  scoutingHeading: {
+    color: '#E56947',
+    opacity: 1,
+  },
+  scoutingCard: {
+    borderLeftWidth: 3,
+    borderLeftColor: '#E56947',
   },
   synthesisLoadingRow: {
     flexDirection: 'row',

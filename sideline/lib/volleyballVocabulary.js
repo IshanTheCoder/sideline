@@ -250,7 +250,7 @@ export function getFeedbackTypeList() {
  */
 export function parseAiLabels(aiLabels) {
   if (!aiLabels || typeof aiLabels !== 'string') {
-    return { displayLabel: '' };
+    return { displayLabel: '', isOpponentNote: false };
   }
   const trimmed = aiLabels.trim();
   if (trimmed.startsWith('{')) {
@@ -265,12 +265,13 @@ export function parseAiLabels(aiLabels) {
         feedbackType: parsed.feedbackType ?? undefined,
         ruleNote: typeof parsed.ruleNote === 'string' && parsed.ruleNote.trim() ? parsed.ruleNote.trim() : undefined,
         taggedPlayers: Array.isArray(parsed.taggedPlayers) ? parsed.taggedPlayers : undefined,
+        isOpponentNote: parsed.isOpponentNote === true,
       };
     } catch {
-      return { displayLabel: trimmed };
+      return { displayLabel: trimmed, isOpponentNote: false };
     }
   }
-  return { displayLabel: trimmed };
+  return { displayLabel: trimmed, isOpponentNote: false };
 }
 
 /**
@@ -287,7 +288,8 @@ export function serializeAiLabels(label, meta = {}) {
     meta.playPattern ||
     meta.feedbackType ||
     (typeof meta.ruleNote === 'string' && meta.ruleNote.trim()) ||
-    (Array.isArray(meta.taggedPlayers) && meta.taggedPlayers.length > 0);
+    (Array.isArray(meta.taggedPlayers) && meta.taggedPlayers.length > 0) ||
+    meta.isOpponentNote === true;
   if (!hasMeta) {
     return label;
   }
@@ -299,6 +301,7 @@ export function serializeAiLabels(label, meta = {}) {
     feedbackType: meta.feedbackType ?? null,
     ruleNote: typeof meta.ruleNote === 'string' && meta.ruleNote.trim() ? meta.ruleNote.trim() : null,
     taggedPlayers: Array.isArray(meta.taggedPlayers) ? meta.taggedPlayers : null,
+    isOpponentNote: meta.isOpponentNote === true,
   });
 }
 

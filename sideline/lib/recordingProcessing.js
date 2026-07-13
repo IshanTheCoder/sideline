@@ -5,6 +5,7 @@ import { generateLabel } from './labelGeneration';
 import { serializeAiLabels, applyVolleyballTranscriptionCorrections } from './volleyballVocabulary';
 import { getPlayersForGameSession, buildRosterNameCorrections, buildRosterNumberCorrections } from './roster';
 import { getCustomBucketsForPrompt } from './customBuckets';
+import { getOpponentNameForGameSession } from './gameSessions';
 
 function findMentionedPlayers(text, rosterPlayers) {
   if (!text || !rosterPlayers?.length) return [];
@@ -51,6 +52,7 @@ async function processRecordingWithDeps(recordingId, userId, deps = {}) {
     buildRosterNameCorrections: buildRosterNameCorrectionsImpl = buildRosterNameCorrections,
     buildRosterNumberCorrections: buildRosterNumberCorrectionsImpl = buildRosterNumberCorrections,
     getCustomBucketsForPrompt: getCustomBucketsForPromptImpl = getCustomBucketsForPrompt,
+    getOpponentNameForGameSession: getOpponentNameForGameSessionImpl = getOpponentNameForGameSession,
   } = deps;
 
   try {
@@ -94,12 +96,16 @@ async function processRecordingWithDeps(recordingId, userId, deps = {}) {
 
     // step 2.5: fetch the roster early — we need names for BOTH Whisper and post-processing
     let rosterPlayers = [];
+    let opponentName = '';
     if (recording.game_session_id) {
       const { players } = await getPlayersForGameSessionImpl(recording.game_session_id);
       rosterPlayers = players;
       if (rosterPlayers.length > 0) {
         console.log(`📋 Loaded roster: ${rosterPlayers.length} players`);
       }
+      // opponent name gives the AI context to tell "our team" notes from "scout the opponent" notes
+      const { opponentName: oppName } = await getOpponentNameForGameSessionImpl(recording.game_session_id);
+      opponentName = oppName || '';
     }
 
     // step 2.6: storage is private so we need a signed URL (like a concert wristband)
@@ -153,7 +159,7 @@ async function processRecordingWithDeps(recordingId, userId, deps = {}) {
     // "number X" references it sees in the (already-corrected) transcription
     const customBuckets = await getCustomBucketsForPromptImpl(userId);
     console.log('🏷️  Generating AI label (volleyball)...');
-    const labelResult = await generateLabelImpl(correctedTranscription, { players: rosterPlayers, customBuckets });
+    const labelResult = await generateLabelImpl(correctedTranscription, { players: rosterPlayers, customBuckets, opponentName });
 
     let aiLabel = null;
     if (labelResult.error || !labelResult.label) {
@@ -161,7 +167,9 @@ async function processRecordingWithDeps(recordingId, userId, deps = {}) {
       // no label? not the end of the world — transcription is the MVP here
     } else {
       console.log('✅ Label generated:', labelResult.label);
-      const mentioned = findMentionedPlayers(correctedTranscription, rosterPlayers);
+      const isOpponentNote = labelResult.isOpponentNote === true;
+      // opponent notes reference the other team — don't attach our own roster players to them
+      const mentioned = isOpponentNote ? [] : findMentionedPlayers(correctedTranscription, rosterPlayers);
       const resolvedPosition = mentioned.length > 1 ? 'multiple_players' : (labelResult.position ?? undefined);
       aiLabel = serializeAiLabelsImpl(labelResult.label, {
         skillCategory: labelResult.skillCategory ?? undefined,
@@ -170,6 +178,7 @@ async function processRecordingWithDeps(recordingId, userId, deps = {}) {
         feedbackType: labelResult.feedbackType ?? undefined,
         ruleNote: labelResult.ruleNote ?? undefined,
         taggedPlayers: mentioned.length ? mentioned : undefined,
+        isOpponentNote,
       });
     }
 
@@ -339,6 +348,7 @@ export async function generateLabelsForGameSession(gameSessionId, userId) {
 
     const { players: rosterPlayers } = await getPlayersForGameSession(gameSessionId);
     const customBuckets = await getCustomBucketsForPrompt(userId);
+    const { opponentName } = await getOpponentNameForGameSession(gameSessionId);
 
     let processedCount = 0;
     let failedCount = 0;
@@ -353,7 +363,7 @@ export async function generateLabelsForGameSession(gameSessionId, userId) {
 
       console.log(`🏷️  Generating label for recording ${recording.id}...`);
 
-      const labelResult = await generateLabel(recording.transcription, { players: rosterPlayers, customBuckets });
+      const labelResult = await generateLabel(recording.transcription, { players: rosterPlayers, customBuckets, opponentName });
 
       if (labelResult.error || !labelResult.label) {
         console.error(`❌ Label generation failed for ${recording.id}:`, labelResult.error);
@@ -363,7 +373,8 @@ export async function generateLabelsForGameSession(gameSessionId, userId) {
 
       console.log(`✅ Label generated for ${recording.id}: "${labelResult.label}"`);
 
-      const mentioned = findMentionedPlayers(recording.transcription, rosterPlayers);
+      const isOpponentNote = labelResult.isOpponentNote === true;
+      const mentioned = isOpponentNote ? [] : findMentionedPlayers(recording.transcription, rosterPlayers);
       const resolvedPosition = mentioned.length > 1 ? 'multiple_players' : (labelResult.position ?? undefined);
       const aiLabel = serializeAiLabels(labelResult.label, {
         skillCategory: labelResult.skillCategory ?? undefined,
@@ -372,6 +383,7 @@ export async function generateLabelsForGameSession(gameSessionId, userId) {
         feedbackType: labelResult.feedbackType ?? undefined,
         ruleNote: labelResult.ruleNote ?? undefined,
         taggedPlayers: mentioned.length ? mentioned : undefined,
+        isOpponentNote,
       });
 
       const { error: updateError } = await updateRecordingData(recording.id, userId, {
@@ -458,6 +470,14 @@ export async function generateMissingLabels(userId, gameSessionId) {
       console.warn('⚠️ Could not load custom buckets:', bucketErr?.message);
     }
 
+    let opponentName = '';
+    try {
+      const { opponentName: oppName } = await getOpponentNameForGameSession(gameSessionId);
+      opponentName = oppName || '';
+    } catch (oppErr) {
+      console.warn('⚠️ Could not load opponent name:', oppErr?.message);
+    }
+
     let processedCount = 0;
     let failedCount = 0;
     let skippedCount = 0;
@@ -475,7 +495,7 @@ export async function generateMissingLabels(userId, gameSessionId) {
         }
 
         console.log(`🏷️  Generating label for recording ${recording.id} (${transcriptionText.substring(0, 50)}...)...`);
-        const labelResult = await generateLabel(transcriptionText, { players: rosterPlayers, customBuckets });
+        const labelResult = await generateLabel(transcriptionText, { players: rosterPlayers, customBuckets, opponentName });
 
         if (labelResult.error || !labelResult.label) {
           const reason = labelResult.error?.message || 'no label returned';
@@ -487,7 +507,8 @@ export async function generateMissingLabels(userId, gameSessionId) {
 
         console.log(`✅ Label generated for ${recording.id}: "${labelResult.label}"`);
 
-        const mentioned = findMentionedPlayers(transcriptionText, rosterPlayers);
+        const isOpponentNote = labelResult.isOpponentNote === true;
+        const mentioned = isOpponentNote ? [] : findMentionedPlayers(transcriptionText, rosterPlayers);
         const resolvedPosition = mentioned.length > 1 ? 'multiple_players' : (labelResult.position ?? undefined);
         const aiLabel = serializeAiLabels(labelResult.label, {
           skillCategory: labelResult.skillCategory ?? undefined,
@@ -496,6 +517,7 @@ export async function generateMissingLabels(userId, gameSessionId) {
           feedbackType: labelResult.feedbackType ?? undefined,
           ruleNote: labelResult.ruleNote ?? undefined,
           taggedPlayers: mentioned.length ? mentioned : undefined,
+          isOpponentNote,
         });
 
         const { error: updateError } = await updateRecordingData(recording.id, userId, {

@@ -531,8 +531,7 @@ export default function MarketingHome() {
           <p className="mk-band-text">
             You just noticed your setter&rsquo;s tempo is off, but the next rally is already
             starting. With Sideline, you tap, talk for five seconds, and get back to coaching.
-            Your observation is saved, transcribed, and organized <em>before the next point even starts</em>,
-            not scribbled on a clipboard you&rsquo;ll never decode, not lost by the third rotation.
+            Your observation is saved, transcribed, and organized <em>before the next point even starts</em>.
           </p>
         </div>
       </section>
@@ -548,7 +547,7 @@ export default function MarketingHome() {
               Read more <a className="mk-link-underline" href="/about">about us</a>.
             </p>
             <p className="mk-founders-note">
-              We&rsquo;re looking for our first ten volleyball coaches to try Sideline this
+              We&rsquo;re looking for ten coaches to try Sideline this
               season, boys&rsquo; and girls&rsquo; programs alike. If that&rsquo;s you,{' '}
               <a className="mk-link-underline" href={`mailto:${CONTACT_EMAIL}`}>email us</a>.
               We&rsquo;ll set you up, and we&rsquo;ll actually read your feedback.

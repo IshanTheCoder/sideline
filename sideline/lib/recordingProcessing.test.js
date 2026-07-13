@@ -133,6 +133,7 @@ describe('createRecordingProcessor', () => {
       ['label', 'Sarah Johnson needs better serve receive communication', {
         players: [{ name: 'Sarah Johnson', number: '4' }],
         customBuckets: { skill: ['hustle'] },
+        opponentName: '',
       }],
     ]);
     expect(calls.map((c) => c.updates)).toEqual([
@@ -147,6 +148,7 @@ describe('createRecordingProcessor', () => {
           feedbackType: 'communication',
           ruleNote: undefined,
           taggedPlayers: ['Sarah Johnson'],
+          isOpponentNote: false,
         }),
         status: 'processed',
       },

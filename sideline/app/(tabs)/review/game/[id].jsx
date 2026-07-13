@@ -1008,8 +1008,23 @@ export default function GameRecordingsScreen() {
 
       {!loading && !error && recordings.length > 0 && (
         <>
-          {/* Action buttons: retry transcriptions + generate labels */}
+          {/* Action buttons: view analysis + retry transcriptions + generate labels */}
           <View style={styles.generateLabelsContainer}>
+            <TouchableOpacity
+              style={[
+                styles.generateLabelsButton,
+                styles.viewAnalysisButton,
+                { backgroundColor: Colors[colorScheme ?? 'light'].tint },
+              ]}
+              onPress={openMatchReflection}
+              activeOpacity={0.7}
+              accessibilityLabel="View Post-Game Analysis"
+            >
+              <IconSymbol name="chart.bar" size={18} color="#FFFFFF" />
+              <ThemedText style={styles.generateLabelsButtonText}>
+                View Post-Game Analysis
+              </ThemedText>
+            </TouchableOpacity>
             {recordings.some((r) => !r.transcription) && (
               <TouchableOpacity
                 style={[
@@ -1567,6 +1582,9 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     gap: 8,
     minHeight: 44,
+  },
+  viewAnalysisButton: {
+    marginBottom: 8,
   },
   retryTranscriptionButton: {
     backgroundColor: 'transparent',

@@ -144,7 +144,7 @@ function abbreviatePlayerNames(label, players = []) {
   return result;
 }
 
-function buildVolleyballSystemPrompt(isLongRecording, players = [], customBuckets = {}) {
+function buildVolleyballSystemPrompt(isLongRecording, players = [], customBuckets = {}, opponentName = null) {
   let namesHint = '';
   if (players.length > 0) {
     const withNumbers = players.filter((p) => p.number);
@@ -169,8 +169,15 @@ function buildVolleyballSystemPrompt(isLongRecording, players = [], customBucket
   const customPosition = (customBuckets.position && customBuckets.position.length) ? `, ${customBuckets.position.join(', ')}` : '';
   const customFeedback = (customBuckets.feedback && customBuckets.feedback.length) ? `, ${customBuckets.feedback.join(', ')}` : '';
 
+  const trimmedOpponent = typeof opponentName === 'string' ? opponentName.trim() : '';
+  const opponentContext = trimmedOpponent ? `\nThe opposing team is "${trimmedOpponent}".\n` : '';
+
   return `You are a volleyball coach assistant. You create labels and metadata for coaching recordings.
-${namesHint}
+${namesHint}${opponentContext}
+OPPONENT VS OWN TEAM (IMPORTANT):
+- If the note is an observation about the OPPOSING team — their tendencies, a weakness to exploit, their players, or their rotations (e.g. "their outside only swings line", "they can't pass a jump serve", "number 7 tips to zone 4") — set isOpponentNote to true.
+- If the note is about your own team or your own players, set isOpponentNote to false.
+
 NAME RULES (VERY IMPORTANT — follow strictly):
 - ALWAYS start the label with every player name that appears in the transcription. This is the #1 priority.
 - Example: transcription "Midyan, Ishan, talk to each other on the overlap" → label MUST start with "Midyan Ishan" then the topic.
@@ -192,7 +199,7 @@ ${lengthGuidance}
 If the transcription mentions a rule violation or ref dispute, set ruleNote to a brief suggestion. Otherwise null.
 
 Respond with ONLY a valid JSON object:
-{"label":"concise label from transcription words only","skillCategory":"or null","position":"or null","playPattern":"or null","feedbackType":"or null","ruleNote":"or null"}
+{"label":"concise label from transcription words only","skillCategory":"or null","position":"or null","playPattern":"or null","feedbackType":"or null","ruleNote":"or null","isOpponentNote":true or false}
 
 Examples of good labels: ${VOLLEYBALL_LABEL_EXAMPLES.join('; ')}`;
 }
@@ -217,6 +224,7 @@ function parseStructuredResponse(content) {
       playPattern: parsed.playPattern ?? null,
       feedbackType: parsed.feedbackType ?? null,
       ruleNote: typeof parsed.ruleNote === 'string' && parsed.ruleNote.trim() ? parsed.ruleNote.trim() : null,
+      isOpponentNote: parsed.isOpponentNote === true,
     };
   } catch {
     return null;
@@ -256,13 +264,14 @@ async function generateLabelWithDeps(transcriptionText, options = {}, deps = {})
           ? options.playerNames.map((name) => ({ name, number: null }))
           : []);
     const customBuckets = options.customBuckets && typeof options.customBuckets === 'object' ? options.customBuckets : {};
+    const opponentName = typeof options.opponentName === 'string' ? options.opponentName : null;
 
     console.log('Generating label for transcription:', transcriptionText.substring(0, 100) + '...');
 
     const wordCount = transcriptionText.trim().split(/\s+/).length;
     const isLongRecording = wordCount > 50;
 
-    const systemPrompt = buildVolleyballSystemPrompt(isLongRecording, players, customBuckets);
+    const systemPrompt = buildVolleyballSystemPrompt(isLongRecording, players, customBuckets, opponentName);
     const userPrompt = isLongRecording
       ? `Create a label and metadata for this coaching recording. Start the label with any player names mentioned. Reply with JSON only:\n\n${transcriptionText}`
       : `Create a label and metadata for this recording. IMPORTANT: If any player names appear in the transcription, the label MUST start with those names. Reply with JSON only:\n\n${transcriptionText}`;
@@ -301,6 +310,7 @@ async function generateLabelWithDeps(transcriptionText, options = {}, deps = {})
         playPattern: structured.playPattern ?? null,
         feedbackType: structured.feedbackType ?? null,
         ruleNote: structured.ruleNote ?? null,
+        isOpponentNote: structured.isOpponentNote === true,
         error: null,
       };
     }
@@ -321,6 +331,7 @@ async function generateLabelWithDeps(transcriptionText, options = {}, deps = {})
       playPattern: null,
       feedbackType: null,
       ruleNote: null,
+      isOpponentNote: false,
       error: null,
     };
   } catch (error) {
