@@ -32,7 +32,10 @@ export default function MarketingLayout() {
 
       <header className="mk-nav">
         <div className="mk-container mk-nav-inner">
-          <a className="mk-logo" href="/">Sideline</a>
+          <a className="mk-logo mk-logo-nav" href="/">
+            <img src="/sideline-whistle.png" alt="" width="38" height="38" />
+            Sideline
+          </a>
           <nav className="mk-navlinks" aria-label="Site">
             <a href="/about">About</a>
             <a className="mk-btn mk-btn-sm" href="/app">{signedIn ? 'Open the app' : 'Try Sideline'}</a>

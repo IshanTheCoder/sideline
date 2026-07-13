@@ -448,9 +448,14 @@ export default function MarketingHome() {
         <meta property="og:title" content={TITLE} />
         <meta property="og:description" content={DESCRIPTION} />
         <meta property="og:url" content={`${SITE_URL}/`} />
+        <meta property="og:image" content={`${SITE_URL}/sideline-whistle.png`} />
+        <meta property="og:image:width" content="156" />
+        <meta property="og:image:height" content="156" />
+        <meta property="og:image:alt" content="Sideline logo" />
         <meta name="twitter:card" content="summary" />
         <meta name="twitter:title" content={TITLE} />
         <meta name="twitter:description" content={DESCRIPTION} />
+        <meta name="twitter:image" content={`${SITE_URL}/sideline-whistle.png`} />
       </Head>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(JSON_LD) }} />
 

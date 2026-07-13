@@ -125,6 +125,26 @@ body:has(.mk-root) #root {
   color: var(--ink) !important;
   letter-spacing: 0.01em;
 }
+/* header wordmark: larger, bolder, with the whistle mark to its left */
+.mk-logo-nav {
+  gap: 10px;
+  font-size: 2rem;
+  font-weight: 700;
+}
+.mk-logo-nav img {
+  width: 34px;
+  height: 34px;
+  display: block;
+}
+@media (min-width: 640px) {
+  .mk-logo-nav { font-size: 2.3rem; }
+  .mk-logo-nav img { width: 38px; height: 38px; }
+}
+/* nav hugs the left edge more than the padding on other sections */
+.mk-nav .mk-container { padding-left: 14px; }
+@media (min-width: 640px) {
+  .mk-nav .mk-container { padding-left: 22px; }
+}
 .mk-navlinks {
   display: flex;
   align-items: center;
@@ -171,7 +191,8 @@ body:has(.mk-root) #root {
 }
 .mk-section-title {
   font-size: clamp(1.7rem, 3.4vw, 2.4rem);
-  line-height: 1.2;
+  /* same descender/selection-clipping risk as .mk-hero h1 on wrapped lines */
+  line-height: 1.3;
   max-width: 22em;
   margin-bottom: 0.6em;
   text-wrap: balance;
@@ -233,7 +254,11 @@ body:has(.mk-root) #root {
 }
 .mk-hero h1 {
   font-size: clamp(2.2rem, 5vw, 3.4rem);
-  line-height: 1.14;
+  /* 1.3 (was 1.14): tighter leading let descenders (y, g) from one line
+     spill into the next line's box, so selecting the text visually "cut"
+     letters where the selection highlight for the next line painted over
+     them. 1.3 gives descenders/ascenders clearance between lines. */
+  line-height: 1.3;
   max-width: 12em;
   margin-bottom: 28px;
   text-wrap: balance;
@@ -608,7 +633,7 @@ body:has(.mk-root) #root {
 }
 .mk-prose h1 {
   font-size: clamp(1.9rem, 4vw, 2.7rem);
-  line-height: 1.18;
+  line-height: 1.3;
   margin-bottom: 0.5em;
 }
 .mk-prose h2 {
