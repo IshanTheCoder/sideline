@@ -17,4 +17,4 @@ Disallow: /settings
 Disallow: /explore
 Disallow: /modal
 
-Sitemap: https://sideline-ai.pages.dev/sitemap.xml
+Sitemap: https://tapsideline.com/sitemap.xml

@@ -105,8 +105,6 @@ export default function PostGameSummaryScreen() {
     [recordings]
   );
 
-  const volleyballStats = useMemo(() => aggregateVolleyballStats(recordings), [recordings]);
-
   // Split notes into observations about our own team vs. scouting notes about the opponent.
   const ownRecordings = useMemo(
     () => recordings.filter((rec) => !parseAiLabels(rec.ai_labels ?? null).isOpponentNote),
@@ -116,6 +114,11 @@ export default function PostGameSummaryScreen() {
     () => recordings.filter((rec) => parseAiLabels(rec.ai_labels ?? null).isOpponentNote),
     [recordings]
   );
+
+  // Own-team stats aggregate ONLY own-team notes — an opponent's tagged position/skill
+  // (e.g. scouting "their outside hitter") must not skew the coach's own Skill Distribution,
+  // Focus Areas, or Feedback-by-Set numbers.
+  const volleyballStats = useMemo(() => aggregateVolleyballStats(ownRecordings), [ownRecordings]);
 
   const noticedMost = useMemo(() => {
     const count = {};
@@ -249,10 +252,12 @@ export default function PostGameSummaryScreen() {
     }));
   }, [volleyballStats.bySkill]);
 
-  // note count per player, from taggedPlayers metadata — powers the badge on player cards
+  // note count per player, from taggedPlayers metadata — powers the badge on player cards.
+  // Own-team notes only; opponent scouting notes carry no roster players anyway, but scope
+  // this to ownRecordings so the counts always mean "notes about my player".
   const playerNoteCounts = useMemo(() => {
     const counts = {};
-    for (const rec of recordings) {
+    for (const rec of ownRecordings) {
       const parsed = parseAiLabels(rec.ai_labels ?? null);
       for (const name of parsed.taggedPlayers ?? []) {
         const first = name.split(' ')[0];
@@ -260,7 +265,7 @@ export default function PostGameSummaryScreen() {
       }
     }
     return counts;
-  }, [recordings]);
+  }, [ownRecordings]);
 
   const windowWidth = Dimensions.get('window').width;
   const [containerWidth, setContainerWidth] = useState(
@@ -324,13 +329,14 @@ export default function PostGameSummaryScreen() {
     }));
   }, [volleyballStats.bySkill, isDark]);
 
-  // Feedback (recordings) per set: x = set number, y = count of recordings for that set
+  // Feedback (own-team notes) per set: x = set number, y = count of notes for that set.
+  // Own-team only so opponent scouting notes don't inflate the coach's per-set feedback volume.
   const feedbackPerSetData = useMemo(() => {
     const setOrder = ['Set 1', 'Set 2', 'Set 3', 'Set 4', 'Set 5'];
     const countBySet = {};
     setOrder.forEach((s) => { countBySet[s] = 0; });
     let unsetCount = 0;
-    for (const rec of recordings) {
+    for (const rec of ownRecordings) {
       const { setMarkers } = parseRecordingNotes(rec.manual_notes ?? null);
       const setLabel = setMarkers?.[0]?.label;
       if (setLabel && setOrder.includes(setLabel)) {
@@ -356,7 +362,7 @@ export default function PostGameSummaryScreen() {
         colors: data.map(() => () => '#E56947'),
       }],
     };
-  }, [recordings]);
+  }, [ownRecordings]);
 
   // Alias for backward compatibility (replaced "FEEDBACK OVER TIME" line chart with "FEEDBACK BY SET" bar chart)
   const feedbackTrendData = null;

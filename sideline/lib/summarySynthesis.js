@@ -144,19 +144,7 @@ export async function synthesizePostGameSummary(labels) {
     const content = data.choices?.[0]?.message?.content?.trim();
     if (!content) return { summary: '', error: new Error('Empty Groq response') };
 
-    let summary = '';
-    try {
-      const parsed = JSON.parse(content);
-      if (typeof parsed === 'string') {
-        summary = parsed.trim();
-      }
-    } catch {
-      let str = content;
-      const codeBlock = str.match(/```(?:json)?\s*([\s\S]*?)```/);
-      if (codeBlock) str = codeBlock[1].trim();
-      str = str.replace(/^["']|["']$/g, '');
-      summary = str.trim();
-    }
+    const summary = extractSummaryText(content);
 
     return { summary: summary.slice(0, 600), error: null };
   } catch (err) {
@@ -294,6 +282,64 @@ export async function synthesizeOpponentScoutingReport(items, opponentName = '')
       error: err instanceof Error ? err : new Error(String(err)),
     };
   }
+}
+
+/**
+ * Robustly pull the post-game summary paragraph out of whatever shape the model
+ * returned. The prompt asks for a bare JSON string, but the model sometimes wraps
+ * it in an object ({"summary":"..."}) or emits a malformed fragment. The old code
+ * only handled a bare string: a valid object silently produced an empty summary,
+ * and a malformed one leaked a trailing `"}` into the UI. This handles all four:
+ * bare JSON string, JSON object (summary/text/paragraph or first string value),
+ * code-fenced JSON, and malformed fragments (strip the object-key wrapper, leading
+ * quote, and any stray trailing quote/brace).
+ * @param {string} content - raw model output
+ * @returns {string}
+ */
+export function extractSummaryText(content) {
+  if (!content || typeof content !== 'string') return '';
+  let str = content.trim();
+  const codeBlock = str.match(/```(?:json)?\s*([\s\S]*?)```/);
+  if (codeBlock) str = codeBlock[1].trim();
+
+  // 1. Iteratively unwrap JSON layers until stable. The model returns the
+  //    paragraph in several shapes: a bare JSON string ("..."), an object
+  //    ({summary|text|paragraph: "..."}), OR — the one that bit us — a JSON
+  //    string whose content is itself a stringified object
+  //    ("{\"paragraph\": \"...\"}"). A single parse of that last shape yields a
+  //    STRING that still reads {"paragraph": "..."}, so one pass isn't enough.
+  //    Loop (capped) so each layer peels off.
+  for (let pass = 0; pass < 4; pass++) {
+    let next = null;
+    try {
+      const parsed = JSON.parse(str);
+      if (typeof parsed === 'string') {
+        next = parsed.trim();
+      } else if (parsed && typeof parsed === 'object') {
+        const val = parsed.summary ?? parsed.text ?? parsed.paragraph
+          ?? Object.values(parsed).find((v) => typeof v === 'string');
+        if (typeof val === 'string') next = val.trim();
+      }
+    } catch {
+      // not strict JSON at this layer — stop unwrapping, fall to lenient cleanup
+    }
+    if (next === null || next === str) break;
+    str = next;
+  }
+
+  // 2. Lenient cleanup for output that never parsed as strict JSON (or a residual
+  //    stringified object). Independent of JSON validity, unwrap a leading object
+  //    key of ANY style — {"paragraph": , {paragraph: , {'paragraph': — by
+  //    dropping from the opening brace to the first colon (non-greedy, barred from
+  //    crossing another brace/colon so it can't eat into the value). Then strip a
+  //    leading quote and any trailing quote/brace clutter. The quote class covers
+  //    ASCII (" ') and typographic quotes (“ ” ‘ ’), since models that emit smart
+  //    apostrophes tend to wrap the whole paragraph in smart quotes too.
+  const Q = '["\'“”‘’]';
+  str = str.replace(/^\{\s*[^:{}]*?:\s*/, '');
+  str = str.replace(new RegExp('^' + Q), '');
+  str = str.replace(new RegExp('[\\s' + '"\'“”‘’' + ']*\\}?\\s*$'), '');
+  return str.trim();
 }
 
 function parseJsonObject(raw) {

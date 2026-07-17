@@ -20,6 +20,20 @@ export const unstable_settings = {
   initialRouteName: '(tabs)',
 };
 
+// The site moved from sideline-ai.pages.dev to tapsideline.com. Cloudflare
+// Pages' _redirects file only matches paths (not hostnames), so send visitors
+// on the old domain to the new one here, before the app mounts. Exact-match
+// the hostname so branch preview deploys (*.sideline-ai.pages.dev) still work.
+if (
+  Platform.OS === 'web' &&
+  typeof window !== 'undefined' &&
+  window.location.hostname === 'sideline-ai.pages.dev'
+) {
+  window.location.replace(
+    `https://tapsideline.com${window.location.pathname}${window.location.search}${window.location.hash}`
+  );
+}
+
 // On web, wrap app in a centered mobile-width column so UI matches mobile
 const WEB_MAX_WIDTH = 440;
 

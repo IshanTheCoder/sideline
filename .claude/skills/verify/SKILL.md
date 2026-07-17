@@ -36,5 +36,5 @@ Use a fresh `--user-data-dir` per invocation (profile lock otherwise).
 - Bash tool's `$TMPDIR` is empty on this machine; use the session scratchpad path explicitly for logs.
 - The shell's cwd persists between calls; `cd sideline` fails if you're already inside it.
 - Marketing pages: `/` and `/about` (files in `sideline/app/(marketing)/`).
-- Known pre-existing issue: horizontal overflow at ~390px width (nav button, hero h1, notecard clip at the right edge). Reproduces on production (https://sideline-ai.pages.dev), so don't attribute it to new changes.
+- Known pre-existing issue: horizontal overflow at ~390px width (nav button, hero h1, notecard clip at the right edge). Reproduces on production (https://tapsideline.com), so don't attribute it to new changes.
 - Stop the server afterward: `Get-NetTCPConnection -LocalPort 8090 -State Listen | % { Stop-Process -Id $_.OwningProcess -Force }`.

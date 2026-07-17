@@ -8,7 +8,7 @@ import { Platform } from 'react-native';
 import { useAuth } from '@/contexts/AuthContext';
 import './marketing.css';
 
-export const SITE_URL = 'https://sideline-ai.pages.dev';
+export const SITE_URL = 'https://tapsideline.com';
 export const CONTACT_EMAIL = 'sarda.ish@gmail.com';
 
 export default function MarketingLayout() {

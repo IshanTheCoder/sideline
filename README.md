@@ -1,9 +1,9 @@
-# Sideline: https://sideline-ai.pages.dev
+# Sideline: https://tapsideline.com
 Sideline is an AI-powered coaching assistant built for sports teams, starting with volleyball. It helps coaches capture in-game observations through voice notes, then automatically transcribes, organizes, and summarizes them into actionable post-game feedback.
 
 ## Links
-- **Website:** https://sideline-ai.pages.dev — marketing site, [about page](https://sideline-ai.pages.dev/about), and [blog](https://sideline-ai.pages.dev/blog)
-- **Web app:** https://sideline-ai.pages.dev/app — opens the app (signed-in users go straight to their home tab)
+- **Website:** https://tapsideline.com — marketing site, [about page](https://tapsideline.com/about), and [blog](https://tapsideline.com/blog)
+- **Web app:** https://tapsideline.com/app — opens the app (signed-in users go straight to their home tab)
 
 ## The Problem
 During games, coaches notice dozens of important details:

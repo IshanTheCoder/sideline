@@ -123,6 +123,28 @@ function correctLabelSpelling(label, players = []) {
   return corrected;
 }
 
+/**
+ * Deterministic backstop for opponent-note classification. The LLM decides
+ * isOpponentNote from the transcription, but it occasionally misses an obvious
+ * opponent note (leaving it in the coach's own-team analysis and out of the
+ * scouting section). This only ever PROMOTES a note to opponent — never demotes
+ * an LLM "true" — and only on unambiguous markers ("opponent", "opposing",
+ * "other team") that essentially never describe one's own team. Keeps the
+ * false-negative fix from introducing false positives on own-team notes.
+ * @param {boolean} llmValue - isOpponentNote as returned by the model
+ * @param {{ label?: string, transcription?: string }} ctx
+ * @returns {boolean}
+ */
+export function detectOpponentNote(llmValue, { label = '', transcription = '' } = {}) {
+  if (llmValue === true) return true;
+  const hay = `${label}\n${transcription}`.toLowerCase();
+  // "opponent" / "opponent's" / "opponents", "opposing", "other team" — unambiguous
+  if (/\bopponent(?:'s|s)?\b/.test(hay) || /\bopposing\b/.test(hay) || /\bother team\b/.test(hay)) {
+    return true;
+  }
+  return false;
+}
+
 function abbreviatePlayerNames(label, players = []) {
   if (!label || !Array.isArray(players) || players.length === 0) return label;
 
@@ -302,7 +324,12 @@ async function generateLabelWithDeps(transcriptionText, options = {}, deps = {})
           players
         )
       );
-      console.log('✅ Label generated (volleyball):', finalLabel, structured.skillCategory ?? '', structured.position ?? '');
+      // deterministic backstop: catch obvious opponent notes the model left as own-team
+      const isOpponentNote = detectOpponentNote(structured.isOpponentNote === true, {
+        label: structured.label,
+        transcription: transcriptionText,
+      });
+      console.log('✅ Label generated (volleyball):', finalLabel, structured.skillCategory ?? '', structured.position ?? '', isOpponentNote ? '[opponent]' : '');
       return {
         label: finalLabel,
         skillCategory: structured.skillCategory ?? null,
@@ -310,7 +337,7 @@ async function generateLabelWithDeps(transcriptionText, options = {}, deps = {})
         playPattern: structured.playPattern ?? null,
         feedbackType: structured.feedbackType ?? null,
         ruleNote: structured.ruleNote ?? null,
-        isOpponentNote: structured.isOpponentNote === true,
+        isOpponentNote,
         error: null,
       };
     }
@@ -323,7 +350,12 @@ async function generateLabelWithDeps(transcriptionText, options = {}, deps = {})
         players
       )
     );
-    console.log('✅ Label generated (plain fallback):', finalFallbackLabel);
+    // same backstop on the fallback path — the model gave no JSON flag, so lean on markers
+    const fallbackIsOpponentNote = detectOpponentNote(false, {
+      label: fallbackLabel,
+      transcription: transcriptionText,
+    });
+    console.log('✅ Label generated (plain fallback):', finalFallbackLabel, fallbackIsOpponentNote ? '[opponent]' : '');
     return {
       label: finalFallbackLabel,
       skillCategory: null,
@@ -331,7 +363,7 @@ async function generateLabelWithDeps(transcriptionText, options = {}, deps = {})
       playPattern: null,
       feedbackType: null,
       ruleNote: null,
-      isOpponentNote: false,
+      isOpponentNote: fallbackIsOpponentNote,
       error: null,
     };
   } catch (error) {
