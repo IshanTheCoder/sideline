@@ -85,7 +85,7 @@ export default function AboutPage() {
           <p>
             You tap once and say what you saw: <em>&ldquo;Block closing late on the
             outside.&rdquo;</em> Sideline transcribes it and structures it into searchable
-            notes, organized by player, skill, priority, and game. No typing during play.
+            notes, organized by player, skill, and game. No typing during play.
             No tagging. No reorganizing a notes app at 11pm.
           </p>
 

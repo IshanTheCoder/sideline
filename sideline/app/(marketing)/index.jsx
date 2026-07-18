@@ -11,7 +11,7 @@ import { SITE_URL, CONTACT_EMAIL } from './_layout';
 
 const TITLE = 'Sideline: Voice-first coaching notes for volleyball coaches';
 const DESCRIPTION =
-  'Sideline turns a coach’s five-second voice notes into structured, searchable feedback, organized by player, skill, and priority. Record during the game, review before practice.';
+  'Sideline turns a coach’s five-second voice notes into structured, searchable feedback, organized by player, skill, and game. Record during the game, review before practice.';
 
 const JSON_LD = {
   '@context': 'https://schema.org',
@@ -32,26 +32,20 @@ const JSON_LD = {
 const DEMO_NOTES = [
   {
     quote: 'Block closing late on the outside',
-    time: '0:04',
     player: '#7 (Sarah K.)',
     skill: 'Block timing',
-    priority: 'High',
-    game: 'vs. Ridge, Set 2',
+    game: 'vs. Ridge',
   },
   {
     quote: 'Libero drifting too deep in serve receive',
-    time: '0:05',
     player: '#12 (Maya R.)',
     skill: 'Serve-receive positioning',
-    priority: 'Medium',
-    game: 'vs. Metuchen, Set 1',
+    game: 'vs. Metuchen',
   },
   {
     quote: 'Setter tempo too fast on outside sets',
-    time: '0:03',
     player: '#4 (Priya S.)',
     skill: 'Set tempo',
-    priority: 'High',
     game: 'Tuesday practice',
   },
 ];
@@ -113,9 +107,11 @@ function HeroPlayer() {
   );
 }
 
-// The founders-section visual: a libero digging a ball (clean silhouette
-// cut from the reference art, served from /public). Fades up once on
-// scroll; static for reduced motion and no-JS.
+// The founders-section visual: a libero diving full-stretch for a ball
+// (background removed from the reference art, served from /public). On
+// scroll she dives in from the right — the direction her pose is already
+// moving — and lands breaking out of the band (see .mk-dig). Static for
+// reduced motion and no-JS.
 function DigFigure() {
   const rootRef = useRef(null);
 
@@ -134,7 +130,13 @@ function DigFigure() {
         start: 'top 80%',
         once: true,
         onEnter: () => {
-          tween = gsap.fromTo(root, { opacity: 0, y: 30 }, { opacity: 1, y: 0, duration: 0.9, ease: 'power2.out' });
+          // she dives the way she's facing: in from the upper right, down
+          // and to the left toward the ball, straightening out as she lands
+          tween = gsap.fromTo(
+            root,
+            { opacity: 0, x: 180, y: -70, rotation: -8 },
+            { opacity: 1, x: 0, y: 0, rotation: 0, duration: 1.15, ease: 'power3.out' }
+          );
         },
       });
     });
@@ -147,7 +149,7 @@ function DigFigure() {
 
   return (
     <figure ref={rootRef} className="mk-dig">
-      <img src="/digger.png" alt="Silhouette of a volleyball player digging a ball" width="504" height="428" />
+      <img src="/libero-dive.png" alt="Illustration of a libero diving full-stretch to dig a volleyball" width="761" height="329" />
     </figure>
   );
 }
@@ -200,15 +202,10 @@ function NoteCardDemo() {
       <figure className="mk-notecard" aria-label="Live example of voice notes turning into structured coaching notes">
         <div className="mk-notecard-quote mk-rise">
           <MicIcon live={cycling && typing} />
-          <div>
-            <p className="mk-notecard-quote-text">
-              &ldquo;{shownQuote}
-              {cycling && typing ? <span className="mk-caret" aria-hidden="true" /> : <>&rdquo;</>}
-            </p>
-            <p className="mk-notecard-time">
-              {cycling && typing ? 'Listening…' : `Voice note · ${note.time}`}
-            </p>
-          </div>
+          <p className="mk-notecard-quote-text">
+            &ldquo;{shownQuote}
+            {cycling && typing ? <span className="mk-caret" aria-hidden="true" /> : <>&rdquo;</>}
+          </p>
         </div>
         <div className="mk-notecard-flow mk-rise mk-rise-1" aria-hidden="true">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -219,7 +216,6 @@ function NoteCardDemo() {
           <div className="mk-notecard-rows mk-notecard-rows-pending" aria-hidden="true">
             <div className="mk-notecard-row"><span className="mk-notecard-label">Player</span><span className="mk-skeleton" /></div>
             <div className="mk-notecard-row"><span className="mk-notecard-label">Skill</span><span className="mk-skeleton mk-skeleton-w2" /></div>
-            <div className="mk-notecard-row"><span className="mk-notecard-label">Priority</span><span className="mk-skeleton mk-skeleton-w3" /></div>
             <div className="mk-notecard-row"><span className="mk-notecard-label">Game</span><span className="mk-skeleton mk-skeleton-w2" /></div>
           </div>
         ) : (
@@ -233,106 +229,40 @@ function NoteCardDemo() {
               <span className="mk-notecard-value">{note.skill}</span>
             </div>
             <div className="mk-notecard-row mk-rise mk-rise-4">
-              <span className="mk-notecard-label">Priority</span>
-              <span className="mk-notecard-value">
-                <span className={note.priority === 'High' ? 'mk-badge-high' : 'mk-badge-med'}>{note.priority}</span>
-              </span>
-            </div>
-            <div className="mk-notecard-row mk-rise mk-rise-5">
               <span className="mk-notecard-label">Game</span>
               <span className="mk-notecard-value">{note.game}</span>
             </div>
           </div>
         )}
       </figure>
-      <div className="mk-notecard-foot mk-rise mk-rise-6">
+      <div className="mk-notecard-foot mk-rise mk-rise-5">
         <p className="mk-notecard-caption">A five-second voice note, organized before the set ends.</p>
-        <div className="mk-dots" role="tablist" aria-label="Example notes">
-          {DEMO_NOTES.map((n, i) => (
-            <button
-              key={n.quote}
-              type="button"
-              className={i === idx ? 'mk-dot mk-dot-on' : 'mk-dot'}
-              aria-label={`Show example ${i + 1}`}
-              onClick={() => {
-                setCycling(true);
-                if (i !== idx) setIdx(i);
-              }}
-            />
-          ))}
-        </div>
       </div>
     </div>
   );
 }
 
-// The note a coach's voice becomes in the voice-to-note morph below.
+// The note a coach's voice becomes in the voice-to-note moment below.
 const WAVE_NOTE = {
   quote: 'Maya’s toss is drifting left on her jump serve.',
   player: '#12 (Maya R.)',
   skill: 'Serve toss consistency',
-  priority: 'Medium',
+  game: 'Tuesday vs. Ridge',
 };
 
-// Builds the voice-to-note timeline: the six bars oscillate like a live
-// waveform for ~1s, then the outer four reshape into the card's frame (the
-// two at the edges stretch into the side borders; two rotate 90° into the
-// top and bottom) while the middle pair fades. The real card crossfades in
-// underneath. Transforms and opacity only; no layout, no canvas.
-function buildWaveTimeline(gsap, card, bars) {
-  const cardRect = card.getBoundingClientRect();
-  const rects = bars.map((b) => b.getBoundingClientRect());
-  const barW = rects[0].width;
-  const barH = rects[0].height;
-  // GSAP x/y are deltas from each bar's resting center to a border midpoint.
-  const moveTo = (i, targetX, targetY) => ({
-    x: targetX - (rects[i].left + rects[i].right) / 2,
-    y: targetY - (rects[i].top + rects[i].bottom) / 2,
-  });
-  const midX = cardRect.left + cardRect.width / 2;
-  const midY = cardRect.top + cardRect.height / 2;
-  const frame = {
-    left: { ...moveTo(0, cardRect.left + barW / 2, midY), rotation: 0, scaleY: cardRect.height / barH },
-    top: { ...moveTo(1, midX, cardRect.top + barW / 2), rotation: 90, scaleY: cardRect.width / barH },
-    bottom: { ...moveTo(4, midX, cardRect.bottom - barW / 2), rotation: 90, scaleY: cardRect.width / barH },
-    right: { ...moveTo(5, cardRect.right - barW / 2, midY), rotation: 0, scaleY: cardRect.height / barH },
-  };
+// The waveform's resting shape: bar heights (px) roughly tracing the
+// cadence of a short spoken sentence — two bursts with a breath between.
+const WAVE_BARS = [
+  16, 26, 38, 50, 42, 32, 24, 20, 28, 36, 26, 18,
+  22, 44, 56, 46, 34, 26, 30, 22, 16, 24, 18, 12,
+];
 
-  const tl = gsap.timeline({ defaults: { transformOrigin: '50% 50%' } });
-  // ~1s of "listening": each bar re-rolls a random height every beat
-  tl.to(bars, {
-    scaleY: 'random(0.3, 2.3)',
-    duration: 0.14,
-    ease: 'sine.inOut',
-    repeat: 6,
-    repeatRefresh: true,
-    stagger: { each: 0.02, from: 'random' },
-  });
-  tl.to(bars, { scaleY: 1, duration: 0.16, ease: 'sine.out' });
-  // the waveform becomes the card frame
-  tl.add('morph');
-  tl.to(bars[0], { ...frame.left, duration: 0.6, ease: 'power3.inOut' }, 'morph');
-  tl.to(bars[1], { ...frame.top, duration: 0.6, ease: 'power3.inOut' }, 'morph');
-  tl.to(bars[4], { ...frame.bottom, duration: 0.6, ease: 'power3.inOut' }, 'morph');
-  tl.to(bars[5], { ...frame.right, duration: 0.6, ease: 'power3.inOut' }, 'morph');
-  tl.to([bars[2], bars[3]], { scaleY: 0.2, opacity: 0, duration: 0.3, ease: 'power2.in' }, 'morph');
-  // the frame hands off to the real card
-  tl.to(card, { opacity: 1, duration: 0.45, ease: 'power1.out' }, 'morph+=0.45');
-  tl.fromTo(
-    card.querySelectorAll('.mk-wavecard-quote, .mk-notecard-row'),
-    { opacity: 0, y: 6 },
-    { opacity: 1, y: 0, duration: 0.35, ease: 'power2.out', stagger: 0.06 },
-    'morph+=0.5'
-  );
-  tl.to(bars, { opacity: 0, duration: 0.3, ease: 'power1.out' }, 'morph+=0.6');
-  return tl;
-}
-
-// The "how it works" moment: a sound waveform that collapses into the
-// structured note card when scrolled into view (GSAP ScrollTrigger, once).
-// Statically rendered as the finished card; the bars only appear after JS
-// arms the animation, so crawlers, no-JS visitors, and reduced-motion users
-// always see the complete card.
+// The "how it works" moment, read top to bottom like the product itself:
+// a voice waveform, an arrow, and the structured note it becomes. On
+// scroll (GSAP ScrollTrigger, once) the bars flutter like live audio,
+// then the arrow and card follow, as if the note files itself. Everything
+// is statically rendered fully visible, so crawlers, no-JS visitors, and
+// reduced-motion users always see the complete moment.
 function WaveToNote() {
   const rootRef = useRef(null);
 
@@ -340,26 +270,51 @@ function WaveToNote() {
     if (Platform.OS !== 'web' || prefersReducedMotion()) return undefined;
     const root = rootRef.current;
     if (!root) return undefined;
-    const card = root.querySelector('.mk-wavecard-card');
     const bars = Array.from(root.querySelectorAll('.mk-wavecard-bar'));
-    if (!card || bars.length === 0) return undefined;
+    const flow = root.querySelector('.mk-wavecard-flow');
+    const card = root.querySelector('.mk-wavecard-card');
+    if (bars.length === 0 || !card) return undefined;
 
     let trigger;
     let tl;
     let cancelled = false;
-    root.classList.add('is-armed');
     loadMarketingGsap().then((gsap) => {
-      if (cancelled) return;
-      if (!gsap) {
-        root.classList.remove('is-armed'); // CDN failed; show the static card
-        return;
-      }
+      if (cancelled || !gsap) return;
       trigger = window.ScrollTrigger.create({
         trigger: root,
         start: 'top 75%',
         once: true,
         onEnter: () => {
-          tl = buildWaveTimeline(gsap, card, bars);
+          tl = gsap.timeline();
+          // the voice: bars sweep up left-to-right, then jitter like live audio
+          tl.fromTo(
+            bars,
+            { scaleY: 0.15, opacity: 0.4, transformOrigin: '50% 50%' },
+            { scaleY: 1, opacity: 1, duration: 0.45, ease: 'power2.out', stagger: { each: 0.02 } }
+          );
+          tl.to(bars, {
+            scaleY: 'random(0.45, 1.5)',
+            duration: 0.14,
+            ease: 'sine.inOut',
+            repeat: 5,
+            repeatRefresh: true,
+            stagger: { each: 0.012, from: 'random' },
+          });
+          tl.to(bars, { scaleY: 1, duration: 0.2, ease: 'sine.out' });
+          // ...becomes the note: arrow, then the card rises in
+          tl.fromTo(flow, { opacity: 0 }, { opacity: 1, duration: 0.3 }, '-=0.25');
+          tl.fromTo(
+            card,
+            { opacity: 0, y: 16 },
+            { opacity: 1, y: 0, duration: 0.55, ease: 'power2.out' },
+            '-=0.05'
+          );
+          tl.fromTo(
+            card.querySelectorAll('.mk-notecard-row'),
+            { opacity: 0, y: 6 },
+            { opacity: 1, y: 0, duration: 0.3, ease: 'power2.out', stagger: 0.07 },
+            '-=0.25'
+          );
         },
       });
     });
@@ -367,36 +322,38 @@ function WaveToNote() {
       cancelled = true;
       if (trigger) trigger.kill();
       if (tl) tl.kill();
-      root.classList.remove('is-armed');
     };
   }, []);
 
   return (
     <div className="mk-wavecard" ref={rootRef}>
-      <div className="mk-wavecard-stage">
-        <div className="mk-wavecard-bars" aria-hidden="true">
-          {[0, 1, 2, 3, 4, 5].map((i) => (
-            <span key={i} className="mk-wavecard-bar" />
-          ))}
-        </div>
-        <figure className="mk-wavecard-card" aria-label="A five-second voice note shown as the structured note it becomes">
-          <p className="mk-wavecard-quote">&ldquo;{WAVE_NOTE.quote}&rdquo;</p>
-          <div className="mk-wavecard-rows">
-            <div className="mk-notecard-row">
-              <span className="mk-notecard-label">Player</span>
-              <span className="mk-notecard-value">{WAVE_NOTE.player}</span>
-            </div>
-            <div className="mk-notecard-row">
-              <span className="mk-notecard-label">Skill</span>
-              <span className="mk-notecard-value">{WAVE_NOTE.skill}</span>
-            </div>
-            <div className="mk-notecard-row">
-              <span className="mk-notecard-label">Priority</span>
-              <span className="mk-notecard-value"><span className="mk-badge-med">{WAVE_NOTE.priority}</span></span>
-            </div>
-          </div>
-        </figure>
+      <div className="mk-wavecard-bars" aria-hidden="true">
+        {WAVE_BARS.map((height, i) => (
+          <span key={i} className="mk-wavecard-bar" style={{ height }} />
+        ))}
       </div>
+      <div className="mk-wavecard-flow" aria-hidden="true">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M12 4v16" /><path d="M6 14l6 6 6-6" />
+        </svg>
+      </div>
+      <figure className="mk-wavecard-card" aria-label="A five-second voice note shown as the structured note it becomes">
+        <p className="mk-wavecard-quote">&ldquo;{WAVE_NOTE.quote}&rdquo;</p>
+        <div className="mk-wavecard-rows">
+          <div className="mk-notecard-row">
+            <span className="mk-notecard-label">Player</span>
+            <span className="mk-notecard-value">{WAVE_NOTE.player}</span>
+          </div>
+          <div className="mk-notecard-row">
+            <span className="mk-notecard-label">Skill</span>
+            <span className="mk-notecard-value">{WAVE_NOTE.skill}</span>
+          </div>
+          <div className="mk-notecard-row">
+            <span className="mk-notecard-label">Game</span>
+            <span className="mk-notecard-value">{WAVE_NOTE.game}</span>
+          </div>
+        </div>
+      </figure>
       <p className="mk-wavecard-caption">Said out loud during a rally. Filed before the next one.</p>
     </div>
   );
@@ -504,10 +461,10 @@ export default function MarketingHome() {
               <EarIcon />
               <h3>Sideline listens.</h3>
               <p>
-                Your note is transcribed and organized by player, skill area, and priority,
+                Your note is transcribed and organized by player and skill area,
                 while the rally is still going. No typing, no tagging, no dropdown menus.
               </p>
-              <p className="mk-moment-example">#12 · Serve toss consistency · Medium</p>
+              <p className="mk-moment-example">#12 · Serve toss consistency</p>
             </div>
             <div className="mk-moment">
               <ClipboardIcon />
@@ -521,6 +478,74 @@ export default function MarketingHome() {
           </div>
 
           <WaveToNote />
+        </div>
+      </section>
+
+      {/* features: what you get back */}
+      <section className="mk-section" id="features">
+        <div className="mk-container">
+          <p className="mk-eyebrow">What you get back</p>
+          <h2 className="mk-section-title">Every note comes back more useful than you left it.</h2>
+          <p className="mk-section-sub">
+            You say five seconds out loud. Sideline turns it into a record your whole
+            season can lean on.
+          </p>
+
+          <div className="mk-features">
+            <div className="mk-feature">
+              <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#75975e" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <circle cx="11" cy="11" r="7" />
+                <path d="M21 21l-4.35-4.35" />
+              </svg>
+              <h3>A searchable season.</h3>
+              <p>
+                Every note is filed by player, skill, and game the moment you say it.
+                Pull up everything on serve receive from the last month in two taps.
+              </p>
+              <p className="mk-feature-example">&ldquo;Show me every note on #7.&rdquo;</p>
+            </div>
+            <div className="mk-feature">
+              <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#75975e" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <circle cx="12" cy="8" r="4" />
+                <path d="M4 21c0-4 3.6-6.5 8-6.5s8 2.5 8 6.5" />
+              </svg>
+              <h3>Player pages.</h3>
+              <p>
+                Each athlete&rsquo;s full history in one place: what you&rsquo;ve noticed, how
+                often, and whether it&rsquo;s improving. Walk into one-on-ones prepared.
+              </p>
+              <p className="mk-feature-example">Maya: three serve-toss notes in two weeks.</p>
+            </div>
+            <div className="mk-feature">
+              <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#75975e" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <rect x="5" y="3" width="14" height="18" rx="2" />
+                <path d="M9 8h6" />
+                <path d="M9 12h6" />
+                <path d="M9 16h4" />
+              </svg>
+              <h3>Post-game summaries.</h3>
+              <p>
+                After the final whistle, Sideline writes up everything you said into a
+                clean recap: by player, by skill, ready to read on the bus home.
+              </p>
+              <p className="mk-feature-example">Six notes on blocking. Start practice there.</p>
+            </div>
+            <div className="mk-feature">
+              <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#75975e" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <circle cx="6" cy="12" r="3" />
+                <circle cx="18" cy="6" r="3" />
+                <circle cx="18" cy="18" r="3" />
+                <path d="M8.7 10.6l6.6-3.2" />
+                <path d="M8.7 13.4l6.6 3.2" />
+              </svg>
+              <h3>Scouting reports.</h3>
+              <p>
+                What you noticed about the other side of the net is saved too, compiled
+                and ready for the next time you face them.
+              </p>
+              <p className="mk-feature-example">Ridge&rsquo;s outside hits line on high sets.</p>
+            </div>
+          </div>
         </div>
       </section>
 

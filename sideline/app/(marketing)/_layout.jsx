@@ -37,6 +37,8 @@ export default function MarketingLayout() {
             Sideline
           </a>
           <nav className="mk-navlinks" aria-label="Site">
+            <a className="mk-nav-hidesm" href="/#how-it-works">How it works</a>
+            <a className="mk-nav-hidesm" href="/#features">Features</a>
             <a href="/about">About</a>
             <a className="mk-btn mk-btn-sm" href="/app">{signedIn ? 'Open the app' : 'Try Sideline'}</a>
           </nav>
