@@ -1,10 +1,9 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Animated, ScrollView, StyleSheet, View, TouchableOpacity, ActivityIndicator, Platform } from 'react-native';
 import { showAlert } from '@/lib/alert';
 import { Audio } from 'expo-av';
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
-import { useFocusEffect } from '@react-navigation/native';
 import * as Crypto from 'expo-crypto';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -15,7 +14,6 @@ import { useAudioPermissions } from '@/hooks/use-audio-permissions';
 import { useThemeColor } from '@/hooks/use-theme-color';
 import { useAuth } from '@/contexts/AuthContext';
 import { useActiveSession } from '@/contexts/ActiveSessionContext';
-import { useTutorial } from '@/contexts/TutorialContext';
 import {
   uploadRecording,
   createRecordingRecord,
@@ -73,11 +71,9 @@ export default function RecordScreen() {
   const router = useRouter();
   const { user } = useAuth();
   const { activeSession, clearActiveSession } = useActiveSession();
-  const { isTutorialActive, registerTarget } = useTutorial();
   const { status, requestPermission, isLoading: isPermissionLoading } = useAudioPermissions();
   const iconColor = useThemeColor({}, 'icon');
-  const recordButtonRef = useRef(null);
-  
+
   // all the state we need to track while recording
   const [isRecording, setIsRecording] = useState(false);
   const [recordingDuration, setRecordingDuration] = useState(0);
@@ -120,18 +116,6 @@ export default function RecordScreen() {
       }
     };
   }, []);
-
-  useFocusEffect(
-    useCallback(() => {
-      if (!isTutorialActive) return;
-      const timer = setTimeout(() => {
-        recordButtonRef.current?.measureInWindow((x, y, width, height) => {
-          if (width > 0 && height > 0) registerTarget('record:recordButton', { x, y, width, height });
-        });
-      }, 700);
-      return () => clearTimeout(timer);
-    }, [isTutorialActive, registerTarget])
-  );
 
   // rotate the coaching tip every 10s while idle — keeps discovery passive, not naggy
   useEffect(() => {
@@ -689,7 +673,7 @@ export default function RecordScreen() {
             </View>
           )}
 
-          <View ref={recordButtonRef} collapsable={false}>
+          <View collapsable={false}>
             <RecordButton
               isRecording={isRecording}
               recordingDuration={recordingDuration}

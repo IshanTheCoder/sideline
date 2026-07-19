@@ -6,7 +6,6 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useAuth } from '@/contexts/AuthContext';
-import { useTutorial } from '@/contexts/TutorialContext';
 import HamburgerMenu from '@/components/HamburgerMenu';
 import { useFocusEffect } from '@react-navigation/native';
 import { Colors } from '@/constants/theme';
@@ -36,32 +35,8 @@ export default function HomeScreen() {
   const colorScheme = useColorScheme();
   const router = useRouter();
   const [menuVisible, setMenuVisible] = useState(false);
-  const { isTutorialActive, registerTarget } = useTutorial();
 
-  const hamburgerRef = useRef(null);
-  const startRecordingRef = useRef(null);
-  const recentGamesRef = useRef(null);
   const homeScrollRef = useRef(null);
-
-  const measureTarget = useCallback((key, ref) => {
-    if (!ref?.current) return;
-    ref.current.measureInWindow((x, y, width, height) => {
-      if (width > 0 && height > 0) registerTarget(key, { x, y, width, height });
-    });
-  }, [registerTarget]);
-
-  useFocusEffect(
-    useCallback(() => {
-      if (!isTutorialActive) return;
-      homeScrollRef.current?.scrollTo({ y: 0, animated: false });
-      const timer = setTimeout(() => {
-        measureTarget('home:hamburger', hamburgerRef);
-        measureTarget('home:startRecording', startRecordingRef);
-        measureTarget('home:recentGames', recentGamesRef);
-      }, 700);
-      return () => clearTimeout(timer);
-    }, [isTutorialActive, measureTarget])
-  );
 
   // recordings + loading/error state for the home screen
   const [recordings, setRecordings] = useState([]);
@@ -225,7 +200,6 @@ export default function HomeScreen() {
       <View style={styles.header}>
         {/* the triple-line hamburger button */}
         <TouchableOpacity
-          ref={hamburgerRef}
           style={styles.hamburgerButton}
           onPress={() => setMenuVisible(true)}
           activeOpacity={0.7}
@@ -273,7 +247,6 @@ export default function HomeScreen() {
 
         {/* big "start recording" CTA card */}
         <TouchableOpacity
-          ref={startRecordingRef}
           style={styles.startRecordingButton}
           onPress={handleStartRecording}
           activeOpacity={0.8}
@@ -292,7 +265,7 @@ export default function HomeScreen() {
         </TouchableOpacity>
 
         {/* recent games feed */}
-        <View ref={recentGamesRef} style={styles.recentSection}>
+        <View style={styles.recentSection}>
           <View style={styles.sectionHeader}>
             <ThemedText style={styles.sectionTitle}>
               Recent Games

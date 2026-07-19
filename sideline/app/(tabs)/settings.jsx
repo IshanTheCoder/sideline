@@ -7,7 +7,6 @@ import { ThemedView } from '@/components/themed-view';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors } from '@/constants/theme';
 import { useAuth } from '@/contexts/AuthContext';
-import { useTutorial } from '@/contexts/TutorialContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { supabase } from '@/lib/supabase';
 import { Image } from 'expo-image';
@@ -20,7 +19,6 @@ export default function SettingsScreen() {
   const { user, profile, signOut, refreshProfile } = useAuth();
   const { colorScheme } = useTheme();
   const router = useRouter();
-  const { startTutorial } = useTutorial();
   const [profileImageUri, setProfileImageUri] = useState(
     profile?.profile_picture_url || null
   );
@@ -314,36 +312,6 @@ export default function SettingsScreen() {
                 <ThemedText style={styles.settingTitle}>Current Sport</ThemedText>
                 <ThemedText style={styles.settingSubtitle}>
                   {profile?.sport || 'Not set'}
-                </ThemedText>
-              </View>
-            </View>
-            <IconSymbol
-              name="chevron.right"
-              size={20}
-              color={Colors[colorScheme].icon}
-            />
-          </TouchableOpacity>
-        </View>
-
-        {/* replay tutorial */}
-        <View style={styles.section}>
-          <TouchableOpacity
-            style={[styles.settingItem, {
-              backgroundColor: Colors[colorScheme].cardBackground,
-            }]}
-            onPress={() => startTutorial()}
-            activeOpacity={0.7}
-          >
-            <View style={styles.settingLeft}>
-              <IconSymbol
-                name="questionmark.circle"
-                size={24}
-                color={Colors[colorScheme ?? 'light'].tint}
-              />
-              <View style={styles.settingTextContainer}>
-                <ThemedText style={styles.settingTitle}>Replay Tutorial</ThemedText>
-                <ThemedText style={styles.settingSubtitle}>
-                  Walk through the app features again
                 </ThemedText>
               </View>
             </View>

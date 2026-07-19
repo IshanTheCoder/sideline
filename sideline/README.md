@@ -29,7 +29,7 @@ The entire capture process takes less than 5 seconds, allowing coaches to stay f
 - Large, easy-to-tap record button designed for quick glances
 - Works in the background even when screen is locked
 - Visual feedback with timer and pulsing indicator
-- Auto-saves recordings to the current game session
+- Auto-saves recordings to the current game session, and the active session persists across app restarts
 
 ### Game Session Management
 - Create game sessions with opponent name, date, and location
@@ -37,9 +37,14 @@ The entire capture process takes less than 5 seconds, allowing coaches to stay f
 - View all past matches in a list, each titled by opponent name
 - Click into any match to see all recordings and post-game summary
 
+### Roster Management
+- Add players manually, or import a roster via CSV, a linked Google Sheet, or an AI-read screenshot
+- Transcriptions get fuzzy-corrected against the roster (jersey numbers and names) so misheard audio still resolves to the right player
+- Custom coach-defined "buckets" for skills, positions, and feedback types, each with an optional AI-written description, layered on top of the built-in volleyball vocabulary
+
 ### AI-Generated Insights
-- Automatic transcription of all voice memos
-- AI extracts key information:
+- Automatic transcription of all voice memos, primed with volleyball terminology and the team roster for better accuracy in a loud gym
+- AI extracts key information per recording:
   - Skill categories (serving, passing, setting, hitting, blocking, defense)
   - Feedback types (positive reinforcement, correction needed, tactical adjustment)
   - Mentioned players
@@ -47,21 +52,31 @@ The entire capture process takes less than 5 seconds, allowing coaches to stay f
   - Key phrases and summaries
 - Searchable transcriptions for easy finding of specific observations
 
-### Post-Game Review
+### Post-Game Review & Summaries
 - View all matches with opponent names as titles
 - Click into any match to see all recordings from that game
-- See AI-generated labels at a glance
-- Filter recordings by skill or feedback type
+- See AI-generated labels at a glance; filter by skill or feedback type
 - Search transcriptions for specific keywords
-- Play audio recordings and review transcriptions
-- Edit AI labels and add manual notes
-- Post-game summary with key observations
+- Play audio recordings and review/edit transcriptions and labels, or add manual notes
+- AI-synthesized post-game summary: top takeaways, a match-flow paragraph, short per-player blurbs, and an opponent scouting report
+
+### Auth & Personalization
+- Email/password sign-up and login, plus Google OAuth, via Supabase Auth
+- Light/dark theme support
 
 ## Technical Stack
 
-- **Frontend**: React Native with Expo
-- **Backend**: Supabase (Authentication, Database, Storage)
-- **AI Services**: OpenAI Whisper (transcription), GPT-4 (analysis)
+- **Frontend**: React Native with Expo (Expo Router), TypeScript/JavaScript, React 19 — one codebase for iOS, Android, and web
+- **Backend**: Supabase (Authentication, Postgres database, Storage)
+- **AI**: All AI features run through the [Groq](https://groq.com) API:
+  - `whisper-large-v3` for audio transcription
+  - Llama / GPT-OSS chat models (`openai/gpt-oss-120b` with Llama fallbacks) for label generation and post-game summary synthesis
+  - Llama vision models for reading rosters out of screenshots
+- **Testing**: Vitest (`npm test`)
+- **Web hosting**: Cloudflare Pages, static export via `expo export --platform web`
+- **Mobile builds**: EAS (Expo Application Services)
+
+> Note: `package.json` still lists the `openai` npm package as a dependency, but it isn't used anywhere in the codebase — all AI calls go through Groq's API (some of which is OpenAI-compatible, e.g. the `/openai/v1/...` endpoint paths and the `openai/gpt-oss-120b` model it hosts). The unused `openai` dependency is safe to remove.
 
 ## Getting Started
 
@@ -70,13 +85,21 @@ The entire capture process takes less than 5 seconds, allowing coaches to stay f
    npm install
    ```
 
-2. Start the app:
+2. Configure environment variables in `.env` (see `.env` for the current values):
+   - `EXPO_PUBLIC_SUPABASE_ANON_KEY` — Supabase anon key
+   - `EXPO_PUBLIC_GROQ_API_KEY` — Groq API key (transcription, label generation, summaries, roster screenshot import)
+
+3. Start the app:
    ```bash
    npx expo start
    ```
+   Or target a platform directly: `npm run ios`, `npm run android`, `npm run web`.
 
-For detailed development instructions and setup, see `tasks.md` in the project root.
+4. Run tests:
+   ```bash
+   npm test
+   ```
 
 ## Project Status
 
-This project is in active development. The MVP focuses on core recording and review functionality for volleyball coaches.
+This project is in active development. Volleyball is the only fully wired-up sport today (multi-sport UI groundwork exists but isn't backed by data yet). Core recording, transcription, labeling, roster management, and post-game review/summary functionality are implemented; see the root `README.md` for the current feature list and planned roadmap.

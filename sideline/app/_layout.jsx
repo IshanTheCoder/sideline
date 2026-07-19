@@ -11,8 +11,6 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { ThemeProvider, useTheme } from '@/contexts/ThemeContext';
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
 import { ActiveSessionProvider } from '@/contexts/ActiveSessionContext';
-import { TutorialProvider } from '@/contexts/TutorialContext';
-import TutorialOverlay from '@/components/TutorialOverlay';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Colors } from '@/constants/theme';
 
@@ -104,7 +102,6 @@ function RootLayoutNav() {
       <View style={[styles.webOuter, { backgroundColor }]}>
         <View style={[styles.webInner, { position: 'relative' }]}>
           <Slot />
-          <TutorialOverlay />
         </View>
       </View>
     );
@@ -112,7 +109,6 @@ function RootLayoutNav() {
   return (
     <View style={styles.nativeRoot}>
       <Slot />
-      <TutorialOverlay />
     </View>
   );
 }
@@ -122,9 +118,7 @@ export default function RootLayout() {
     <ThemeProvider>
       <AuthProvider>
         <ActiveSessionProvider>
-          <TutorialProvider>
-            <ThemedNavigationProvider />
-          </TutorialProvider>
+          <ThemedNavigationProvider />
         </ActiveSessionProvider>
       </AuthProvider>
     </ThemeProvider>
