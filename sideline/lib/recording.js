@@ -177,15 +177,34 @@ const getOrCreateDefaultGameSession = async (userId) => {
       };
     }
 
-    // check if today already has a game session saved
+    // check if today already has a PLAYED game session saved — must exclude
+    // status='scheduled' rows (the new Schedule feature), or a recording
+    // taken outside the normal capture flow would silently attach itself to
+    // an upcoming game that hasn't been started yet
     const today = new Date().toISOString().split('T')[0];
-    const { data: existingSession } = await supabase
-      .from('game_sessions')
-      .select('id')
-      .eq('team_id', teamId)
-      .eq('date', today)
-      .limit(1)
-      .single();
+    let existingSession = null;
+    {
+      const { data, error } = await supabase
+        .from('game_sessions')
+        .select('id')
+        .eq('team_id', teamId)
+        .eq('date', today)
+        .eq('status', 'played')
+        .limit(1)
+        .single();
+      if (error && isMissingColumnError(error, 'status')) {
+        // pre-migration DB — no status column, no scheduled games to worry about
+        ({ data: existingSession } = await supabase
+          .from('game_sessions')
+          .select('id')
+          .eq('team_id', teamId)
+          .eq('date', today)
+          .limit(1)
+          .single());
+      } else {
+        existingSession = data;
+      }
+    }
 
     if (existingSession) {
       return { id: existingSession.id, error: null };
@@ -297,6 +316,82 @@ export function formatDuration(seconds) {
   const mins = Math.floor(seconds / 60);
   const secs = Math.floor(seconds % 60);
   return `${mins}:${secs.toString().padStart(2, '0')}`;
+}
+
+/**
+ * Fetches recordings belonging to ONE team, newest-first. Recordings link to
+ * a game_session, and every game_session carries a team_id, so we inner-join
+ * on game_sessions and filter by that team. This is what keeps each team's
+ * games, notes, and analysis isolated — switching teams shows only that team's
+ * history. Recordings with no game session (team-less) are intentionally
+ * excluded. Falls back gracefully when the optional match_type column is
+ * missing on older databases.
+ * @param {string} userId
+ * @param {string} teamId
+ * @returns {Promise<{ data: any[]|null, error: Error|null }>}
+ */
+export async function fetchRecordingsForTeam(userId, teamId) {
+  if (!teamId) return { data: [], error: null };
+  try {
+    const selectWithMatchType = `
+      id,
+      created_at,
+      duration,
+      audio_url,
+      user_id,
+      game_session_id,
+      manual_notes,
+      transcription,
+      ai_labels,
+      status,
+      game_sessions!inner (
+        opponent_name,
+        date,
+        match_type,
+        team_id
+      )
+    `;
+    const selectWithoutMatchType = `
+      id,
+      created_at,
+      duration,
+      audio_url,
+      user_id,
+      game_session_id,
+      manual_notes,
+      transcription,
+      ai_labels,
+      status,
+      game_sessions!inner (
+        opponent_name,
+        date,
+        team_id
+      )
+    `;
+
+    let { data, error } = await supabase
+      .from('recordings')
+      .select(selectWithMatchType)
+      .eq('user_id', userId)
+      .eq('game_sessions.team_id', teamId)
+      .order('created_at', { ascending: false });
+
+    if (error && isMissingColumnError(error, 'match_type')) {
+      const retry = await supabase
+        .from('recordings')
+        .select(selectWithoutMatchType)
+        .eq('user_id', userId)
+        .eq('game_sessions.team_id', teamId)
+        .order('created_at', { ascending: false });
+      data = retry.data;
+      error = retry.error;
+    }
+
+    if (error) return { data: null, error };
+    return { data: data ?? [], error: null };
+  } catch (e) {
+    return { data: null, error: e };
+  }
 }
 
 // fetches every recording this user has ever made, sorted newest-first

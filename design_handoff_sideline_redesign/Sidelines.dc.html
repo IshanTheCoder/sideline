@@ -1,0 +1,1223 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0;background:#E9E7E1;font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",sans-serif;display:flex;justify-content:center;padding:24px 0}
+a{color:#40613A;text-decoration:none}a:hover{color:#34502F}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+@keyframes wave{0%,100%{transform:scaleY(.25)}50%{transform:scaleY(1)}}
+@keyframes pulse{0%{box-shadow:0 0 0 0 rgba(255,69,58,.45)}100%{box-shadow:0 0 0 28px rgba(255,69,58,0)}}
+@keyframes toastIn{from{opacity:0;transform:translateY(16px) scale(.96)}to{opacity:1;transform:none}}
+@keyframes sheetIn{from{transform:translateY(100%)}to{transform:none}}
+@keyframes spin{to{transform:rotate(360deg)}}
+input:focus{outline:none;border-color:#40613A !important}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+::-webkit-scrollbar{display:none}
+textarea:focus{outline:none}
+</style>
+</helmet>
+<x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" dark="{{ statusDark }}" hint-size="430px,880px">
+
+<!-- ============ AUTH ============ -->
+<sc-if value="{{ isAuth }}" hint-placeholder-val="{{ true }}">
+<div data-screen-label="Auth" style="height:100%;overflow-y:auto;background:#000;padding:56px 30px 40px;display:flex;flex-direction:column">
+  <div>
+    <a onClick="{{ enterApp }}" style="display:inline-flex;align-items:center;gap:8px;font-size:16px;font-weight:700;color:#6FA76A;cursor:pointer">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#6FA76A" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 5 8 12l6.5 7"></path></svg>
+      Back to site
+    </a>
+  </div>
+  <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;padding-bottom:20px">
+    <img src="assets/whistle.png" alt="Sideline" style="width:220px;height:auto;display:block">
+    <div style="font-size:56px;font-weight:900;letter-spacing:1px;color:#5C8A57;line-height:1;margin-top:8px">SIDELINE</div>
+    <div style="font-size:30px;font-weight:800;color:#fff;margin-top:22px;letter-spacing:-.4px">Welcome to Sideline</div>
+    <div style="font-size:16px;color:#A3A8AE;text-align:center;line-height:1.5;margin-top:12px;max-width:300px">Your coaching assistant for capturing and organizing game observations</div>
+  </div>
+  
+  <button onClick="{{ enterApp }}" style="width:100%;height:60px;border-radius:16px;border:none;background:#40613A;color:#fff;font-size:18px;font-weight:800;cursor:pointer;font-family:inherit" style-hover="background:#34502F">Get Started</button><div style="text-align:center;margin-top:22px;font-size:16px;color:#A3A8AE">Already have an account? <a onClick="{{ enterApp }}" style="color:#6FA76A;font-weight:700;cursor:pointer">Login</a></div>
+</div>
+</sc-if>
+
+<!-- ============ HOME ============ -->
+<sc-if value="{{ isHome }}" hint-placeholder-val="{{ true }}">
+<div data-screen-label="Home" style="height:100%;overflow-y:auto;background:#F2F1EC;padding:0 20px 40px;display:flex;flex-direction:column;gap:22px">
+  <div style="position:sticky;top:0;height:62px;background:#F2F1EC;z-index:8;flex:none;margin:0 -20px"></div>
+  <div style="display:flex;justify-content:space-between;align-items:center;padding-top:4px">
+    <div>
+      <div style="font-size:14px;color:#8A8F94;font-weight:500">{{ todayLabel }}</div>
+      <div style="font-size:28px;font-weight:800;letter-spacing:-.5px;color:#16181D;white-space:nowrap">Coach Rajesh</div>
+    </div>
+    <div style="display:flex;gap:10px">
+      <button onClick="{{ goSchedule }}" style="width:44px;height:44px;border-radius:22px;border:none;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.07);cursor:pointer;display:flex;align-items:center;justify-content:center">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#16181D" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4.5" width="18" height="16" rx="3"></rect><path d="M3 9h18M8 2.5v4M16 2.5v4"></path></svg>
+      </button>
+      <button onClick="{{ goRoster }}" style="width:44px;height:44px;border-radius:22px;border:none;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.07);font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#16181D" stroke-width="1.8" stroke-linecap="round"><circle cx="9" cy="8" r="3.4"></circle><path d="M2.5 19.5c0-3.3 2.9-5.5 6.5-5.5s6.5 2.2 6.5 5.5"></path><circle cx="17" cy="9" r="2.6"></circle><path d="M17.5 14.2c2.4.4 4 2.1 4 4.3"></path></svg>
+      </button>
+      <button onClick="{{ goSettings }}" style="width:44px;height:44px;border-radius:22px;border:none;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.07);cursor:pointer;display:flex;align-items:center;justify-content:center">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#16181D" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1 1.55V21a2 2 0 1 1-4 0v-.09a1.7 1.7 0 0 0-1-1.55 1.7 1.7 0 0 0-1.87.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.7 1.7 0 0 0 .34-1.87 1.7 1.7 0 0 0-1.55-1H3a2 2 0 1 1 0-4h.09a1.7 1.7 0 0 0 1.55-1 1.7 1.7 0 0 0-.34-1.87l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.7 1.7 0 0 0 1.87.34h.01a1.7 1.7 0 0 0 1-1.55V3a2 2 0 1 1 4 0v.09a1.7 1.7 0 0 0 1 1.55h.01a1.7 1.7 0 0 0 1.87-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.7 1.7 0 0 0-.34 1.87v.01a1.7 1.7 0 0 0 1.55 1H21a2 2 0 1 1 0 4h-.09a1.7 1.7 0 0 0-1.55 1Z"></path></svg>
+      </button>
+    </div>
+  </div>
+
+  <!-- Game day hero -->
+  <div style="background:#16181D;border-radius:24px;padding:22px 22px 20px;color:#fff;position:relative;overflow:hidden;flex:none">
+    <div style="position:absolute;right:-40px;top:-40px;width:170px;height:170px;border-radius:50%;background:radial-gradient(circle,rgba(64,97,58,.5),transparent 70%)"></div>
+    <div style="display:flex;align-items:center;gap:8px;font-size:12px;font-weight:700;letter-spacing:.12em;color:#A9C39B">
+      <span style="width:7px;height:7px;border-radius:50%;background:#8CA97D;display:inline-block"></span>{{ nextGame.badge }}
+    </div>
+    <div style="font-size:24px;font-weight:800;letter-spacing:-.4px;margin-top:8px">vs. {{ nextGame.opponent }}</div>
+    <div style="font-size:14px;color:#A3A8AE;margin-top:2px">{{ nextGame.when }}</div>
+    <button onClick="{{ startLive }}" style="margin-top:18px;width:100%;height:56px;border-radius:18px;border:none;background:#40613A;color:#fff;font-size:17px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:10px;font-family:inherit" style-hover="background:#34502F">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="#fff"><rect x="9" y="2.5" width="6" height="12" rx="3"></rect><path d="M5 11a7 7 0 0 0 14 0h-2a5 5 0 0 1-10 0H5Z"></path><rect x="11" y="18.5" width="2" height="3.5" rx="1"></rect></svg>
+      Start Capture
+    </button>
+  </div>
+
+  <!-- Schedule -->
+  <div>
+    <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:12px">
+      <div style="font-size:19px;font-weight:800;letter-spacing:-.3px;color:#16181D">Schedule</div>
+      <a onClick="{{ openAddGame }}" style="font-size:14px;font-weight:700;cursor:pointer">+ Add game</a>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <sc-for list="{{ schedule }}" as="s" hint-placeholder-count="3">
+        <div style="display:flex;align-items:center;gap:14px;background:#fff;border-radius:20px;padding:14px 16px;box-shadow:0 1px 3px rgba(0,0,0,.05)">
+          <div style="width:48px;height:48px;border-radius:14px;background:#EAEFE4;display:flex;flex-direction:column;align-items:center;justify-content:center;flex:none">
+            <div style="font-size:10px;font-weight:700;color:#40613A;letter-spacing:.04em">{{ s.mon }}</div>
+            <div style="font-size:18px;font-weight:800;color:#16181D;line-height:1">{{ s.day }}</div>
+          </div>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:16px;font-weight:700;color:#16181D">vs. {{ s.opponent }}</div>
+            <div style="font-size:13px;color:#8A8F94;margin-top:2px">{{ s.when }}</div>
+          </div>
+          <span style="font-size:11.5px;font-weight:700;padding:4px 10px;border-radius:10px;background:{{ s.tagBg }};color:{{ s.tagInk }}">{{ s.tag }}</span>
+        </div>
+      </sc-for>
+    </div>
+  </div>
+
+  <!-- Recent games -->
+  <div>
+    <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:12px">
+      <div style="font-size:19px;font-weight:800;letter-spacing:-.3px;color:#16181D">Recent games</div>
+      <a onClick="{{ viewAll }}" style="font-size:14px;font-weight:600;cursor:pointer">View all</a>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <sc-for list="{{ games }}" as="g" hint-placeholder-count="2">
+        <button onClick="{{ g.open }}" style="display:flex;align-items:center;gap:14px;background:#fff;border:none;border-radius:20px;padding:16px;box-shadow:0 1px 3px rgba(0,0,0,.05);cursor:pointer;text-align:left;font-family:inherit;width:100%" style-hover="background:#FBFAF7">
+          <div style="width:46px;height:46px;border-radius:14px;background:{{ g.tint }};display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:800;color:{{ g.tintInk }};flex:none">{{ g.initials }}</div>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:16px;font-weight:700;color:#16181D">vs. {{ g.opponent }}</div>
+            <div style="font-size:13px;color:#8A8F94;margin-top:2px">{{ g.date }} · {{ g.noteCount }} notes</div>
+          </div>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#C4C7CB" stroke-width="2.4" stroke-linecap="round" style="flex:none"><path d="m9 5 7 7-7 7"></path></svg>
+        </button>
+      </sc-for>
+    </div>
+  </div>
+</div>
+</sc-if>
+
+<!-- ============ LIVE CAPTURE ============ -->
+<sc-if value="{{ isLive }}" hint-placeholder-val="{{ false }}">
+<div data-screen-label="Live capture" onPointerDown="{{ surfaceDown }}" onPointerUp="{{ surfaceUp }}" style="height:100%;display:flex;flex-direction:column;background:{{ lv.bg }};animation:fadeIn .25s ease;cursor:pointer;touch-action:none;user-select:none;-webkit-user-select:none">
+  <div style="display:flex;justify-content:space-between;align-items:center;padding:60px 20px 0">
+    <button onClick="{{ endLive }}" onPointerDown="{{ swallow }}" onPointerUp="{{ swallow }}" style="height:36px;padding:0 14px;border-radius:18px;border:1px solid {{ lv.line }};background:transparent;color:{{ lv.muted }};font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">End game</button>
+    <div style="display:flex;align-items:center;gap:7px;font-size:13px;font-weight:700;color:{{ lv.ink }}">
+      <span style="width:8px;height:8px;border-radius:50%;background:#FF453A;display:inline-block"></span>
+      LIVE · {{ liveClock }}
+    </div>
+  </div>
+  <div style="text-align:center;margin-top:10px">
+    <div style="font-size:22px;font-weight:800;letter-spacing:-.4px;color:{{ lv.ink }}">vs. {{ nextGame.opponent }}</div>
+  </div>
+  <!-- Set switcher -->
+  <div style="display:flex;gap:8px;justify-content:center;margin-top:14px">
+    <sc-for list="{{ sets }}" as="s" hint-placeholder-count="5">
+      <button onClick="{{ s.pick }}" onPointerDown="{{ swallow }}" onPointerUp="{{ swallow }}" style="width:52px;height:44px;border-radius:14px;border:1px solid {{ s.border }};background:{{ s.bg }};color:{{ s.ink }};font-size:15px;font-weight:700;cursor:pointer;font-family:inherit">{{ s.label }}</button>
+    </sc-for>
+  </div>
+
+  <!-- Record zone -->
+  <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:26px;padding:0 28px">
+    <sc-if value="{{ isRecording }}" hint-placeholder-val="{{ false }}">
+      <div style="display:flex;align-items:flex-end;gap:5px;height:44px">
+        <sc-for list="{{ waveBars }}" as="b" hint-placeholder-count="9">
+          <div style="width:6px;height:44px;border-radius:3px;background:#FF453A;transform-origin:bottom;animation:wave {{ b.dur }} ease-in-out {{ b.delay }} infinite"></div>
+        </sc-for>
+      </div>
+    </sc-if>
+    <sc-if value="{{ notRecording }}" hint-placeholder-val="{{ true }}">
+      <div style="height:44px;display:flex;align-items:center;font-size:14px;font-weight:500;color:{{ lv.muted }}">{{ idleHint }}</div>
+    </sc-if>
+
+    {{ recordButton }}
+
+    <div style="height:52px;display:flex;align-items:center">
+      <sc-if value="{{ isProcessing }}" hint-placeholder-val="{{ false }}">
+        <div style="display:flex;align-items:center;gap:8px;font-size:14px;font-weight:600;color:{{ lv.muted }}">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#40613A" stroke-width="2.4" stroke-linecap="round"><path d="M12 3a9 9 0 1 0 9 9"></path></svg>
+          Transcribing…
+        </div>
+      </sc-if>
+      <sc-if value="{{ lastToast }}" hint-placeholder-val="{{ false }}">
+        <div style="animation:toastIn .35s cubic-bezier(.2,.9,.3,1.2);display:flex;align-items:center;gap:10px;background:{{ lv.card }};border:1px solid {{ lv.line }};border-radius:16px;padding:10px 14px;max-width:330px">
+          <div style="width:30px;height:30px;border-radius:10px;background:rgba(64,97,58,.16);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;color:#8CA97D;flex:none">{{ toastNum }}</div>
+          <div style="min-width:0">
+            <div style="font-size:13.5px;font-weight:700;color:{{ lv.ink }};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ toastTitle }}</div>
+            <div style="font-size:12px;color:{{ lv.muted }}">{{ toastMeta }}</div>
+          </div>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#34C77B" stroke-width="2.6" stroke-linecap="round" style="flex:none"><path d="M4.5 12.5 10 18 19.5 6.5"></path></svg>
+        </div>
+      </sc-if>
+    </div>
+  </div>
+
+</div>
+</sc-if>
+
+<!-- ============ LIVE NOTES SHEET ============ -->
+<sc-if value="{{ liveNotesOpen }}" hint-placeholder-val="{{ false }}">
+<div style="position:absolute;inset:0;z-index:40">
+  <div onClick="{{ closeLiveNotes }}" style="position:absolute;inset:0;background:rgba(10,12,16,.5);animation:fadeIn .2s ease"></div>
+  <div data-screen-label="Live notes" style="position:absolute;left:0;right:0;bottom:0;background:{{ lv.card }};border-radius:28px 28px 0 0;padding:12px 22px 34px;animation:sheetIn .3s cubic-bezier(.2,.9,.3,1);max-height:78%;overflow-y:auto">
+    <div style="width:38px;height:5px;border-radius:3px;background:{{ lv.line }};margin:0 auto 16px"></div>
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <div style="font-size:20px;font-weight:800;letter-spacing:-.3px;color:{{ lv.ink }}">This game · {{ liveNoteCount }} notes</div>
+      <button onClick="{{ closeLiveNotes }}" style="width:32px;height:32px;border-radius:16px;border:1px solid {{ lv.line }};background:transparent;cursor:pointer;display:flex;align-items:center;justify-content:center">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="{{ lv.muted }}" stroke-width="2.6" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"></path></svg>
+      </button>
+    </div>
+    <sc-if value="{{ liveNotesEmpty }}" hint-placeholder-val="{{ false }}">
+      <div style="padding:36px 20px;text-align:center;font-size:14px;color:{{ lv.muted }};line-height:1.6">Nothing captured yet.<br><br>Tap the big button when you see something worth keeping.</div>
+    </sc-if>
+    <div style="display:flex;flex-direction:column;gap:8px;margin-top:14px">
+      <sc-for list="{{ liveNotesList }}" as="n" hint-placeholder-count="2">
+        <div style="display:flex;align-items:center;gap:13px;border:1px solid {{ lv.line }};border-radius:16px;padding:12px 14px">
+          <div style="width:36px;height:36px;border-radius:18px;background:rgba(64,97,58,.14);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;color:#8CA97D;flex:none">{{ n.idx }}</div>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:14.5px;font-weight:700;color:{{ lv.ink }};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ n.title }}</div>
+            <div style="font-size:12px;color:{{ lv.muted }};margin-top:2px">{{ n.meta }}</div>
+          </div>
+        </div>
+      </sc-for>
+    </div>
+  </div>
+</div>
+</sc-if>
+
+<!-- ============ GAME DETAIL ============ -->
+<sc-if value="{{ isGame }}" hint-placeholder-val="{{ false }}">
+<div data-screen-label="Game detail" style="height:100%;overflow-y:auto;background:#F2F1EC;padding:0 20px 40px;animation:fadeIn .25s ease">
+  <div style="position:sticky;top:0;height:62px;background:#F2F1EC;z-index:8;flex:none;margin:0 -20px 0"></div>
+  <div style="display:flex;align-items:center;gap:12px;padding-top:4px">
+    <button onClick="{{ goHome }}" style="width:40px;height:40px;border-radius:20px;border:none;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.07);cursor:pointer;display:flex;align-items:center;justify-content:center">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#16181D" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 5 8 12l6.5 7"></path></svg>
+    </button>
+    <div>
+      <div style="font-size:22px;font-weight:800;letter-spacing:-.4px;color:#16181D">vs. {{ activeGame.opponent }}</div>
+      <div style="font-size:13px;color:#8A8F94">{{ activeGame.date }} · Regular season</div>
+    </div>
+  </div>
+
+  
+
+  <button onClick="{{ goReport }}" style="margin-top: 12px; width: 100%; height: 54px; border-radius: 18px; border: none; background: #16181D; color: #fff; font-size: 16px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 10px; font-family: inherit; position: relative" style-hover="background:#23262D" type="button">
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"><path d="M4 20V10M10 20V4M16 20v-8M22 20H2"></path></svg>
+    Game Analysis
+  </button>
+
+  <div style="margin-top:24px;display:flex;flex-direction:column;gap:18px">
+    <sc-for list="{{ activeGameSets }}" as="set" hint-placeholder-count="2">
+      <div>
+        <div style="font-size:12px;font-weight:700;letter-spacing:.12em;color:#8A8F94;margin-bottom:10px">SET {{ set.num }}</div>
+        <div style="display:flex;flex-direction:column;gap:10px">
+          <sc-for list="{{ set.notes }}" as="n" hint-placeholder-count="2">
+            <button onClick="{{ n.open }}" style="display:flex;align-items:center;gap:13px;background:#fff;border:none;border-radius:18px;padding:14px 15px;box-shadow:0 1px 3px rgba(0,0,0,.05);cursor:pointer;text-align:left;font-family:inherit;width:100%" style-hover="background:#FBFAF7">
+              <div style="width:40px;height:40px;border-radius:20px;background:rgba(64,97,58,.12);display:flex;align-items:center;justify-content:center;flex:none">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="#40613A"><path d="M7 5.5v13l11-6.5L7 5.5Z"></path></svg>
+              </div>
+              <div style="flex:1;min-width:0">
+                <div style="font-size:15px;font-weight:700;color:#16181D;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ n.title }}</div>
+                <div style="display:flex;gap:6px;margin-top:6px;align-items:center;flex-wrap:wrap">
+                  <span style="font-size:11.5px;font-weight:700;padding:3px 9px;border-radius:9px;background:{{ n.playerBg }};color:{{ n.playerInk }}">{{ n.player }}</span>
+                  <span style="font-size:11.5px;font-weight:600;padding:3px 9px;border-radius:9px;background:#F0EFEA;color:#6B7075">{{ n.tag }}</span>
+                  <span style="font-size:11.5px;color:#B0B4B8">{{ n.dur }}</span>
+                </div>
+              </div>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#C4C7CB" stroke-width="2.4" stroke-linecap="round" style="flex:none"><path d="m9 5 7 7-7 7"></path></svg>
+            </button>
+          </sc-for>
+        </div>
+      </div>
+    </sc-for>
+  </div>
+</div>
+</sc-if>
+
+<!-- ============ NOTE SHEET ============ -->
+<sc-if value="{{ noteOpen }}" hint-placeholder-val="{{ false }}">
+<div style="position:absolute;inset:0;z-index:40">
+  <div onClick="{{ closeNote }}" style="position:absolute;inset:0;background:rgba(10,12,16,.45);animation:fadeIn .2s ease"></div>
+  <div data-screen-label="Note detail" style="position:absolute;left:0;right:0;bottom:0;background:#fff;border-radius:28px 28px 0 0;padding:12px 22px 34px;animation:sheetIn .3s cubic-bezier(.2,.9,.3,1);max-height:78%;overflow-y:auto">
+    <div style="width:38px;height:5px;border-radius:3px;background:#E3E1DB;margin:0 auto 16px"></div>
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px">
+      <div style="font-size:20px;font-weight:800;letter-spacing:-.3px;color:#16181D;line-height:1.25">{{ activeNote.title }}</div>
+      <button onClick="{{ closeNote }}" style="width:32px;height:32px;border-radius:16px;border:none;background:#F0EFEA;cursor:pointer;flex:none;display:flex;align-items:center;justify-content:center">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#6B7075" stroke-width="2.6" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"></path></svg>
+      </button>
+    </div>
+    <div style="display:flex;gap:6px;margin-top:10px">
+      <span style="font-size:12px;font-weight:700;padding:4px 10px;border-radius:10px;background:{{ activeNote.playerBg }};color:{{ activeNote.playerInk }}">{{ activeNote.player }}</span>
+      <span style="font-size:12px;font-weight:600;padding:4px 10px;border-radius:10px;background:#F0EFEA;color:#6B7075">{{ activeNote.tag }}</span>
+      <span style="font-size:12px;font-weight:600;padding:4px 10px;border-radius:10px;background:#F0EFEA;color:#6B7075">Set {{ activeNote.set }}</span>
+    </div>
+    <!-- audio row -->
+    <div style="display:flex;align-items:center;gap:12px;background:#F2F1EC;border-radius:16px;padding:12px 14px;margin-top:16px">
+      <button onClick="{{ togglePlay }}" style="width:40px;height:40px;border-radius:20px;border:none;background:#40613A;cursor:pointer;display:flex;align-items:center;justify-content:center;flex:none">{{ playIcon }}</button>
+      <div style="flex:1">
+        <div style="height:5px;border-radius:3px;background:#E3E1DB;overflow:hidden">
+          <div style="height:100%;border-radius:3px;background:#40613A;width:{{ playPct }};transition:width .3s linear"></div>
+        </div>
+      </div>
+      <div style="font-size:12.5px;font-weight:600;color:#8A8F94;flex:none">{{ playClock }} / {{ activeNote.dur }}</div>
+    </div>
+    <div style="font-size:12px;font-weight:700;letter-spacing:.12em;color:#8A8F94;margin:20px 0 8px">TRANSCRIPT</div>
+    <div style="font-size:15.5px;line-height:1.55;color:#2B2E33;background:#F9F8F5;border-radius:16px;padding:14px 16px">“{{ activeNote.transcript }}”</div>
+    <div style="font-size:12px;font-weight:700;letter-spacing:.12em;color:#8A8F94;margin:20px 0 8px">MANUAL NOTES</div>
+    <textarea placeholder="Add context for Monday…" style="width:100%;min-height:84px;border:1px solid #E3E1DB;border-radius:16px;padding:13px 15px;font-size:15px;font-family:inherit;color:#2B2E33;background:#fff;resize:vertical"></textarea>
+  </div>
+</div>
+</sc-if>
+
+<!-- ============ REPORT ============ -->
+<sc-if value="{{ isReport }}" hint-placeholder-val="{{ false }}">
+<div data-screen-label="Game analysis" style="height:100%;overflow-y:auto;background:#F2F1EC;padding:0 20px 40px;animation:fadeIn .25s ease">
+  <div style="position:sticky;top:0;height:62px;background:#F2F1EC;z-index:8;flex:none;margin:0 -20px 0"></div>
+  <div style="display:flex;align-items:center;gap:12px;padding-top:4px">
+    <button onClick="{{ goGameBack }}" style="width:40px;height:40px;border-radius:20px;border:none;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.07);cursor:pointer;display:flex;align-items:center;justify-content:center">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#16181D" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 5 8 12l6.5 7"></path></svg>
+    </button>
+    <div>
+      <div style="font-size:22px;font-weight:800;letter-spacing:-.4px;color:#16181D">Game Analysis</div>
+      <div style="font-size:13px;color:#8A8F94">vs. East Windsor · 12 notes → 3 priorities</div>
+    </div>
+  </div>
+
+  <div style="background:#16181D;border-radius:22px;padding:18px 20px;margin-top:18px;color:#fff">
+    <div style="font-size:12px;font-weight:700;letter-spacing:.12em;color:#A9C39B">TUESDAY, DO ONE THING</div>
+    <div style="font-size:19px;font-weight:700;line-height:1.4;margin-top:8px">Rapid-fire serve receive.</div>
+    <div style="font-size:14px;color:#A3A8AE;line-height:1.5;margin-top:6px">5 of your 12 notes were the same note, platforms collapse when the pace goes up.</div>
+  </div>
+
+  <div style="font-size:12px;font-weight:700;letter-spacing:.12em;color:#8A8F94;margin:22px 0 10px">AT A GLANCE</div>
+  <div style="display:flex;gap:10px">
+    <div style="flex:1;background:#fff;border-radius:20px;padding:16px;box-shadow:0 1px 3px rgba(0,0,0,.05);display:flex;flex-direction:column;align-items:center;justify-content:center">
+      <svg width="120" height="120" viewBox="0 0 120 120">
+        <circle cx="60" cy="60" r="46" fill="none" stroke="#F0EFEA" stroke-width="15"></circle>
+        <sc-for list="{{ donut }}" as="d" hint-placeholder-count="3">
+          <circle cx="60" cy="60" r="46" fill="none" stroke="{{ d.color }}" stroke-width="15" stroke-linecap="round" stroke-dasharray="{{ d.dash }}" stroke-dashoffset="{{ d.offset }}" transform="rotate(-90 60 60)"></circle>
+        </sc-for>
+        <text x="60" y="57" text-anchor="middle" font-size="28" font-weight="800" fill="#16181D">{{ totalNotes }}</text>
+        <text x="60" y="73" text-anchor="middle" font-size="10" font-weight="600" letter-spacing="0.5" fill="#8A8F94">NOTES</text>
+      </svg>
+      <div style="display:flex;flex-direction:column;gap:6px;margin-top:12px;width:100%">
+        <sc-for list="{{ donut }}" as="d" hint-placeholder-count="3">
+          <div style="display:flex;align-items:center;gap:7px">
+            <span style="width:9px;height:9px;border-radius:3px;background:{{ d.color }};flex:none"></span>
+            <span style="font-size:12.5px;color:#16181D;font-weight:600;flex:1">{{ d.name }}</span>
+            <span style="font-size:12.5px;color:#8A8F94">{{ d.count }}</span>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+    <div style="flex:1;background:#fff;border-radius:20px;padding:16px;box-shadow:0 1px 3px rgba(0,0,0,.05)">
+      <div style="font-size:13px;font-weight:700;color:#16181D">Notes by set</div>
+      <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:10px;height:104px;margin-top:14px">
+        <sc-for list="{{ notesBySet }}" as="s" hint-placeholder-count="3">
+          <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;gap:6px">
+            <div style="font-size:12px;font-weight:800;color:#40613A">{{ s.count }}</div>
+            <div style="width:100%;border-radius:6px 6px 0 0;background:#40613A;height:{{ s.h }}"></div>
+            <div style="font-size:11px;color:#8A8F94;font-weight:600">{{ s.label }}</div>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+  </div>
+
+  <div style="font-size:12px;font-weight:700;letter-spacing:.12em;color:#8A8F94;margin:22px 0 10px">PLAYERS · PRIORITIZED</div>
+  <div style="display:flex;flex-direction:column;gap:10px">
+    <sc-for list="{{ reportPlayers }}" as="p" hint-placeholder-count="3">
+      <div style="background:#fff;border-radius:20px;padding:16px;box-shadow:0 1px 3px rgba(0,0,0,.05)">
+        <div style="display:flex;align-items:center;gap:12px">
+          <div style="width:42px;height:42px;border-radius:21px;background:{{ p.bg }};display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:800;color:{{ p.ink }};flex:none">{{ p.num }}</div>
+          <div style="flex:1">
+            <div style="font-size:16px;font-weight:800;color:#16181D">{{ p.name }}</div>
+            <div style="font-size:12.5px;color:#8A8F94">{{ p.pos }} · {{ p.count }} notes</div>
+          </div>
+        </div>
+        <div style="font-size:14.5px;line-height:1.5;color:#2B2E33;margin-top:12px">{{ p.insight }}</div>
+        <div style="display:flex;align-items:center;gap:8px;margin-top:10px;background:#F0F5EC;border-radius:12px;padding:9px 12px">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#40613A" stroke-width="2.2" stroke-linecap="round" style="flex:none"><circle cx="12" cy="12" r="9"></circle><path d="m9.5 12.5 2 2 4-4.5"></path></svg>
+          <div style="font-size:13px;font-weight:600;color:#40613A">Drill: {{ p.drill }}</div>
+        </div>
+      </div>
+    </sc-for>
+  </div>
+
+  <div style="font-size:12px;font-weight:700;letter-spacing:.12em;color:#8A8F94;margin:22px 0 10px">FOCUS AREAS</div>
+  <div style="background:#fff;border-radius:20px;padding:16px;box-shadow:0 1px 3px rgba(0,0,0,.05);display:flex;flex-direction:column;gap:14px">
+    <sc-for list="{{ focusAreas }}" as="f" hint-placeholder-count="3">
+      <div>
+        <div style="display:flex;justify-content:space-between;font-size:14px;margin-bottom:6px">
+          <span style="font-weight:700;color:#16181D">{{ f.name }}</span>
+          <span style="color:#8A8F94;font-weight:500">{{ f.count }} notes</span>
+        </div>
+        <div style="height:7px;border-radius:4px;background:#F0EFEA;overflow:hidden">
+          <div style="height:100%;border-radius:4px;background:{{ f.color }};width:{{ f.pct }}"></div>
+        </div>
+      </div>
+    </sc-for>
+  </div>
+
+  <div style="font-size:12px;font-weight:700;letter-spacing:.12em;color:#8A8F94;margin:22px 0 10px">TUESDAY PRACTICE PLAN</div>
+  <div style="display:flex;flex-direction:column;gap:10px">
+    <sc-for list="{{ practicePlan }}" as="d" hint-placeholder-count="3">
+      <div style="display:flex;gap:13px;background:#fff;border-radius:18px;padding:14px 16px;box-shadow:0 1px 3px rgba(0,0,0,.05);align-items:center">
+        <div style="width:34px;height:34px;border-radius:12px;background:#F0EFEA;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;color:#16181D;flex:none">{{ d.n }}</div>
+        <div style="flex:1">
+          <div style="font-size:15px;font-weight:700;color:#16181D">{{ d.name }}</div>
+          <div style="font-size:12.5px;color:#8A8F94;margin-top:1px">{{ d.why }}</div>
+        </div>
+        <div style="font-size:12px;font-weight:700;color:#8A8F94;flex:none">{{ d.mins }}</div>
+      </div>
+    </sc-for>
+  </div>
+</div>
+</sc-if>
+
+<!-- ============ ROSTER ============ -->
+<sc-if value="{{ isRoster }}" hint-placeholder-val="{{ false }}">
+<div data-screen-label="Roster" style="height:100%;overflow-y:auto;background:#F2F1EC;padding:0 20px 40px;animation:fadeIn .25s ease">
+  <div style="position:sticky;top:0;height:62px;background:#F2F1EC;z-index:8;flex:none;margin:0 -20px 0"></div>
+  <div style="display:flex;align-items:center;gap:12px;padding-top:4px">
+    <button onClick="{{ goHome }}" style="width:40px;height:40px;border-radius:20px;border:none;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.07);cursor:pointer;display:flex;align-items:center;justify-content:center">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#16181D" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 5 8 12l6.5 7"></path></svg>
+    </button>
+    <div>
+      <div style="font-size:22px;font-weight:800;letter-spacing:-.4px;color:#16181D">Roster</div>
+      <div style="font-size:13px;color:#8A8F94">Names power transcription accuracy</div>
+    </div>
+  </div>
+  <div style="display:flex;gap:10px;margin-top:16px">
+    <button onClick="{{ openAddPlayer }}" style="flex:1;height:48px;border-radius:16px;border:none;background:#40613A;color:#fff;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit" style-hover="background:#34502F">+ Add player</button>
+    <button onClick="{{ openScan }}" style="flex:1;height:48px;border-radius:16px;border:1.5px solid #D8D6D0;background:#fff;color:#16181D;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit" style-hover="background:#FBFAF7">Scan a roster</button>
+  </div>
+  <div style="display:flex;flex-direction:column;gap:8px;margin-top:16px">
+    <sc-for list="{{ roster }}" as="r" hint-placeholder-count="5">
+      <div style="display:flex;align-items:center;gap:13px;background:#fff;border-radius:18px;padding:13px 15px;box-shadow:0 1px 3px rgba(0,0,0,.05)">
+        <div style="width:42px;height:42px;border-radius:21px;background:#EAEFE4;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:800;color:#40613A;flex:none">{{ r.num }}</div>
+        <div style="flex:1">
+          <div style="font-size:15.5px;font-weight:700;color:#16181D">{{ r.name }}</div>
+          <div style="font-size:12.5px;color:#8A8F94">{{ r.pos }} · {{ r.classYear }}</div>
+        </div>
+      </div>
+    </sc-for>
+  </div>
+</div>
+</sc-if>
+
+<!-- ============ ADD GAME SHEET ============ -->
+<sc-if value="{{ addGameOpen }}" hint-placeholder-val="{{ false }}">
+<div style="position:absolute;inset:0;z-index:40">
+  <div onClick="{{ closeAddGame }}" style="position:absolute;inset:0;background:rgba(10,12,16,.45);animation:fadeIn .2s ease"></div>
+  <div data-screen-label="Add game" style="position:absolute;left:0;right:0;bottom:0;background:#fff;border-radius:28px 28px 0 0;padding:12px 22px 34px;animation:sheetIn .3s cubic-bezier(.2,.9,.3,1);max-height:88%;overflow-y:auto">
+    <div style="width:38px;height:5px;border-radius:3px;background:#E3E1DB;margin:0 auto 16px"></div>
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <div style="font-size:20px;font-weight:800;letter-spacing:-.3px;color:#16181D">Add games</div>
+      <button onClick="{{ closeAddGame }}" style="width:32px;height:32px;border-radius:16px;border:none;background:#F0EFEA;cursor:pointer;display:flex;align-items:center;justify-content:center">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#6B7075" stroke-width="2.6" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"></path></svg>
+      </button>
+    </div>
+    <div style="display:flex;gap:6px;background:#F0EFEA;border-radius:14px;padding:4px;margin-top:16px">
+      <button onClick="{{ agModeManual }}" style="flex:1;height:38px;border-radius:11px;border:none;cursor:pointer;font-family:inherit;font-size:14px;font-weight:700;background:{{ agManualBg }};color:{{ agManualInk }}">Enter manually</button>
+      <button onClick="{{ agModeScan }}" style="flex:1;height:38px;border-radius:11px;border:none;cursor:pointer;font-family:inherit;font-size:14px;font-weight:700;background:{{ agScanBg }};color:{{ agScanInk }}">Scan schedule</button>
+    </div>
+    <sc-if value="{{ agManual }}" hint-placeholder-val="{{ true }}">
+      <div style="font-size:12px;font-weight:700;letter-spacing:.12em;color:#8A8F94;margin:18px 0 8px">OPPONENT</div>
+      <input value="{{ agOpp }}" onChange="{{ setAgOpp }}" placeholder="e.g. Ridgefield" style="width:100%;height:50px;border:1px solid #E3E1DB;border-radius:14px;padding:0 15px;font-size:16px;font-family:inherit;color:#16181D;background:#fff">
+      <div style="display:flex;gap:12px">
+        <div style="flex:1">
+          <div style="font-size:12px;font-weight:700;letter-spacing:.12em;color:#8A8F94;margin:16px 0 8px">DATE</div>
+          <input value="{{ agDate }}" onChange="{{ setAgDate }}" placeholder="Jul 20" style="width:100%;height:50px;border:1px solid #E3E1DB;border-radius:14px;padding:0 15px;font-size:16px;font-family:inherit;color:#16181D;background:#fff">
+        </div>
+        <div style="flex:1">
+          <div style="font-size:12px;font-weight:700;letter-spacing:.12em;color:#8A8F94;margin:16px 0 8px">TIME</div>
+          <input value="{{ agTime }}" onChange="{{ setAgTime }}" placeholder="6:00 PM" style="width:100%;height:50px;border:1px solid #E3E1DB;border-radius:14px;padding:0 15px;font-size:16px;font-family:inherit;color:#16181D;background:#fff">
+        </div>
+      </div>
+      <div style="font-size:12px;font-weight:700;letter-spacing:.12em;color:#8A8F94;margin:16px 0 8px">LOCATION</div>
+      <div style="display:flex;gap:8px">
+        <sc-for list="{{ agVenues }}" as="v" hint-placeholder-count="2">
+          <button onClick="{{ v.pick }}" style="flex:1;height:44px;border-radius:12px;border:1px solid {{ v.border }};background:{{ v.bg }};color:{{ v.ink }};font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">{{ v.label }}</button>
+        </sc-for>
+      </div>
+      <button onClick="{{ saveGame }}" style="margin-top:22px;width:100%;height:54px;border-radius:18px;border:none;background:{{ agSaveBg }};color:#fff;font-size:16px;font-weight:700;cursor:pointer;font-family:inherit">{{ agSaveLabel }}</button>
+    </sc-if>
+    <sc-if value="{{ agScanPick }}" hint-placeholder-val="{{ false }}">
+      <div style="margin-top:16px;border:1.5px dashed #C9C6BE;border-radius:20px;padding:34px 20px;display:flex;flex-direction:column;align-items:center;gap:10px;background:#FBFAF7">
+        <div style="width:56px;height:56px;border-radius:28px;background:rgba(64,97,58,.1);display:flex;align-items:center;justify-content:center">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#40613A" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8.5c0-1.1.9-2 2-2h1.6l1.5-2h7.8l1.5 2H19a2 2 0 0 1 2 2V18a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8.5Z"></path><circle cx="12" cy="13" r="3.4"></circle></svg>
+        </div>
+        <div style="font-size:15px;font-weight:700;color:#16181D">Photo or screenshot of your schedule</div>
+        <div style="font-size:13px;color:#8A8F94;text-align:center;line-height:1.5">Snap the printed schedule or upload a screenshot, Sideline reads every game at once.</div>
+      </div>
+      <div style="display:flex;gap:10px;margin-top:16px">
+        <button onClick="{{ agScanPhoto }}" style="flex:1;height:54px;border-radius:18px;border:none;background:#40613A;color:#fff;font-size:16px;font-weight:700;cursor:pointer;font-family:inherit" style-hover="background:#34502F">Take photo</button>
+        <button onClick="{{ agScanPhoto }}" style="flex:1;height:54px;border-radius:18px;border:1.5px solid #D8D6D0;background:#fff;color:#16181D;font-size:16px;font-weight:700;cursor:pointer;font-family:inherit" style-hover="background:#FBFAF7">Upload screenshot</button>
+      </div>
+    </sc-if>
+    <sc-if value="{{ agScanProcessing }}" hint-placeholder-val="{{ false }}">
+      <div style="margin-top:16px;padding:44px 20px;display:flex;flex-direction:column;align-items:center;gap:14px">
+        <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#40613A" stroke-width="2.4" stroke-linecap="round" style="animation:spin 1s linear infinite"><path d="M12 3a9 9 0 1 0 9 9"></path></svg>
+        <div style="font-size:15px;font-weight:700;color:#16181D">Reading schedule…</div>
+        <div style="font-size:13px;color:#8A8F94">Extracting opponents, dates, times</div>
+      </div>
+    </sc-if>
+    <sc-if value="{{ agScanReview }}" hint-placeholder-val="{{ false }}">
+      <div style="font-size:13px;color:#8A8F94;margin-top:14px">Found {{ agFoundCount }} games, tap to exclude any.</div>
+      <div style="display:flex;flex-direction:column;gap:8px;margin-top:12px">
+        <sc-for list="{{ agScanResults }}" as="s" hint-placeholder-count="3">
+          <button onClick="{{ s.toggle }}" style="display:flex;align-items:center;gap:13px;background:{{ s.rowBg }};border:1px solid {{ s.rowBorder }};border-radius:16px;padding:12px 14px;cursor:pointer;font-family:inherit;text-align:left;width:100%;opacity:{{ s.opacity }}">
+            <div style="width:44px;height:44px;border-radius:12px;background:#EAEFE4;display:flex;flex-direction:column;align-items:center;justify-content:center;flex:none">
+              <div style="font-size:9px;font-weight:700;color:#40613A">{{ s.mon }}</div>
+              <div style="font-size:16px;font-weight:800;color:#16181D;line-height:1">{{ s.day }}</div>
+            </div>
+            <div style="flex:1;min-width:0">
+              <div style="font-size:15px;font-weight:700;color:#16181D">vs. {{ s.opponent }}</div>
+              <div style="font-size:12.5px;color:#8A8F94">{{ s.when }}</div>
+            </div>
+            {{ s.check }}
+          </button>
+        </sc-for>
+      </div>
+      <button onClick="{{ agScanConfirm }}" style="margin-top:18px;width:100%;height:54px;border-radius:18px;border:none;background:#40613A;color:#fff;font-size:16px;font-weight:700;cursor:pointer;font-family:inherit" style-hover="background:#34502F">{{ agScanConfirmLabel }}</button>
+    </sc-if>
+  </div>
+</div>
+</sc-if>
+
+<!-- ============ ADD PLAYER SHEET ============ -->
+<sc-if value="{{ addPlayerOpen }}" hint-placeholder-val="{{ false }}">
+<div style="position:absolute;inset:0;z-index:40">
+  <div onClick="{{ closeAddPlayer }}" style="position:absolute;inset:0;background:rgba(10,12,16,.45);animation:fadeIn .2s ease"></div>
+  <div data-screen-label="Add player" style="position:absolute;left:0;right:0;bottom:0;background:#fff;border-radius:28px 28px 0 0;padding:12px 22px 34px;animation:sheetIn .3s cubic-bezier(.2,.9,.3,1);max-height:86%;overflow-y:auto">
+    <div style="width:38px;height:5px;border-radius:3px;background:#E3E1DB;margin:0 auto 16px"></div>
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <div style="font-size:20px;font-weight:800;letter-spacing:-.3px;color:#16181D">Add player</div>
+      <button onClick="{{ closeAddPlayer }}" style="width:32px;height:32px;border-radius:16px;border:none;background:#F0EFEA;cursor:pointer;display:flex;align-items:center;justify-content:center">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#6B7075" stroke-width="2.6" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"></path></svg>
+      </button>
+    </div>
+    <div style="font-size:12px;font-weight:700;letter-spacing:.12em;color:#8A8F94;margin:18px 0 8px">NAME</div>
+    <input value="{{ apName }}" onChange="{{ setApName }}" placeholder="e.g. Zoe Kim" style="width:100%;height:50px;border:1px solid #E3E1DB;border-radius:14px;padding:0 15px;font-size:16px;font-family:inherit;color:#16181D;background:#fff">
+    <div style="font-size:12px;font-weight:700;letter-spacing:.12em;color:#8A8F94;margin:16px 0 8px">JERSEY #</div>
+    <input value="{{ apNum }}" onChange="{{ setApNum }}" placeholder="e.g. 8" inputMode="numeric" style="width:110px;height:50px;border:1px solid #E3E1DB;border-radius:14px;padding:0 15px;font-size:16px;font-family:inherit;color:#16181D;background:#fff">
+    <div style="font-size:12px;font-weight:700;letter-spacing:.12em;color:#8A8F94;margin:16px 0 8px">POSITION</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <sc-for list="{{ apPositions }}" as="p" hint-placeholder-count="6">
+        <button onClick="{{ p.pick }}" style="height:40px;padding:0 15px;border-radius:12px;border:1px solid {{ p.border }};background:{{ p.bg }};color:{{ p.ink }};font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">{{ p.label }}</button>
+      </sc-for>
+    </div>
+    <div style="font-size:12px;font-weight:700;letter-spacing:.12em;color:#8A8F94;margin:16px 0 8px">CLASS YEAR</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <sc-for list="{{ apGrades }}" as="g" hint-placeholder-count="4">
+        <button onClick="{{ g.pick }}" style="height:40px;padding:0 14px;border-radius:12px;border:1px solid {{ g.border }};background:{{ g.bg }};color:{{ g.ink }};font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">{{ g.label }}</button>
+      </sc-for>
+    </div>
+    <button onClick="{{ savePlayer }}" style="margin-top:22px;width:100%;height:54px;border-radius:18px;border:none;background:{{ apSaveBg }};color:#fff;font-size:16px;font-weight:700;cursor:pointer;font-family:inherit">{{ apSaveLabel }}</button>
+  </div>
+</div>
+</sc-if>
+
+<!-- ============ SCAN ROSTER SHEET ============ -->
+<sc-if value="{{ scanOpen }}" hint-placeholder-val="{{ false }}">
+<div style="position:absolute;inset:0;z-index:40">
+  <div onClick="{{ closeScan }}" style="position:absolute;inset:0;background:rgba(10,12,16,.45);animation:fadeIn .2s ease"></div>
+  <div data-screen-label="Scan roster" style="position:absolute;left:0;right:0;bottom:0;background:#fff;border-radius:28px 28px 0 0;padding:12px 22px 34px;animation:sheetIn .3s cubic-bezier(.2,.9,.3,1);max-height:86%;overflow-y:auto">
+    <div style="width:38px;height:5px;border-radius:3px;background:#E3E1DB;margin:0 auto 16px"></div>
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <div style="font-size:20px;font-weight:800;letter-spacing:-.3px;color:#16181D">Scan a roster</div>
+      <button onClick="{{ closeScan }}" style="width:32px;height:32px;border-radius:16px;border:none;background:#F0EFEA;cursor:pointer;display:flex;align-items:center;justify-content:center">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#6B7075" stroke-width="2.6" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"></path></svg>
+      </button>
+    </div>
+    <sc-if value="{{ scanPick }}" hint-placeholder-val="{{ true }}">
+      <div style="margin-top:16px;border:1.5px dashed #C9C6BE;border-radius:20px;padding:34px 20px;display:flex;flex-direction:column;align-items:center;gap:10px;background:#FBFAF7">
+        <div style="width:56px;height:56px;border-radius:28px;background:rgba(64,97,58,.1);display:flex;align-items:center;justify-content:center">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#40613A" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8.5c0-1.1.9-2 2-2h1.6l1.5-2h7.8l1.5 2H19a2 2 0 0 1 2 2V18a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8.5Z"></path><circle cx="12" cy="13" r="3.4"></circle></svg>
+        </div>
+        <div style="font-size:15px;font-weight:700;color:#16181D">Photo or screenshot of your roster</div>
+        <div style="font-size:13px;color:#8A8F94;text-align:center;line-height:1.5">Snap a printed team sheet or upload a screenshot, Sideline reads names, numbers and positions so transcription attributes notes correctly.</div>
+      </div>
+      <div style="display:flex;gap:10px;margin-top:16px">
+        <button onClick="{{ scanTakePhoto }}" style="flex:1;height:54px;border-radius:18px;border:none;background:#40613A;color:#fff;font-size:16px;font-weight:700;cursor:pointer;font-family:inherit" style-hover="background:#34502F">Take photo</button>
+        <button onClick="{{ scanTakePhoto }}" style="flex:1;height:54px;border-radius:18px;border:1.5px solid #D8D6D0;background:#fff;color:#16181D;font-size:16px;font-weight:700;cursor:pointer;font-family:inherit" style-hover="background:#FBFAF7">Upload screenshot</button>
+      </div>
+    </sc-if>
+    <sc-if value="{{ scanProcessing }}" hint-placeholder-val="{{ false }}">
+      <div style="margin-top:16px;padding:44px 20px;display:flex;flex-direction:column;align-items:center;gap:14px">
+        <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#40613A" stroke-width="2.4" stroke-linecap="round" style="animation:spin 1s linear infinite"><path d="M12 3a9 9 0 1 0 9 9"></path></svg>
+        <div style="font-size:15px;font-weight:700;color:#16181D">Reading roster…</div>
+        <div style="font-size:13px;color:#8A8F94">Extracting names, numbers, positions</div>
+      </div>
+    </sc-if>
+    <sc-if value="{{ scanReview }}" hint-placeholder-val="{{ false }}">
+      <div style="font-size:13px;color:#8A8F94;margin-top:10px">Found {{ scanFoundCount }} players, tap to exclude any.</div>
+      <div style="display:flex;flex-direction:column;gap:8px;margin-top:12px">
+        <sc-for list="{{ scanResults }}" as="s" hint-placeholder-count="3">
+          <button onClick="{{ s.toggle }}" style="display:flex;align-items:center;gap:13px;background:{{ s.rowBg }};border:1px solid {{ s.rowBorder }};border-radius:16px;padding:12px 14px;cursor:pointer;font-family:inherit;text-align:left;width:100%;opacity:{{ s.opacity }}">
+          <div style="width:38px;height:38px;border-radius:19px;background:#EAEFE4;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;color:#40613A;flex:none">{{ s.num }}</div>
+          <div style="flex:1">
+            <div style="font-size:15px;font-weight:700;color:#16181D">{{ s.name }}</div>
+            <div style="font-size:12.5px;color:#8A8F94">{{ s.pos }} · Grade {{ s.grade }}</div>
+          </div>
+          {{ s.check }}
+          </button>
+        </sc-for>
+      </div>
+      <button onClick="{{ scanConfirm }}" style="margin-top:18px;width:100%;height:54px;border-radius:18px;border:none;background:#40613A;color:#fff;font-size:16px;font-weight:700;cursor:pointer;font-family:inherit" style-hover="background:#34502F">{{ scanConfirmLabel }}</button>
+    </sc-if>
+  </div>
+</div>
+</sc-if>
+
+<!-- ============ SETTINGS ============ -->
+<sc-if value="{{ isSettings }}" hint-placeholder-val="{{ false }}">
+<div data-screen-label="Settings" style="height:100%;overflow-y:auto;background:#F2F1EC;padding:0 20px 40px;animation:fadeIn .25s ease">
+  <div style="position:sticky;top:0;height:62px;background:#F2F1EC;z-index:8;flex:none;margin:0 -20px 0"></div>
+  <div style="display:flex;align-items:center;gap:12px;padding-top:4px">
+    <button onClick="{{ goHome }}" style="width:40px;height:40px;border-radius:20px;border:none;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.07);cursor:pointer;display:flex;align-items:center;justify-content:center">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#16181D" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 5 8 12l6.5 7"></path></svg>
+    </button>
+    <div style="font-size:22px;font-weight:800;letter-spacing:-.4px;color:#16181D">Settings</div>
+  </div>
+  <div style="display:flex;align-items:center;gap:14px;background:#fff;border-radius:20px;padding:16px;margin-top:18px;box-shadow:0 1px 3px rgba(0,0,0,.05)">
+    <div style="width:52px;height:52px;border-radius:26px;background:#16181D;color:#fff;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:800;flex:none">RD</div>
+    <div>
+      <div style="font-size:16px;font-weight:800;color:#16181D">Rajesh Damarapati</div>
+      <div style="font-size:13px;color:#8A8F94">rajesh.damarapati@gmail.com</div>
+    </div>
+  </div>
+  <div style="font-size:12px;font-weight:700;letter-spacing:.12em;color:#8A8F94;margin:22px 0 8px">MY TEAMS</div>
+  <div style="background:#fff;border-radius:20px;box-shadow:0 1px 3px rgba(0,0,0,.05);overflow:hidden">
+    <sc-for list="{{ teams }}" as="t" hint-placeholder-count="2">
+      <button onClick="{{ t.pick }}" style="display:flex;align-items:center;gap:13px;padding:15px 16px;width:100%;border:none;border-bottom:1px solid #F0EFEA;background:none;cursor:pointer;font-family:inherit;text-align:left">
+        <div style="width:40px;height:40px;border-radius:12px;background:{{ t.badgeBg }};display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;color:{{ t.badgeInk }};flex:none">{{ t.initials }}</div>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:15px;font-weight:700;color:#16181D">{{ t.name }}</div>
+          <div style="font-size:12.5px;color:#8A8F94">{{ t.meta }}</div>
+        </div>
+        {{ t.check }}
+      </button>
+    </sc-for>
+    <button onClick="{{ addTeam }}" style="display:flex;align-items:center;gap:13px;padding:15px 16px;width:100%;border:none;background:none;cursor:pointer;font-family:inherit;text-align:left">
+      <div style="width:40px;height:40px;border-radius:12px;background:#EAEFE4;display:flex;align-items:center;justify-content:center;flex:none">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#40613A" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg>
+      </div>
+      <div style="flex:1;font-size:15px;font-weight:700;color:#40613A">Add a team</div>
+    </button>
+  </div>
+
+  <div style="font-size:12px;font-weight:700;letter-spacing:.12em;color:#8A8F94;margin:22px 0 8px">{{ activeTeamLabel }}</div>
+  <div style="background:#fff;border-radius:20px;box-shadow:0 1px 3px rgba(0,0,0,.05);overflow:hidden">
+    <div style="display:flex;align-items:center;gap:12px;padding:15px 16px;border-bottom:1px solid #F0EFEA">
+      <div style="flex:1;font-size:15px;font-weight:600;color:#16181D">Sport</div>
+      <div style="font-size:14px;font-weight:600;color:#8A8F94">{{ activeTeamSport }}</div>
+    </div>
+    <button onClick="{{ goRoster }}" style="display:flex;align-items:center;gap:12px;padding:15px 16px;width:100%;border:none;background:none;cursor:pointer;font-family:inherit;text-align:left">
+      <div style="flex:1;font-size:15px;font-weight:600;color:#16181D">Roster</div>
+      <div style="font-size:14px;font-weight:600;color:#8A8F94">{{ rosterTotal }} players</div>
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#C4C7CB" stroke-width="2.4" stroke-linecap="round"><path d="m9 5 7 7-7 7"></path></svg>
+    </button>
+  </div>
+
+  <div style="font-size:12px;font-weight:700;letter-spacing:.12em;color:#8A8F94;margin:22px 0 8px">ACCOUNT</div>
+  <div style="background:#fff;border-radius:20px;box-shadow:0 1px 3px rgba(0,0,0,.05);overflow:hidden">
+    <sc-for list="{{ accountRows }}" as="row" hint-placeholder-count="2">
+      <button onClick="{{ row.tap }}" style="display:flex;align-items:center;gap:12px;padding:15px 16px;width:100%;border:none;border-bottom:1px solid #F0EFEA;background:none;cursor:pointer;font-family:inherit;text-align:left">
+        <div style="flex:1;font-size:15px;font-weight:600;color:#16181D">{{ row.label }}</div>
+        <div style="font-size:14px;font-weight:500;color:#8A8F94">{{ row.value }}</div>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#C4C7CB" stroke-width="2.4" stroke-linecap="round"><path d="m9 5 7 7-7 7"></path></svg>
+      </button>
+    </sc-for>
+  </div>
+
+  <button onClick="{{ signOut }}" style="margin-top:16px;width:100%;height:52px;border-radius:16px;border:none;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.05);color:#C24545;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit" style-hover="background:#FDF3F3">Sign out</button>
+</div>
+</sc-if>
+
+<!-- ============ SCHEDULE SCREEN ============ -->
+<sc-if value="{{ isSchedule }}" hint-placeholder-val="{{ false }}">
+<div data-screen-label="Schedule" style="height:100%;overflow-y:auto;background:#F2F1EC;padding:0 20px 40px;animation:fadeIn .25s ease">
+  <div style="position:sticky;top:0;height:62px;background:#F2F1EC;z-index:8;flex:none;margin:0 -20px 0"></div>
+  <div style="display:flex;align-items:center;gap:12px;padding-top:4px">
+    <button onClick="{{ goHome }}" style="width:40px;height:40px;border-radius:20px;border:none;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.07);cursor:pointer;display:flex;align-items:center;justify-content:center">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#16181D" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 5 8 12l6.5 7"></path></svg>
+    </button>
+    <div>
+      <div style="font-size:22px;font-weight:800;letter-spacing:-.4px;color:#16181D">Schedule</div>
+      <div style="font-size:13px;color:#8A8F94">{{ seasonGamesLabel }}</div>
+    </div>
+  </div>
+
+  <!-- Month pills -->
+  <div style="display:flex;gap:8px;margin-top:18px">
+    <sc-for list="{{ monthPills }}" as="m" hint-placeholder-count="3">
+      <button onClick="{{ m.pick }}" style="flex:1;height:56px;border-radius:16px;border:1px solid {{ m.border }};background:{{ m.bg }};cursor:pointer;font-family:inherit;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px">
+        <div style="font-size:14px;font-weight:800;color:{{ m.ink }}">{{ m.abbr }}</div>
+        <div style="font-size:11px;font-weight:600;color:{{ m.sub }}">{{ m.count }}</div>
+      </button>
+    </sc-for>
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:10px;margin-top:18px">
+    <sc-for list="{{ monthGames }}" as="s" hint-placeholder-count="3">
+      <button onClick="{{ s.open }}" style="display:flex;align-items:center;gap:14px;background:#fff;border:none;border-radius:20px;padding:14px 16px;box-shadow:0 1px 3px rgba(0,0,0,.05);cursor:pointer;font-family:inherit;text-align:left;width:100%" style-hover="background:#FBFAF7">
+        <div style="width:50px;height:56px;border-radius:14px;background:{{ s.dayBg }};display:flex;flex-direction:column;align-items:center;justify-content:center;flex:none">
+          <div style="font-size:10px;font-weight:700;color:#40613A;letter-spacing:.06em">{{ s.mon }}</div>
+          <div style="font-size:20px;font-weight:800;color:#16181D;line-height:1.05">{{ s.day }}</div>
+          <div style="font-size:9px;font-weight:600;color:#8A8F94;letter-spacing:.04em">{{ s.dow }}</div>
+        </div>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:16px;font-weight:700;color:#16181D">vs. {{ s.opponent }}</div>
+          <div style="font-size:13px;color:#8A8F94;margin-top:2px">{{ s.when }}</div>
+        </div>
+        <span style="font-size:11.5px;font-weight:700;padding:4px 10px;border-radius:10px;background:{{ s.tagBg }};color:{{ s.tagInk }}">{{ s.tag }}</span>
+      </button>
+    </sc-for>
+    <sc-if value="{{ monthEmpty }}" hint-placeholder-val="{{ false }}">
+      <div style="display:flex;flex-direction:column;align-items:center;gap:14px;background:#fff;border-radius:22px;padding:44px 28px;box-shadow:0 1px 3px rgba(0,0,0,.05);margin-top:4px">
+        <div style="width:58px;height:58px;border-radius:29px;background:#EAEFE4;display:flex;align-items:center;justify-content:center">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#40613A" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4.5" width="18" height="16" rx="3"></rect><path d="M3 9h18M8 2.5v4M16 2.5v4"></path></svg>
+        </div>
+        <div style="text-align:center">
+          <div style="font-size:16px;font-weight:700;color:#16181D">No games in {{ monthShort }}</div>
+          <div style="font-size:13.5px;color:#8A8F94;margin-top:4px;line-height:1.5">Add a game below, or tap another month above.</div>
+        </div>
+      </div>
+    </sc-if>
+  </div>
+
+  <button onClick="{{ openAddGame }}" style="margin-top:18px;width:100%;height:54px;border-radius:18px;border:none;background:#40613A;color:#fff;font-size:16px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px" style-hover="background:#34502F">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg>
+    Add game
+  </button>
+</div>
+</sc-if>
+</x-import></x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;: {&quot;width&quot;: 470, &quot;height&quot;: 940}}">
+class Component extends DCLogic {
+  state = {
+    screen: 'auth', prevScreen: 'auth',
+    activeGameId: 'ew', activeNoteId: null,
+    // live
+    liveSec: 0, liveSet: 1, recording: false, processing: false,
+    liveNotes: [], toast: null,
+    scheduleMonthIdx: 0,
+    // audio player
+    playing: false, playSec: 0,
+    // schedule
+    extraGames: [], addGameOpen: false, agMode: 'manual', agOpp: '', agDate: '', agTime: '', agVenue: '', agScanStage: 'pick', agScanExcluded: [],
+    // roster building
+    extraPlayers: [], addPlayerOpen: false,
+    apName: '', apNum: '', apPos: '', apYear: '',
+    scanOpen: false, scanStage: 'pick', scanExcluded: [],
+    liveNotesOpen: false,
+    activeTeam: 0,
+    teams: [
+      {name: 'Varsity Volleyball 2025', sport: 'Volleyball', level: 'Varsity · High school', season: '2025 season'},
+      {name: 'Jersey Elite 17U Club', sport: 'Volleyball', level: 'Club', season: '2025 club season'},
+    ],
+  };
+
+  SCAN_RESULTS = [
+    {num: 8, name: 'Zoe Kim', pos: 'Outside Hitter', grade: 10},
+    {num: 6, name: 'Riley Adams', pos: 'DS', grade: 9},
+    {num: 10, name: 'Tara Singh', pos: 'Middle Blocker', grade: 11},
+    {num: 1, name: 'Nora Ellis', pos: 'Setter', grade: 9},
+  ];
+
+  AG_SCAN = [
+    {id: 's1', opponent: 'Hopewell Valley', mon: 'JUL', day: 29, date: 'Jul 29', time: '6:00 PM', venue: 'Away'},
+    {id: 's2', opponent: 'Notre Dame', mon: 'AUG', day: 2, date: 'Aug 2', time: '5:30 PM', venue: 'Home'},
+    {id: 's3', opponent: 'Steinert', mon: 'AUG', day: 6, date: 'Aug 6', time: '7:00 PM', venue: 'Home'},
+  ];
+
+  DATA = (() => {
+    const roster = [
+      {num: 7, name: 'Sarah Okafor', pos: 'Outside Hitter', grade: 11},
+      {num: 4, name: 'Maya Chen', pos: 'Libero', grade: 10},
+      {num: 12, name: 'Siddy Rao', pos: 'Setter', grade: 10},
+      {num: 11, name: 'Ishan Patel', pos: 'Outside Hitter', grade: 10},
+      {num: 3, name: 'Emma Torres', pos: 'Middle Blocker', grade: 12},
+      {num: 9, name: 'Lena Novak', pos: 'Opposite', grade: 11},
+      {num: 5, name: 'Priya Shah', pos: 'DS', grade: 9},
+      {num: 14, name: 'Jade Miller', pos: 'Middle Blocker', grade: 11},
+      {num: 2, name: 'Ava Brooks', pos: 'Setter', grade: 9},
+    ];
+    const ewNotes = [
+      {id: 'n1', set: 1, player: 'Maya', title: 'Pick up the ball fast on digs', tag: 'Transition', dur: '0:09', transcript: 'Maya, pick up the ball faster after the dig, we\u2019re losing two seconds getting into transition every single time.'},
+      {id: 'n2', set: 1, player: 'Sarah', title: 'Platform angle collapses when rushed', tag: 'Passing', dur: '0:07', transcript: 'Sarah\u2019s platform angle collapses when she\u2019s rushed, fine on easy serves, falls apart the moment the pace goes up.'},
+      {id: 'n3', set: 1, player: 'Ishan', title: 'Number 4 must sprint to the ball', tag: 'Effort', dur: '0:06', transcript: 'Number four has to sprint to the ball after the opponent attack. Walking to position, giving up free space.'},
+      {id: 'n4', set: 2, player: 'Sarah', title: 'Shift to front row, give hitters room', tag: 'Positioning', dur: '0:08', transcript: 'Number seven, shift to the front row and give the hitters more room. She\u2019s crowding the approach lane.'},
+      {id: 'n5', set: 2, player: 'Siddy', title: 'Tempo too slow on the outside set', tag: 'Setting', dur: '0:10', transcript: 'Siddy\u2019s outside sets are floating, tempo is too slow and East Windsor\u2019s block is getting there early every time.'},
+      {id: 'n6', set: 3, player: 'Emma', title: 'Great read block on the slide', tag: 'Blocking', dur: '0:05', transcript: 'Emma read that slide perfectly, that\u2019s exactly the patience on the block we drilled Tuesday. Call it out Monday.'},
+    ];
+    const games = [
+      {id: 'ew', opponent: 'East Windsor', date: 'Jul 12', noteCount: 12, players: 7, notes: ewNotes},
+      {id: 'ww', opponent: 'WWSHP', date: 'Mar 19', noteCount: 8, players: 5, notes: ewNotes.slice(0, 3)},
+      {id: 'lk', opponent: 'Lakeview', date: 'Mar 11', noteCount: 9, players: 6, notes: ewNotes.slice(1, 5)},
+    ];
+    const captureQueue = [
+      {player: 'Sarah', tag: 'Passing', title: 'Platform drops on the short serve'},
+      {player: 'Maya', tag: 'Transition', title: 'First step late out of serve receive'},
+      {player: 'Siddy', tag: 'Setting', title: 'Push the tempo on the outside'},
+      {player: 'Emma', tag: 'Blocking', title: 'Close the seam on the quick'},
+      {player: 'Lena', tag: 'Serving', title: 'Target zone one, they\u2019re hiding the libero'},
+    ];
+    const schedule = [
+      {id: 'g1', opponent: 'Ridgefield', mon: 'JUL', day: 18, date: 'Jul 18', time: '6:00 PM', venue: 'Home', today: true},
+      {id: 'g2', opponent: 'Montclair', mon: 'JUL', day: 22, date: 'Jul 22', time: '5:30 PM', venue: 'Away'},
+      {id: 'g3', opponent: 'Princeton Day', mon: 'JUL', day: 26, date: 'Jul 26', time: '7:00 PM', venue: 'Home'},
+    ];
+    return {roster, games, captureQueue, schedule};
+  })();
+
+  PALETTE = [
+    ['#E7EEE0', '#40613A'], ['#E6F4EC', '#1E8A5A'], ['#F6EDE2', '#B06A1F'],
+    ['#F0E8F8', '#7A4FC0'], ['#FAE8E8', '#C24545'], ['#E4F2F5', '#2380A0'],
+  ];
+
+  fmt(s) { return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); }
+  pcolor(name) {
+    const i = this.DATA.roster.findIndex(r => r.name.startsWith(name));
+    return this.PALETTE[(i < 0 ? 0 : i) % this.PALETTE.length];
+  }
+  nav(screen, extra) { this.setState(s => Object.assign({prevScreen: s.screen, screen}, extra || {})); }
+
+  componentDidMount() {
+    this._t = setInterval(() => {
+      this.setState(s => {
+        const u = {};
+        if (s.screen === 'live') u.liveSec = s.liveSec + 1;
+        if (s.playing && s.activeNoteId) {
+          const note = this.findNote(s.activeNoteId);
+          const max = note ? this.durSec(note.dur) : 9;
+          u.playSec = s.playSec + 1 >= max ? 0 : s.playSec + 1;
+          if (s.playSec + 1 >= max) u.playing = false;
+        }
+        return (u.liveSec !== undefined || u.playSec !== undefined) ? u : null;
+      });
+    }, 1000);
+  }
+  componentWillUnmount() { clearInterval(this._t); clearTimeout(this._proc); clearTimeout(this._toast); }
+
+  durSec(d) { const [m, s] = d.split(':').map(Number); return m * 60 + s; }
+  findNote(id) {
+    for (const g of this.DATA.games) { const n = g.notes.find(n => n.id === id); if (n) return n; }
+    return null;
+  }
+
+  startRec() {
+    if (this.state.recording || this.state.processing) return;
+    this.setState({recording: true, toast: null});
+  }
+  stopRec() {
+    if (!this.state.recording) return;
+    this.setState({recording: false, processing: true});
+    this._proc = setTimeout(() => {
+      this.setState(s => {
+        const item = this.DATA.captureQueue[s.liveNotes.length % this.DATA.captureQueue.length];
+        const note = Object.assign({set: s.liveSet, at: s.liveSec}, item);
+        return {processing: false, liveNotes: [...s.liveNotes, note], toast: note};
+      });
+      this._toast = setTimeout(() => this.setState({toast: null}), 3200);
+    }, 1200);
+  }
+
+  renderVals() {
+    const st = this.state, D = this.DATA;
+    const mode = 'tap';
+    const CLASS = {9: 'Freshman', 10: 'Sophomore', 11: 'Junior', 12: 'Senior'};
+    const classYear = g => CLASS[g] || g;
+    const dark = false;
+    const lv = {bg: '#F2F1EC', ink: '#16181D', muted: '#8A8F94', card: '#FFFFFF', line: '#E7E5DF', ringTrack: '#EDECE7'};
+    const allGames = D.schedule.concat(st.extraGames);
+    const venueLabel = v => v === 'Home' ? 'Home gym' : 'Away';
+    const ng = allGames[0] || null;
+    const nextGame = ng
+      ? {opponent: ng.opponent, badge: ng.today ? 'GAME DAY' : 'NEXT GAME',
+         when: (ng.today ? 'Today' : ng.date) + ' · ' + ng.time + ' · ' + venueLabel(ng.venue)}
+      : {opponent: 'No game set', badge: 'NEXT GAME', when: 'Add your schedule to get started'};
+
+    const now = new Date();
+    const todayLabel = now.toLocaleDateString('en-US', {weekday: 'long', month: 'long', day: 'numeric'});
+
+    const games = D.games.map(g => {
+      const pct = Math.round(g.players / 9 * 100);
+      const C = 2 * Math.PI * 13;
+      return {
+        opponent: g.opponent, date: g.date, noteCount: g.noteCount,
+        playersLabel: g.players + '/9 players',
+        initials: g.opponent.split(/\s/).map(w => w[0]).join('').slice(0, 2).toUpperCase(),
+        tint: '#EAEFE4', tintInk: '#40613A',
+        coveragePct: pct, ringDash: (C * pct / 100).toFixed(1) + ' ' + C.toFixed(1),
+        open: () => this.nav('game', {activeGameId: g.id}),
+      };
+    });
+
+    const ag = D.games.find(g => g.id === st.activeGameId) || D.games[0];
+    const agPct = Math.round(ag.players / 9 * 100);
+    const bigC = 2 * Math.PI * 22;
+    const setNums = [...new Set(ag.notes.map(n => n.set))].sort();
+    const activeGameSets = setNums.map(num => ({
+      num,
+      notes: ag.notes.filter(n => n.set === num).map(n => {
+        const [bg, ink] = this.pcolor(n.player);
+        return Object.assign({}, n, {playerBg: bg, playerInk: ink,
+          open: () => this.setState({activeNoteId: n.id, playing: false, playSec: 0})});
+      }),
+    }));
+
+    const an = this.findNote(st.activeNoteId);
+    const anCols = an ? this.pcolor(an.player) : ['#EEE', '#666'];
+    const anMax = an ? this.durSec(an.dur) : 1;
+
+    const sets = [1, 2, 3, 4, 5].map(n => ({
+      label: n,
+      bg: n === st.liveSet ? '#40613A' : (dark ? '#161A22' : '#FFFFFF'),
+      ink: n === st.liveSet ? '#fff' : lv.muted,
+      border: n === st.liveSet ? '#40613A' : lv.line,
+      pick: () => this.setState({liveSet: n}),
+    }));
+
+    const rosterTotal = D.roster.length + st.extraPlayers.length;
+    const livePlayers = new Set(st.liveNotes.map(n => n.player));
+    const livePct = Math.round(livePlayers.size / rosterTotal * 100);
+    const liveC = 2 * Math.PI * 17;
+
+    const waveBars = [0,1,2,3,4,5,6,7,8].map(i => ({
+      dur: (0.5 + (i * 37 % 40) / 100) + 's', delay: (i * 83 % 40) / 100 + 's',
+    }));
+
+    // record button, purely visual; the whole screen is the tap target
+    const recSize = 300;
+    const recording = st.recording;
+    const recordButton = React.createElement('button', {
+      style: {
+        pointerEvents: 'none',
+        width: recSize, height: recSize, borderRadius: recSize / 2, border: 'none', cursor: 'pointer',
+        background: recording ? '#FF453A' : '#40613A',
+        boxShadow: recording ? 'none' : '0 12px 40px rgba(64,97,58,.4)',
+        animation: recording ? 'pulse 1.4s ease-out infinite' : 'none',
+        display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 8,
+        color: '#fff', fontFamily: 'inherit', transition: 'background .2s ease, transform .12s ease',
+        transform: recording && mode === 'hold' ? 'scale(1.06)' : 'none',
+        touchAction: 'none', userSelect: 'none', WebkitUserSelect: 'none',
+      },
+    }, [
+      React.createElement('svg', {key: 'i', width: 78, height: 78, viewBox: '0 0 24 24', fill: '#fff'},
+        recording && mode === 'tap'
+          ? React.createElement('rect', {x: 6, y: 6, width: 12, height: 12, rx: 3})
+          : [React.createElement('rect', {key: 'a', x: 9, y: 2.5, width: 6, height: 12, rx: 3}),
+             React.createElement('path', {key: 'b', d: 'M5 11a7 7 0 0 0 14 0h-2a5 5 0 0 1-10 0H5Z'}),
+             React.createElement('rect', {key: 'c', x: 11, y: 18.5, width: 2, height: 3.5, rx: 1})]),
+      React.createElement('div', {key: 't', style: {fontSize: 18, fontWeight: 800, letterSpacing: '.02em'}},
+        recording ? (mode === 'hold' ? 'Listening…' : 'Tap anywhere to stop') : (mode === 'hold' ? 'Hold anywhere' : 'Tap anywhere')),
+    ]);
+
+    const playIcon = React.createElement('svg', {width: 15, height: 15, viewBox: '0 0 24 24', fill: '#fff'},
+      st.playing ? React.createElement('path', {d: 'M7 5h3.4v14H7zM13.6 5H17v14h-3.6z'})
+                 : React.createElement('path', {d: 'M7.5 5v14l11-7-11-7Z'}));
+
+    const reportPlayers = [
+      {name: 'Sarah Okafor', num: 7, pos: 'Outside Hitter', count: 4, badge: 'Priority', badgeBg: '#FAE8E8', badgeInk: '#C24545',
+       insight: 'Platform angle collapses when she\u2019s rushed. Clean on easy serves; breaks down the moment tempo rises. Also crowding the approach lane in the front row.',
+       drill: 'Rapid-fire serve receive, 3 rounds of 10'},
+      {name: 'Maya Chen', num: 4, pos: 'Libero', count: 3, badge: 'Priority', badgeBg: '#FAE8E8', badgeInk: '#C24545',
+       insight: 'Slow first step out of the dig into transition, losing roughly two seconds per rally. Effort is there, footwork pattern isn\u2019t.',
+       drill: 'Dig-and-go ladder, 8 minutes'},
+      {name: 'Siddy Rao', num: 12, pos: 'Setter', count: 2, badge: 'Watch', badgeBg: '#F6EDE2', badgeInk: '#B06A1F',
+       insight: 'Outside sets floating slow, opposing block arrives early every time. Needs a faster tempo call with Sarah and Ishan.',
+       drill: 'Tempo sets vs. live block, 10 minutes'},
+      {name: 'Emma Torres', num: 3, pos: 'Middle Blocker', count: 1, badge: 'Praise', badgeBg: '#E6F4EC', badgeInk: '#1E8A5A',
+       insight: 'Read the slide perfectly in set 3, exactly the patient block from Tuesday\u2019s drill. Call it out in front of the team.',
+       drill: 'None, reinforce publicly'},
+    ].map(p => { const [bg, ink] = this.pcolor(p.name); return Object.assign(p, {bg, ink}); });
+
+    return {
+      // routing
+      isHome: st.screen === 'home', isLive: st.screen === 'live', isGame: st.screen === 'game',
+      isReport: st.screen === 'report', isRoster: st.screen === 'roster', isSettings: st.screen === 'settings',
+      isSchedule: st.screen === 'schedule',
+      isAuth: st.screen === 'auth',
+      statusDark: (st.screen === 'live' && dark) || st.screen === 'auth',
+      enterApp: () => this.nav('home'),
+      goHome: () => this.nav('home'), goRoster: () => this.nav('roster'),
+      goSchedule: () => this.nav('schedule'),
+      goSettings: () => this.nav('settings'), goReport: () => this.nav('report'),
+      goGameBack: () => this.nav('game'),
+      startLive: () => this.nav('live', {liveSec: 0, liveSet: 1, liveNotes: [], recording: false, processing: false, toast: null}),
+      endLive: () => this.nav('game', {activeGameId: 'ew', recording: false, processing: false}),
+      // home
+      todayLabel, seasonGames: 5, seasonNotes: 38, streakLabel: '4 games', games,
+      viewAll: () => this.nav('game', {activeGameId: 'ew'}),
+      // live
+      lv, sets, liveClock: this.fmt(st.liveSec),
+      isRecording: st.recording, notRecording: !st.recording,
+      isProcessing: st.processing,
+      idleHint: st.processing ? '' : (st.liveNotes.length === 0 ? 'Eyes on the court. Say what you saw.' : 'Ready for the next one.'),
+      waveBars, recordButton,
+      swallow: e => e.stopPropagation(),
+      surfaceDown: () => {
+        if (this.state.processing || this.state.recording) return;
+        this._pressAt = Date.now(); this._armed = false;
+        this.startRec();
+      },
+      surfaceUp: () => {
+        if (!this.state.recording) return;
+        if (mode === 'hold') { this.stopRec(); return; }
+        if (Date.now() - this._pressAt < 350 && !this._armed) { this._armed = true; return; }
+        this._armed = false; this.stopRec();
+      },
+      lastToast: !!st.toast && !st.recording && !st.processing,
+      toastNum: st.liveNotes.length, toastTitle: st.toast ? st.toast.title : '',
+      toastMeta: st.toast ? (st.toast.player + ' · ' + st.toast.tag + ' · Set ' + st.toast.set) : '',
+      liveNoteCount: st.liveNotes.length, livePlayersCount: livePlayers.size,
+      liveCoveragePct: livePct, liveRingDash: (liveC * livePct / 100).toFixed(1) + ' ' + liveC.toFixed(1),
+      liveCoverageHint: livePlayers.size === 0 ? 'Coverage builds as you name players, tap for the list' : (rosterTotal - livePlayers.size) + ' players without a note yet',
+      rosterTotal,
+      // game detail
+      activeGame: {
+        opponent: ag.opponent, date: ag.date, noteCount: ag.noteCount,
+        playersLabel: ag.players + ' of 9 players', coveragePct: agPct,
+        bigRingDash: (bigC * agPct / 100).toFixed(1) + ' ' + bigC.toFixed(1),
+        coverageHint: (9 - ag.players) + ' players had no notes, worth a look Monday',
+      },
+      activeGameSets,
+      // note sheet
+      noteOpen: !!an,
+      activeNote: an ? Object.assign({}, an, {playerBg: anCols[0], playerInk: anCols[1]}) : {},
+      closeNote: () => this.setState({activeNoteId: null, playing: false, playSec: 0}),
+      togglePlay: () => this.setState(s => ({playing: !s.playing})),
+      playIcon, playPct: Math.round(st.playSec / anMax * 100) + '%', playClock: this.fmt(st.playSec),
+      // report
+      reportPlayers,
+      donut: (() => {
+        const segs = [{name: 'Corrections', count: 7, color: '#40613A'}, {name: 'Positioning', count: 3, color: '#8CA97D'}, {name: 'Praise', count: 2, color: '#C8B26B'}];
+        const total = segs.reduce((a, s) => a + s.count, 0), C = 2 * Math.PI * 46;
+        const gap = 5; // px gap between segments for clean division
+        let acc = 0;
+        return segs.map(s => { const full = C * s.count / total; const dash = Math.max(0, full - gap); const seg = Object.assign({}, s, {dash: dash.toFixed(1) + ' ' + (C - dash).toFixed(1), offset: (-acc).toFixed(1)}); acc += full; return seg; });
+      })(),
+      totalNotes: 12,
+      notesBySet: [{label: 'S1', count: 3, h: '75%'}, {label: 'S2', count: 4, h: '100%'}, {label: 'S3', count: 3, h: '75%'}, {label: 'S4', count: 2, h: '50%'}],
+      focusAreas: [
+        {name: 'Passing', count: 5, pct: '100%', color: '#40613A'},
+        {name: 'Transition', count: 3, pct: '60%', color: '#7A4FC0'},
+        {name: 'Positioning', count: 2, pct: '40%', color: '#2380A0'},
+        {name: 'Setting', count: 2, pct: '40%', color: '#B06A1F'},
+      ],
+      practicePlan: [
+        {n: 1, name: 'Rapid-fire serve receive', why: 'Sarah + 2 others, platforms under pressure', mins: '15 min'},
+        {n: 2, name: 'Dig-and-go transition ladder', why: 'Maya, first step out of the dig', mins: '10 min'},
+        {n: 3, name: 'Tempo sets vs. live block', why: 'Siddy → Sarah/Ishan connection', mins: '10 min'},
+      ],
+      // roster
+      roster: D.roster.concat(st.extraPlayers).map((r, i) => {
+        const [bg, ink] = this.PALETTE[i % this.PALETTE.length];
+        return Object.assign({}, r, {bg, ink, classYear: r.year || classYear(r.grade), notes: r.notes ?? [8, 6, 5, 4, 3, 3, 2, 1, 0][i] ?? 0});
+      }),
+      // schedule
+      nextGame,
+      schedule: allGames.map(g => ({
+        opponent: g.opponent, mon: g.mon, day: g.day,
+        when: (g.today ? 'Today' : g.date) + ' · ' + g.time,
+        tag: g.venue, tagBg: g.venue === 'Home' ? '#EAEFE4' : '#F0EFEA', tagInk: g.venue === 'Home' ? '#40613A' : '#6B7075',
+      })),
+      // schedule screen (month switcher)
+      ...(() => {
+        const MON_ABBR = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
+        const MON_NAME = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+        const DOW = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
+        const YEAR = 2025;
+        // derive the set of months present in the schedule, in calendar order
+        const present = [...new Set(allGames.map(g => MON_ABBR.indexOf(g.mon)).filter(i => i >= 0))].sort((a, b) => a - b);
+        const monthIdxs = present.length ? present : [new Date().getMonth()];
+        const dowFor = (mIdx, day) => day ? DOW[new Date(YEAR, mIdx, day).getDay()] : '';
+        const pos = Math.max(0, Math.min(monthIdxs.length - 1, st.scheduleMonthIdx));
+        const curMonth = monthIdxs[pos];
+        const countIn = mIdx => allGames.filter(g => MON_ABBR.indexOf(g.mon) === mIdx).length;
+        const inMonth = allGames.filter(g => MON_ABBR.indexOf(g.mon) === curMonth).sort((a, b) => (a.day || 0) - (b.day || 0));
+        return {
+          seasonGamesLabel: allGames.length + ' games this season',
+          monthTitle: MON_NAME[curMonth] + ' ' + YEAR, monthShort: MON_NAME[curMonth],
+          monthEmpty: inMonth.length === 0,
+          monthPills: monthIdxs.map((mIdx, i) => {
+            const sel = i === pos, c = countIn(mIdx);
+            return {
+              abbr: MON_ABBR[mIdx], count: c === 0 ? '—' : c + (c === 1 ? ' game' : ' games'),
+              bg: sel ? '#40613A' : '#fff', border: sel ? '#40613A' : '#E7E5DF',
+              ink: sel ? '#fff' : '#16181D', sub: sel ? '#C8D8BC' : '#8A8F94',
+              pick: () => this.setState({scheduleMonthIdx: i}),
+            };
+          }),
+          monthGames: inMonth.map(g => ({
+            opponent: g.opponent, mon: g.mon, day: g.day, dow: dowFor(curMonth, g.day),
+            when: (g.today ? 'Today' : g.date) + ' · ' + g.time + ' · ' + (g.venue === 'Home' ? 'Home gym' : 'Away'),
+            dayBg: g.today ? '#D8E6CC' : '#EAEFE4',
+            tag: g.venue, tagBg: g.venue === 'Home' ? '#EAEFE4' : '#F0EFEA', tagInk: g.venue === 'Home' ? '#40613A' : '#6B7075',
+            open: () => this.nav('game', {activeGameId: 'ew'}),
+          })),
+        };
+      })(),
+      addGameOpen: st.addGameOpen,
+      openAddGame: () => this.setState({addGameOpen: true, agMode: 'manual', agOpp: '', agDate: '', agTime: '', agVenue: '', agScanStage: 'pick', agScanExcluded: []}),
+      closeAddGame: () => { clearTimeout(this._agscan); this.setState({addGameOpen: false}); },
+      agModeManual: () => this.setState({agMode: 'manual'}),
+      agModeScan: () => this.setState({agMode: 'scan'}),
+      agManual: st.addGameOpen && st.agMode === 'manual',
+      agManualBg: st.agMode === 'manual' ? '#fff' : 'transparent', agManualInk: st.agMode === 'manual' ? '#16181D' : '#8A8F94',
+      agScanBg: st.agMode === 'scan' ? '#fff' : 'transparent', agScanInk: st.agMode === 'scan' ? '#16181D' : '#8A8F94',
+      agOpp: st.agOpp, agDate: st.agDate, agTime: st.agTime,
+      setAgOpp: e => this.setState({agOpp: e.target.value}),
+      setAgDate: e => this.setState({agDate: e.target.value}),
+      setAgTime: e => this.setState({agTime: e.target.value}),
+      agVenues: ['Home', 'Away'].map(v => ({label: v,
+        bg: v === st.agVenue ? '#40613A' : '#fff', ink: v === st.agVenue ? '#fff' : '#16181D',
+        border: v === st.agVenue ? '#40613A' : '#E3E1DB', pick: () => this.setState({agVenue: v})})),
+      agSaveBg: st.agOpp.trim() ? '#40613A' : '#C4C7CB',
+      agSaveLabel: st.agOpp.trim() ? ('Add ' + st.agOpp.trim()) : 'Add game',
+      saveGame: () => {
+        const s = this.state; if (!s.agOpp.trim()) return;
+        const mon = (s.agDate.split(' ')[0] || 'TBD').toUpperCase().slice(0, 3);
+        const day = parseInt((s.agDate.match(/\d+/) || [])[0]) || '';
+        this.setState({extraGames: [...s.extraGames, {id: 'x' + Date.now(), opponent: s.agOpp.trim(), mon, day, date: s.agDate || 'TBD', time: s.agTime || 'TBD', venue: s.agVenue || 'Home'}], addGameOpen: false});
+      },
+      agScanPick: st.addGameOpen && st.agMode === 'scan' && st.agScanStage === 'pick',
+      agScanProcessing: st.agMode === 'scan' && st.agScanStage === 'processing',
+      agScanReview: st.agMode === 'scan' && st.agScanStage === 'review',
+      agScanPhoto: () => { this.setState({agScanStage: 'processing'}); this._agscan = setTimeout(() => this.setState({agScanStage: 'review'}), 1600); },
+      agFoundCount: this.AG_SCAN.length,
+      agScanResults: this.AG_SCAN.map((g, i) => { const off = st.agScanExcluded.includes(i); return Object.assign({}, g, {
+        rowBg: off ? '#FBFAF7' : '#fff', rowBorder: off ? '#EDECE7' : '#C8D8BC', opacity: off ? '.45' : '1',
+        when: g.date + ' · ' + g.time + ' · ' + g.venue,
+        check: React.createElement('svg', {width: 20, height: 20, viewBox: '0 0 24 24', style: {flex: 'none'}},
+          off ? React.createElement('circle', {cx: 12, cy: 12, r: 9, fill: 'none', stroke: '#C4C7CB', strokeWidth: 1.8})
+              : [React.createElement('circle', {key: 'c', cx: 12, cy: 12, r: 10, fill: '#40613A'}),
+                 React.createElement('path', {key: 'p', d: 'm7.5 12.5 3 3 6-6.5', fill: 'none', stroke: '#fff', strokeWidth: 2.4, strokeLinecap: 'round'})]),
+        toggle: () => this.setState(s => ({agScanExcluded: s.agScanExcluded.includes(i) ? s.agScanExcluded.filter(x => x !== i) : [...s.agScanExcluded, i]})),
+      }); }),
+      agScanConfirmLabel: 'Add ' + (this.AG_SCAN.length - st.agScanExcluded.length) + ' games',
+      agScanConfirm: () => { const add = this.AG_SCAN.filter((_, i) => !this.state.agScanExcluded.includes(i)); this.setState(s => ({extraGames: [...s.extraGames, ...add], addGameOpen: false})); },
+      // add player sheet
+      addPlayerOpen: st.addPlayerOpen,
+      openAddPlayer: () => this.setState({addPlayerOpen: true, apName: '', apNum: '', apPos: '', apYear: ''}),
+      closeAddPlayer: () => this.setState({addPlayerOpen: false}),
+      apName: st.apName, apNum: st.apNum,
+      setApName: e => this.setState({apName: e.target.value}),
+      setApNum: e => this.setState({apNum: e.target.value.replace(/\D/g, '').slice(0, 2)}),
+      apPositions: ['Outside Hitter', 'Setter', 'Libero', 'Middle Blocker', 'Opposite', 'DS'].map(p => ({
+        label: p,
+        bg: p === st.apPos ? '#40613A' : '#fff', ink: p === st.apPos ? '#fff' : '#16181D',
+        border: p === st.apPos ? '#40613A' : '#E3E1DB',
+        pick: () => this.setState({apPos: p}),
+      })),
+      apGrades: ['Freshman', 'Sophomore', 'Junior', 'Senior'].map(y => ({
+        label: y,
+        bg: y === st.apYear ? '#40613A' : '#fff', ink: y === st.apYear ? '#fff' : '#16181D',
+        border: y === st.apYear ? '#40613A' : '#E3E1DB',
+        pick: () => this.setState({apYear: y}),
+      })),
+      apSaveBg: st.apName.trim() && st.apNum ? '#40613A' : '#C4C7CB',
+      apSaveLabel: st.apName.trim() ? ('Add ' + st.apName.trim().split(' ')[0]) : 'Add player',
+      savePlayer: () => {
+        const s = this.state;
+        if (!s.apName.trim() || !s.apNum) return;
+        this.setState({
+          extraPlayers: [...s.extraPlayers, {num: +s.apNum, name: s.apName.trim(), pos: s.apPos || 'DS', year: s.apYear || 'Freshman', notes: 0}],
+          addPlayerOpen: false,
+        });
+      },
+      // scan sheet
+      scanOpen: st.scanOpen,
+      openScan: () => this.setState({scanOpen: true, scanStage: 'pick', scanExcluded: []}),
+      closeScan: () => { clearTimeout(this._scan); this.setState({scanOpen: false}); },
+      scanPick: st.scanStage === 'pick', scanProcessing: st.scanStage === 'processing', scanReview: st.scanStage === 'review',
+      scanTakePhoto: () => {
+        this.setState({scanStage: 'processing'});
+        this._scan = setTimeout(() => this.setState({scanStage: 'review'}), 1600);
+      },
+      scanFoundCount: this.SCAN_RESULTS.length,
+      scanResults: this.SCAN_RESULTS.map((r, i) => {
+        const off = st.scanExcluded.includes(i);
+        return Object.assign({}, r, {
+          rowBg: off ? '#FBFAF7' : '#fff', rowBorder: off ? '#EDECE7' : '#C8D8BC', opacity: off ? '.45' : '1',
+          check: React.createElement('svg', {width: 20, height: 20, viewBox: '0 0 24 24', style: {flex: 'none'}},
+            off ? React.createElement('circle', {cx: 12, cy: 12, r: 9, fill: 'none', stroke: '#C4C7CB', strokeWidth: 1.8})
+                : [React.createElement('circle', {key: 'c', cx: 12, cy: 12, r: 10, fill: '#40613A'}),
+                   React.createElement('path', {key: 'p', d: 'm7.5 12.5 3 3 6-6.5', fill: 'none', stroke: '#fff', strokeWidth: 2.4, strokeLinecap: 'round'})]),
+          toggle: () => this.setState(s => ({scanExcluded: s.scanExcluded.includes(i) ? s.scanExcluded.filter(x => x !== i) : [...s.scanExcluded, i]})),
+        });
+      }),
+      scanConfirmLabel: 'Add ' + (this.SCAN_RESULTS.length - st.scanExcluded.length) + ' players',
+      scanConfirm: () => {
+        const add = this.SCAN_RESULTS.filter((_, i) => !this.state.scanExcluded.includes(i)).map(r => Object.assign({notes: 0}, r));
+        this.setState(s => ({extraPlayers: [...s.extraPlayers, ...add], scanOpen: false}));
+      },
+      // live notes sheet
+      liveNotesOpen: st.liveNotesOpen,
+      openLiveNotes: () => this.setState({liveNotesOpen: true}),
+      closeLiveNotes: () => this.setState({liveNotesOpen: false}),
+      liveNotesEmpty: st.liveNotes.length === 0,
+      liveNotesList: st.liveNotes.map((n, i) => ({
+        idx: i + 1, title: n.title,
+        meta: n.player + ' · ' + n.tag + ' · Set ' + n.set + ' · ' + this.fmt(n.at),
+      })).reverse(),
+      // settings — teams + account
+      teams: st.teams.map((t, i) => {
+        const sel = i === st.activeTeam;
+        return {
+          name: t.name, meta: t.level + ' · ' + t.season,
+          initials: t.name.split(/\s/).map(w => w[0]).join('').slice(0, 2).toUpperCase(),
+          badgeBg: sel ? '#40613A' : '#EAEFE4', badgeInk: sel ? '#fff' : '#40613A',
+          pick: () => this.setState({activeTeam: i}),
+          check: React.createElement('svg', {width: 20, height: 20, viewBox: '0 0 24 24', style: {flex: 'none'}},
+            sel ? [React.createElement('circle', {key: 'c', cx: 12, cy: 12, r: 10, fill: '#40613A'}),
+                   React.createElement('path', {key: 'p', d: 'm7.5 12.5 3 3 6-6.5', fill: 'none', stroke: '#fff', strokeWidth: 2.4, strokeLinecap: 'round'})]
+                : React.createElement('circle', {cx: 12, cy: 12, r: 9, fill: 'none', stroke: '#D8D6D0', strokeWidth: 1.8})),
+        };
+      }),
+      activeTeamLabel: (st.teams[st.activeTeam] || {}).name ? (st.teams[st.activeTeam].name.toUpperCase()) : 'ACTIVE TEAM',
+      activeTeamSport: (st.teams[st.activeTeam] || {}).sport || 'Volleyball',
+      addTeam: () => this.setState(s => ({teams: [...s.teams, {name: 'New Team ' + (s.teams.length + 1), sport: 'Volleyball', level: 'Custom', season: '2025 season'}], activeTeam: s.teams.length})),
+      accountRows: [
+        {label: 'Change email', value: 'rajesh.damarapati@gmail.com', tap: () => {}},
+        {label: 'Change password', value: '', tap: () => {}},
+      ],
+      signOut: () => this.nav('auth'),
+    };
+  }
+}
+</script>
+</body>
+</html>
