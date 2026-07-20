@@ -1,361 +1,391 @@
+/**
+ * Settings — redesign: profile card (tap to edit), MY TEAMS with real
+ * multi-team switching (tap a team to make it active; add new teams via a
+ * small sheet), an active-team section (Sport + Roster), ACCOUNT rows using
+ * the existing email/password modals, and Sign out.
+ */
+import { useFocusEffect } from '@react-navigation/native';
+import { useRouter } from 'expo-router';
+import { Check, ChevronLeft, ChevronRight, Pencil, Plus, X } from 'lucide-react-native';
+import { useCallback, useState } from 'react';
+import {
+  ActivityIndicator,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from 'react-native';
+import BottomSheet from '@/components/BottomSheet';
 import ChangeEmailModal from '@/components/ChangeEmailModal';
 import ChangePasswordModal from '@/components/ChangePasswordModal';
 import ProfileEditModal from '@/components/ProfileEditModal';
-import { SportSelectionModal } from '@/components/SportSelectionModal';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { IconSymbol } from '@/components/ui/icon-symbol';
-import { Colors } from '@/constants/theme';
+import { Brand, Shape } from '@/constants/brand';
 import { useAuth } from '@/contexts/AuthContext';
-import { useTheme } from '@/contexts/ThemeContext';
-import { supabase } from '@/lib/supabase';
-import { Image } from 'expo-image';
-import { useRouter } from 'expo-router';
-import { useEffect, useRef, useState } from 'react';
-import { Platform, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { showAlert } from '@/lib/alert';
+import { fetchPlayersForTeam } from '@/lib/roster';
+import { initialsFor } from '@/lib/scheduleFormat';
+import { createTeam, getActiveTeam, setActiveTeamId, updateTeam } from '@/lib/teams';
+
+const SPORTS = ['Volleyball'];
 
 export default function SettingsScreen() {
   const { user, profile, signOut, refreshProfile } = useAuth();
-  const { colorScheme } = useTheme();
   const router = useRouter();
-  const [profileImageUri, setProfileImageUri] = useState(
-    profile?.profile_picture_url || null
-  );
-  const [imageError, setImageError] = useState(false);
+
+  const [teams, setTeams] = useState([]);
+  const [activeTeam, setActiveTeam] = useState(null);
+  const [rosterCount, setRosterCount] = useState(null);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showChangeEmailModal, setShowChangeEmailModal] = useState(false);
   const [showChangePasswordModal, setShowChangePasswordModal] = useState(false);
-  const [showSportModal, setShowSportModal] = useState(false);
-  const [savingSport, setSavingSport] = useState(false);
-  const prevPictureUrl = useRef(profile?.profile_picture_url || null);
-  const cacheBusterRef = useRef(Date.now());
+  const [addTeamOpen, setAddTeamOpen] = useState(false);
+  const [newTeamName, setNewTeamName] = useState('');
+  const [savingTeam, setSavingTeam] = useState(false);
+  // edit-team sheet
+  const [editTeam, setEditTeam] = useState(null); // the team being edited, or null
+  const [editName, setEditName] = useState('');
+  const [editSport, setEditSport] = useState('Volleyball');
+  const [savingEdit, setSavingEdit] = useState(false);
 
-  useEffect(() => {
-    if (profile?.profile_picture_url) {
-      if (profile.profile_picture_url !== prevPictureUrl.current) {
-        cacheBusterRef.current = Date.now();
-        prevPictureUrl.current = profile.profile_picture_url;
-      }
-      const separator = profile.profile_picture_url.includes('?') ? '&' : '?';
-      setProfileImageUri(profile.profile_picture_url + `${separator}t=${cacheBusterRef.current}`);
-      setImageError(false);
-    } else {
-      setProfileImageUri(null);
-      setImageError(false);
+  const load = useCallback(async () => {
+    if (!user?.id) return;
+    const { team, teams: all } = await getActiveTeam(user.id);
+    setTeams(all);
+    setActiveTeam(team);
+    if (team?.id) {
+      const { data } = await fetchPlayersForTeam(team.id);
+      setRosterCount((data ?? []).length);
     }
-  }, [profile?.profile_picture_url]);
+  }, [user?.id]);
 
-  const handleEditProfile = () => {
-    setShowEditModal(true);
+  useFocusEffect(
+    useCallback(() => {
+      load();
+    }, [load])
+  );
+
+  const pickTeam = async (team) => {
+    if (!user?.id || team.id === activeTeam?.id) return;
+    await setActiveTeamId(user.id, team.id);
+    setActiveTeam(team);
+    const { data } = await fetchPlayersForTeam(team.id);
+    setRosterCount((data ?? []).length);
   };
 
-  const handleModalSave = async () => {
-    await refreshProfile();
-  };
-
-  const handleSportSelect = async (sport) => {
-    if (!user) return;
-
-    setSavingSport(true);
-
+  const addTeam = async () => {
+    if (!user?.id || !newTeamName.trim() || savingTeam) return;
+    setSavingTeam(true);
     try {
-      const { error } = await supabase
-        .from('profiles')
-        .update({ sport })
-        .eq('id', user.id);
-
-      if (error) {
-        console.log('Error updating sport:', error);
-        showAlert('Error', 'Failed to update sport. Please try again.');
-        setSavingSport(false);
+      const { team, error } = await createTeam(user.id, { name: newTeamName.trim() });
+      if (error || !team) {
+        showAlert('Could not add team', error?.message ?? 'Try again.');
         return;
       }
-
-      // pull the latest profile so the UI reflects the new sport
-      await refreshProfile();
-      setSavingSport(false);
-      
-      showAlert('Success', `Your sport has been updated to ${sport}!`);
-    } catch (error) {
-      console.log('Unexpected error updating sport:', error);
-      showAlert('Error', 'An unexpected error occurred. Please try again.');
-      setSavingSport(false);
+      await setActiveTeamId(user.id, team.id);
+      setAddTeamOpen(false);
+      setNewTeamName('');
+      load();
+    } finally {
+      setSavingTeam(false);
     }
   };
 
-  const handleSignOut = async () => {
-    const doSignOut = async () => {
-      try {
-        await signOut();
-      } catch (error) {
-        console.error('Sign out error:', error);
-        showAlert('Error', 'Failed to sign out. Please try again.');
-      }
-    };
-
-    showAlert(
-      'Sign Out',
-      'Are you sure you want to sign out?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Sign Out',
-          style: 'destructive',
-          onPress: doSignOut,
-        },
-      ]
+  const openEditTeam = (team) => {
+    setEditTeam(team);
+    setEditName(team.name ?? '');
+    setEditSport(
+      team.sport ? team.sport.charAt(0).toUpperCase() + team.sport.slice(1) : 'Volleyball'
     );
+  };
+
+  const saveEditTeam = async () => {
+    if (!user?.id || !editTeam || !editName.trim() || savingEdit) return;
+    setSavingEdit(true);
+    try {
+      const { team, error } = await updateTeam(user.id, editTeam.id, {
+        name: editName.trim(),
+        sport: editSport,
+      });
+      if (error || !team) {
+        showAlert('Could not update team', error?.message ?? 'Try again.');
+        return;
+      }
+      setEditTeam(null);
+      load();
+    } finally {
+      setSavingEdit(false);
+    }
+  };
+
+  const handleSignOut = () => {
+    showAlert('Sign Out', 'Are you sure you want to sign out?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Sign Out',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await signOut();
+          } catch (error) {
+            console.error('Sign out error:', error);
+            showAlert('Error', 'Failed to sign out. Please try again.');
+          }
+        },
+      },
+    ]);
   };
 
   const getInitials = () => {
     if (profile?.name) {
-      const nameParts = profile.name.trim().split(' ');
-      if (nameParts.length >= 2) {
-        return `${nameParts[0][0]}${nameParts[nameParts.length - 1][0]}`.toUpperCase();
-      }
+      const parts = profile.name.trim().split(/\s+/);
+      if (parts.length >= 2) return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase();
       return profile.name.substring(0, 2).toUpperCase();
     }
-    
-    if (user?.email) {
-      const emailName = user.email.split('@')[0];
-      const parts = emailName.split(/[._-]/);
-      if (parts.length >= 2) {
-        return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
-      }
-      return emailName.substring(0, 2).toUpperCase();
-    }
-    
+    if (user?.email) return user.email.substring(0, 2).toUpperCase();
     return 'U';
   };
 
-  // volleyball emoji icon — keeps it consistent with SportButtonSelector
-  const VolleyballIcon = ({ size = 24 }) => (
-    <View style={{ 
-      width: size * 1.5, 
-      height: size * 1.5, 
-      alignItems: 'center', 
-      justifyContent: 'center',
-      overflow: 'visible',
-    }}>
-      <ThemedText style={{ 
-        fontSize: size, 
-        lineHeight: size * 1.1,
-        textAlign: 'center',
-        width: size * 1.5,
-      }}>
-        🏐
-      </ThemedText>
-    </View>
-  );
+  const teamSeason = (team) => {
+    const year = team?.created_at ? new Date(team.created_at).getFullYear() : new Date().getFullYear();
+    const sport = team?.sport
+      ? team.sport.charAt(0).toUpperCase() + team.sport.slice(1)
+      : 'Volleyball';
+    return `${sport} · ${year} season`;
+  };
 
   return (
-    <ThemedView style={styles.container}>
-      {/* top nav bar */}
-      <View style={[styles.header, { paddingTop: Platform.OS === 'ios' ? 60 : Platform.OS === 'web' ? 24 : 40 }]}>
-        <TouchableOpacity 
-          style={styles.backButton}
-          onPress={() => router.replace('/(tabs)/home')}
-          activeOpacity={0.7}
-        >
-          <IconSymbol
-            name="chevron.left"
-            size={28}
-            color={Colors[colorScheme ?? 'light'].text}
-          />
-        </TouchableOpacity>
-        <ThemedText style={styles.headerTitle}>Settings</ThemedText>
-        <View style={styles.headerSpacer} />
-      </View>
-
+    <View style={styles.container}>
       <ScrollView
-        style={styles.scrollView}
+        style={styles.scroll}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* user profile card */}
-        <View style={styles.section}>
-          <ThemedText style={styles.sectionTitle}>Profile</ThemedText>
-          
-          <View style={styles.profileContainer}>
-            <View style={styles.profilePictureContainer}>
-              {/* profile pic or initials fallback */}
-              <View style={[styles.profilePictureWrapper, {
-                borderWidth: 2,
-                borderColor: Colors[colorScheme].border,
-                borderRadius: 40,
-              }]}>
-              {profileImageUri && !imageError ? (
-                <Image
-                  key={profileImageUri}
-                  source={{ uri: profileImageUri }}
-                  style={styles.profilePicture}
-                  cachePolicy="memory-disk"
-                  onLoad={() => setImageError(false)}
-                  onError={() => setImageError(true)}
-                />
-              ) : (
-                  <View style={[styles.profilePicturePlaceholder, {
-                    backgroundColor: Colors[colorScheme].cardBackground,
-                  }]}>
-                    <ThemedText style={styles.initialsText}>
-                      {getInitials()}
-                    </ThemedText>
-                  </View>
-                )}
-              </View>
+        {/* header */}
+        <View style={styles.headerRow}>
+          <TouchableOpacity
+            style={styles.backBtn}
+            onPress={() => (router.canGoBack() ? router.back() : router.replace('/(tabs)/app'))}
+            activeOpacity={0.7}
+          >
+            <ChevronLeft size={18} color={Brand.ink} strokeWidth={2.4} />
+          </TouchableOpacity>
+          <Text style={styles.title}>Settings</Text>
+        </View>
 
-              {/* pencil badge to edit your profile */}
-              <TouchableOpacity 
-                style={[styles.editBadge, {
-                  backgroundColor: Colors[colorScheme ?? 'light'].tint,
-                }]}
-                onPress={handleEditProfile}
-                activeOpacity={0.7}
+        {/* profile card — tap to edit name / photo */}
+        <TouchableOpacity
+          style={styles.profileCard}
+          onPress={() => setShowEditModal(true)}
+          activeOpacity={0.8}
+        >
+          <View style={styles.profileAvatar}>
+            <Text style={styles.profileAvatarText}>{getInitials()}</Text>
+          </View>
+          <View style={styles.profileInfo}>
+            <Text style={styles.profileName}>{profile?.name || 'Coach'}</Text>
+            <Text style={styles.profileEmail}>{user?.email}</Text>
+          </View>
+        </TouchableOpacity>
+
+        {/* my teams */}
+        <Text style={styles.eyebrow}>MY TEAMS</Text>
+        <View style={styles.card}>
+          {teams.map((t) => {
+            const sel = t.id === activeTeam?.id;
+            return (
+              <TouchableOpacity
+                key={t.id}
+                style={[styles.teamRow, styles.rowBorder]}
+                onPress={() => pickTeam(t)}
+                activeOpacity={0.75}
               >
-                <ThemedText style={styles.editIcon}>✏️</ThemedText>
+                <View style={[styles.teamBadge, sel && styles.teamBadgeActive]}>
+                  <Text style={[styles.teamBadgeText, sel && styles.teamBadgeTextActive]}>
+                    {initialsFor(t.name)}
+                  </Text>
+                </View>
+                <View style={styles.teamInfo}>
+                  <Text style={styles.teamName} numberOfLines={1}>{t.name}</Text>
+                  <Text style={styles.teamMeta}>{teamSeason(t)}</Text>
+                </View>
+                <TouchableOpacity
+                  style={styles.teamEditBtn}
+                  onPress={() => openEditTeam(t)}
+                  activeOpacity={0.7}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                >
+                  <Pencil size={15} color={Brand.muted} strokeWidth={2} />
+                </TouchableOpacity>
+                {sel ? (
+                  <View style={styles.teamCheck}>
+                    <Check size={12} color="#fff" strokeWidth={3} />
+                  </View>
+                ) : (
+                  <View style={styles.teamRing} />
+                )}
+              </TouchableOpacity>
+            );
+          })}
+          <TouchableOpacity
+            style={styles.teamRow}
+            onPress={() => setAddTeamOpen(true)}
+            activeOpacity={0.75}
+          >
+            <View style={styles.addTeamBadge}>
+              <Plus size={18} color={Brand.green} strokeWidth={2.4} />
+            </View>
+            <Text style={styles.addTeamText}>Add a team</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* active team */}
+        {activeTeam && (
+          <>
+            <Text style={styles.eyebrow}>{activeTeam.name.toUpperCase()}</Text>
+            <View style={styles.card}>
+              <View style={[styles.settingRow, styles.rowBorder]}>
+                <Text style={styles.settingLabel}>Sport</Text>
+                <Text style={styles.settingValue}>
+                  {activeTeam.sport
+                    ? activeTeam.sport.charAt(0).toUpperCase() + activeTeam.sport.slice(1)
+                    : 'Volleyball'}
+                </Text>
+              </View>
+              <TouchableOpacity
+                style={styles.settingRow}
+                onPress={() => router.push('/(tabs)/roster')}
+                activeOpacity={0.75}
+              >
+                <Text style={styles.settingLabel}>Roster</Text>
+                <Text style={styles.settingValue}>
+                  {rosterCount == null ? '—' : `${rosterCount} player${rosterCount === 1 ? '' : 's'}`}
+                </Text>
+                <ChevronRight size={14} color={Brand.chevron} strokeWidth={2.4} />
               </TouchableOpacity>
             </View>
+          </>
+        )}
 
-            <View style={styles.profileInfo}>
-              <ThemedText style={styles.profileName}>
-                {profile?.name || 'User'}
-              </ThemedText>
-              <ThemedText style={styles.profileEmail}>
-                {user?.email}
-              </ThemedText>
-            </View>
-          </View>
-        </View>
-
-        {/* email & password settings */}
-        <View style={styles.section}>
-          <ThemedText style={styles.sectionTitle}>Privacy</ThemedText>
-          
-          <TouchableOpacity 
-            style={[styles.settingItem, {
-              backgroundColor: Colors[colorScheme].cardBackground,
-              borderWidth: 4,
-              borderColor: Colors[colorScheme].border,
-            }]}
+        {/* account */}
+        <Text style={styles.eyebrow}>ACCOUNT</Text>
+        <View style={styles.card}>
+          <TouchableOpacity
+            style={[styles.settingRow, styles.rowBorder]}
             onPress={() => setShowChangeEmailModal(true)}
-            activeOpacity={0.7}
+            activeOpacity={0.75}
           >
-            <View style={styles.settingLeft}>
-              <IconSymbol
-                name="envelope"
-                size={24}
-                color={Colors[colorScheme ?? 'light'].text}
-              />
-              <View style={styles.settingTextContainer}>
-                <ThemedText style={styles.settingTitle}>Email</ThemedText>
-                <ThemedText style={styles.settingSubtitle}>
-                  {user?.email}
-                </ThemedText>
-              </View>
-            </View>
-            <IconSymbol
-              name="chevron.right"
-              size={20}
-              color={Colors[colorScheme].icon}
-            />
+            <Text style={styles.settingLabel}>Change email</Text>
+            <Text style={styles.settingValue} numberOfLines={1}>
+              {user?.email}
+            </Text>
+            <ChevronRight size={14} color={Brand.chevron} strokeWidth={2.4} />
           </TouchableOpacity>
-
-          <TouchableOpacity 
-            style={[styles.settingItem, {
-              backgroundColor: Colors[colorScheme].cardBackground,
-              borderWidth: 4,
-              borderColor: Colors[colorScheme].border,
-            }]}
+          <TouchableOpacity
+            style={styles.settingRow}
             onPress={() => setShowChangePasswordModal(true)}
-            activeOpacity={0.7}
+            activeOpacity={0.75}
           >
-            <View style={styles.settingLeft}>
-              <IconSymbol
-                name="lock"
-                size={24}
-                color={Colors[colorScheme ?? 'light'].text}
-              />
-              <View style={styles.settingTextContainer}>
-                <ThemedText style={styles.settingTitle}>Password</ThemedText>
-                <ThemedText style={styles.settingSubtitle}>
-                  Change your password
-                </ThemedText>
-              </View>
-            </View>
-            <IconSymbol
-              name="chevron.right"
-              size={20}
-              color={Colors[colorScheme].icon}
-            />
+            <Text style={styles.settingLabel}>Change password</Text>
+            <ChevronRight size={14} color={Brand.chevron} strokeWidth={2.4} />
           </TouchableOpacity>
         </View>
 
-        {/* pick your sport */}
-        <View style={styles.section}>
-          <ThemedText style={styles.sectionTitle}>Sport</ThemedText>
-          
-          <TouchableOpacity 
-            style={[styles.settingItem, {
-              backgroundColor: Colors[colorScheme].cardBackground,
-              borderWidth: 4,
-              borderColor: Colors[colorScheme].border,
-            }]}
-            onPress={() => setShowSportModal(true)}
-            activeOpacity={0.7}
-          >
-            <View style={styles.settingLeft}>
-              <View style={styles.volleyballIconWrapper}>
-                <VolleyballIcon size={40} />
-              </View>
-              <View style={styles.settingTextContainer}>
-                <ThemedText style={styles.settingTitle}>Current Sport</ThemedText>
-                <ThemedText style={styles.settingSubtitle}>
-                  {profile?.sport || 'Not set'}
-                </ThemedText>
-              </View>
-            </View>
-            <IconSymbol
-              name="chevron.right"
-              size={20}
-              color={Colors[colorScheme].icon}
-            />
-          </TouchableOpacity>
-        </View>
-
-        {/* sign out zone */}
-        <View style={styles.section}>
-          <ThemedText style={styles.sectionTitle}>Account</ThemedText>
-          
-          <TouchableOpacity 
-            style={[styles.settingItem, styles.signOutButton]}
-            onPress={handleSignOut}
-            activeOpacity={0.7}
-          >
-            <View style={styles.settingLeft}>
-              <IconSymbol
-                name="rectangle.portrait.and.arrow.right"
-                size={24}
-                color="#FF3B30"
-              />
-              <ThemedText style={[styles.settingTitle, styles.signOutText]}>
-                Sign Out
-              </ThemedText>
-            </View>
-          </TouchableOpacity>
-        </View>
-
-        {/* version number footer */}
-        <View style={styles.versionContainer}>
-          <ThemedText style={styles.versionText}>
-            Sideline v1.0.0
-          </ThemedText>
-        </View>
+        {/* sign out */}
+        <TouchableOpacity style={styles.signOutBtn} onPress={handleSignOut} activeOpacity={0.8}>
+          <Text style={styles.signOutText}>Sign out</Text>
+        </TouchableOpacity>
       </ScrollView>
 
-      {/* legacy profile edit modal — component was removed */}
+      {/* add team sheet */}
+      <BottomSheet visible={addTeamOpen} onClose={() => setAddTeamOpen(false)} maxHeightPct={0.5}>
+        <View style={styles.sheetHeader}>
+          <Text style={styles.sheetTitle}>Add a team</Text>
+          <TouchableOpacity
+            style={styles.sheetClose}
+            onPress={() => setAddTeamOpen(false)}
+            activeOpacity={0.7}
+          >
+            <X size={13} color={Brand.chip} strokeWidth={2.6} />
+          </TouchableOpacity>
+        </View>
+        <Text style={styles.fieldLabel}>TEAM NAME</Text>
+        <TextInput
+          value={newTeamName}
+          onChangeText={setNewTeamName}
+          placeholder="e.g. Jersey Elite 17U Club"
+          placeholderTextColor={Brand.faint}
+          style={styles.input}
+        />
+        <TouchableOpacity
+          style={[styles.saveBtn, (!newTeamName.trim() || savingTeam) && styles.saveBtnDisabled]}
+          onPress={addTeam}
+          disabled={!newTeamName.trim() || savingTeam}
+          activeOpacity={0.85}
+        >
+          {savingTeam ? (
+            <ActivityIndicator color="#fff" />
+          ) : (
+            <Text style={styles.saveBtnText}>
+              {newTeamName.trim() ? `Add ${newTeamName.trim()}` : 'Add team'}
+            </Text>
+          )}
+        </TouchableOpacity>
+      </BottomSheet>
 
-      {/* change email modal */}
+      {/* edit team sheet */}
+      <BottomSheet visible={!!editTeam} onClose={() => setEditTeam(null)} maxHeightPct={0.6}>
+        <View style={styles.sheetHeader}>
+          <Text style={styles.sheetTitle}>Edit team</Text>
+          <TouchableOpacity
+            style={styles.sheetClose}
+            onPress={() => setEditTeam(null)}
+            activeOpacity={0.7}
+          >
+            <X size={13} color={Brand.chip} strokeWidth={2.6} />
+          </TouchableOpacity>
+        </View>
+        <Text style={styles.fieldLabel}>TEAM NAME</Text>
+        <TextInput
+          value={editName}
+          onChangeText={setEditName}
+          placeholder="e.g. Varsity Volleyball 2025"
+          placeholderTextColor={Brand.faint}
+          style={styles.input}
+        />
+        <Text style={styles.fieldLabel}>SPORT</Text>
+        <View style={styles.sportRow}>
+          {SPORTS.map((s) => {
+            const sel = editSport === s;
+            return (
+              <TouchableOpacity
+                key={s}
+                style={[styles.sportChip, sel && styles.sportChipActive]}
+                onPress={() => setEditSport(s)}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.sportEmoji}>🏐</Text>
+                <Text style={[styles.sportChipText, sel && styles.sportChipTextActive]}>{s}</Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+        <TouchableOpacity
+          style={[styles.saveBtn, (!editName.trim() || savingEdit) && styles.saveBtnDisabled]}
+          onPress={saveEditTeam}
+          disabled={!editName.trim() || savingEdit}
+          activeOpacity={0.85}
+        >
+          {savingEdit ? (
+            <ActivityIndicator color="#fff" />
+          ) : (
+            <Text style={styles.saveBtnText}>Save changes</Text>
+          )}
+        </TouchableOpacity>
+      </BottomSheet>
+
+      {/* existing account modals */}
       {user && (
         <ChangeEmailModal
           visible={showChangeEmailModal}
@@ -363,8 +393,6 @@ export default function SettingsScreen() {
           currentEmail={user.email || ''}
         />
       )}
-
-      {/* change password modal */}
       {user && (
         <ChangePasswordModal
           visible={showChangePasswordModal}
@@ -372,212 +400,309 @@ export default function SettingsScreen() {
           userEmail={user.email || ''}
         />
       )}
-
-      {/* profile edit modal — name + pic */}
       {user && (
         <ProfileEditModal
           visible={showEditModal}
           onClose={() => setShowEditModal(false)}
           userId={user.id}
           currentName={profile?.name || ''}
-          currentProfilePicture={profileImageUri}
-          onSave={handleModalSave}
-          onImageUploaded={(imageUrl) => {
-            cacheBusterRef.current = Date.now();
-            prevPictureUrl.current = imageUrl;
-            const separator = imageUrl.includes('?') ? '&' : '?';
-            setProfileImageUri(imageUrl + `${separator}t=${cacheBusterRef.current}`);
-            setImageError(false);
+          currentProfilePicture={profile?.profile_picture_url || null}
+          onSave={async () => {
+            await refreshProfile();
           }}
+          onImageUploaded={() => {}}
         />
       )}
-
-      {/* sport picker modal */}
-      <SportSelectionModal
-        visible={showSportModal}
-        onClose={() => setShowSportModal(false)}
-        onSelect={handleSportSelect}
-        initialSport={profile?.sport || 'Volleyball'}
-      />
-    </ThemedView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: Brand.bg,
   },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingBottom: 16,
-  },
-  backButton: {
-    padding: 4,
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-  },
-  headerSpacer: {
-    width: 36,
-  },
-  scrollView: {
+  scroll: {
     flex: 1,
   },
   scrollContent: {
     paddingHorizontal: 20,
+    paddingTop: 66,
     paddingBottom: 40,
-    paddingLeft: 20,
   },
-  section: {
-    marginBottom: 32,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    marginBottom: 16,
-    opacity: 0.9,
-  },
-  profileContainer: {
+  headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 16,
-    paddingTop: 8,
-    paddingLeft: 0,
-    paddingRight: 0,
-    minHeight: 100,
-    width: '100%',
+    gap: 12,
   },
-  profilePictureContainer: {
-    position: 'relative',
-    marginRight: 16,
-    marginLeft: 0,
-    flexShrink: 0,
-    width: 80,
-    height: 80,
-    overflow: 'visible',
-  },
-  profilePictureWrapper: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    overflow: 'visible',
-    justifyContent: 'center',
+  backBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: Brand.card,
     alignItems: 'center',
-  },
-  profilePicture: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-  },
-  profilePicturePlaceholder: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
     justifyContent: 'center',
-    alignItems: 'center',
-    padding: 0,
-  },
-  editBadge: {
-    position: 'absolute',
-    bottom: -4,
-    right: -4,
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 3,
-    borderColor: '#FFFFFF',
     shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
-    zIndex: 10,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.07,
+    shadowRadius: 3,
+    elevation: 2,
   },
-  editIcon: {
+  title: {
+    fontSize: 22,
+    fontWeight: '800',
+    letterSpacing: -0.4,
+    color: Brand.ink,
+  },
+  profileCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    backgroundColor: Brand.card,
+    borderRadius: Shape.cardRadius,
+    padding: 16,
+    marginTop: 18,
+    ...Shape.cardShadow,
+  },
+  profileAvatar: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: Brand.ink,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  profileAvatarText: {
+    color: '#fff',
     fontSize: 18,
-  },
-  initialsText: {
-    fontSize: 32,
-    fontWeight: '700',
-    opacity: 0.7,
-    textAlign: 'center',
-    lineHeight: 40,
-    ...(Platform.OS === 'android' && { includeFontPadding: false }),
+    fontWeight: '800',
   },
   profileInfo: {
     flex: 1,
+    minWidth: 0,
   },
   profileName: {
-    fontSize: 20,
-    fontWeight: '700',
-    marginBottom: 4,
+    fontSize: 16,
+    fontWeight: '800',
+    color: Brand.ink,
   },
   profileEmail: {
-    fontSize: 14,
-    opacity: 0.6,
-  },
-  settingItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 20,
-    paddingHorizontal: 20,
-    paddingLeft: 22,
-    borderRadius: 12,
-    marginBottom: 12,
-    minHeight: 64,
-    overflow: 'visible',
-  },
-  settingLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-    overflow: 'visible',
-  },
-  settingTextContainer: {
-    marginLeft: 12,
-    flex: 1,
-  },
-  volleyballIconWrapper: {
-    width: 64,
-    height: 64,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-    marginLeft: 0,
-    overflow: 'visible',
-  },
-  settingTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 2,
-  },
-  settingSubtitle: {
     fontSize: 13,
-    opacity: 0.6,
+    color: Brand.muted,
   },
-  signOutButton: {
-    backgroundColor: 'rgba(255, 59, 48, 0.1)',
+  eyebrow: {
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 1.4,
+    color: Brand.muted,
+    marginTop: 22,
+    marginBottom: 8,
+  },
+  card: {
+    backgroundColor: Brand.card,
+    borderRadius: Shape.cardRadius,
+    overflow: 'hidden',
+    ...Shape.cardShadow,
+  },
+  rowBorder: {
+    borderBottomWidth: 1,
+    borderBottomColor: Brand.hairline,
+  },
+  teamRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 13,
+    paddingVertical: 15,
+    paddingHorizontal: 16,
+  },
+  teamBadge: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: Brand.greenTint,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  teamBadgeActive: {
+    backgroundColor: Brand.green,
+  },
+  teamBadgeText: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: Brand.green,
+  },
+  teamBadgeTextActive: {
+    color: '#fff',
+  },
+  teamInfo: {
+    flex: 1,
+    minWidth: 0,
+  },
+  teamName: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: Brand.ink,
+  },
+  teamMeta: {
+    fontSize: 12.5,
+    color: Brand.muted,
+  },
+  teamEditBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: Brand.hairline,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 4,
+  },
+  teamCheck: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: Brand.green,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  teamRing: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    borderWidth: 1.8,
+    borderColor: Brand.borderBtn,
+  },
+  addTeamBadge: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: Brand.greenTint,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  addTeamText: {
+    flex: 1,
+    fontSize: 15,
+    fontWeight: '700',
+    color: Brand.green,
+  },
+  settingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingVertical: 15,
+    paddingHorizontal: 16,
+  },
+  settingLabel: {
+    flex: 1,
+    fontSize: 15,
+    fontWeight: '600',
+    color: Brand.ink,
+  },
+  settingValue: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: Brand.muted,
+    maxWidth: 190,
+  },
+  signOutBtn: {
+    marginTop: 16,
+    width: '100%',
+    height: 52,
+    borderRadius: 16,
+    backgroundColor: Brand.card,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...Shape.cardShadow,
   },
   signOutText: {
-    color: '#FF3B30',
+    color: Brand.danger,
+    fontSize: 15,
+    fontWeight: '700',
   },
-  versionContainer: {
+  sheetHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    marginTop: 20,
-    marginBottom: 20,
   },
-  versionText: {
+  sheetTitle: {
+    fontSize: 20,
+    fontWeight: '800',
+    letterSpacing: -0.3,
+    color: Brand.ink,
+  },
+  sheetClose: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: Brand.hairline,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  fieldLabel: {
     fontSize: 12,
-    opacity: 0.4,
+    fontWeight: '700',
+    letterSpacing: 1.4,
+    color: Brand.muted,
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  input: {
+    width: '100%',
+    height: 50,
+    borderWidth: 1,
+    borderColor: Brand.border2,
+    borderRadius: 14,
+    paddingHorizontal: 15,
+    fontSize: 16,
+    color: Brand.ink,
+    backgroundColor: Brand.card,
+  },
+  sportRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  sportChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    height: 46,
+    paddingHorizontal: 16,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: Brand.border2,
+    backgroundColor: Brand.card,
+  },
+  sportChipActive: {
+    backgroundColor: Brand.green,
+    borderColor: Brand.green,
+  },
+  sportEmoji: {
+    fontSize: 16,
+  },
+  sportChipText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: Brand.ink,
+  },
+  sportChipTextActive: {
+    color: '#fff',
+  },
+  saveBtn: {
+    marginTop: 22,
+    width: '100%',
+    height: 54,
+    borderRadius: 18,
+    backgroundColor: Brand.green,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  saveBtnDisabled: {
+    backgroundColor: Brand.chevron,
+  },
+  saveBtnText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '700',
   },
 });

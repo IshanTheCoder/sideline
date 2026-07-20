@@ -1,25 +1,28 @@
+/**
+ * ProfileEditModal — redesign: brand-styled bottom sheet (was an old-theme
+ * full-width modal). Tap the avatar to pick + upload a profile picture,
+ * edit the display name, save. Upload/save logic unchanged; only the shell
+ * and styles moved to the shared BottomSheet + Brand tokens.
+ */
+import * as ImagePicker from 'expo-image-picker';
+import { Camera, X } from 'lucide-react-native';
 import React, { useState } from 'react';
 import {
+  ActivityIndicator,
+  Image,
+  Linking,
+  Platform,
   StyleSheet,
-  View,
-  Modal,
+  Text,
   TextInput,
   TouchableOpacity,
-  Image,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-  ActivityIndicator,
-  Linking,
+  View,
 } from 'react-native';
-import * as ImagePicker from 'expo-image-picker';
-import { ThemedText } from './themed-text';
-import { IconSymbol } from './ui/icon-symbol';
-import { Colors } from '@/constants/theme';
-import { useColorScheme } from '@/hooks/use-color-scheme';
+import BottomSheet from '@/components/BottomSheet';
+import { Brand } from '@/constants/brand';
+import { showAlert } from '@/lib/alert';
 import { uploadProfilePicture } from '@/lib/profilePicture';
 import { supabase } from '@/lib/supabase';
-import { showAlert } from '@/lib/alert';
 
 export default function ProfileEditModal({
   visible,
@@ -30,11 +33,8 @@ export default function ProfileEditModal({
   onSave,
   onImageUploaded,
 }) {
-  const colorScheme = useColorScheme();
   const [name, setName] = useState(currentName);
-  const [profileImageUri, setProfileImageUri] = useState(
-    currentProfilePicture || null
-  );
+  const [profileImageUri, setProfileImageUri] = useState(currentProfilePicture || null);
   const [saving, setSaving] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [imageError, setImageError] = useState(false);
@@ -42,7 +42,6 @@ export default function ProfileEditModal({
   // Sync with parent's currentProfilePicture when it changes or modal opens
   React.useEffect(() => {
     if (visible) {
-      console.log('Modal opened, syncing profile picture:', currentProfilePicture);
       setName(currentName);
       setProfileImageUri(currentProfilePicture || null);
       setImageError(false);
@@ -62,24 +61,15 @@ export default function ProfileEditModal({
 
   const pickImage = async () => {
     try {
-      console.log('📸 Starting image picker...');
-      
-      // Check current permission status first
       const { status: currentStatus } = await ImagePicker.getMediaLibraryPermissionsAsync();
-      console.log('📸 Current permission status:', currentStatus);
-      
       let finalStatus = currentStatus;
-      
-      // Request permissions if not already granted
+
       if (currentStatus !== 'granted') {
-        console.log('📸 Requesting permissions...');
         const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
         finalStatus = status;
-        console.log('📸 Permission request result:', status);
       }
-      
+
       if (finalStatus !== 'granted') {
-        console.log('❌ Permission denied, showing alert');
         showAlert(
           'Photo Access Needed',
           'Sideline needs access to your camera roll to set your profile picture.',
@@ -106,9 +96,6 @@ export default function ProfileEditModal({
         return;
       }
 
-      console.log('✅ Permissions granted, launching image picker...');
-      
-      // Launch image picker
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: true,
@@ -118,30 +105,20 @@ export default function ProfileEditModal({
           allowsMultipleSelection: false,
         }),
       });
-      
-      console.log('📸 Image picker result:', result.canceled ? 'Canceled' : 'Image selected');
 
       if (!result.canceled && result.assets[0]) {
         const asset = result.assets[0];
         setUploadingImage(true);
         setImageError(false);
 
-        // Get file extension
         const uriParts = asset.uri.split('.');
         let fileExtension = uriParts[uriParts.length - 1].toLowerCase();
-        
-        // Normalize file extension (some devices use .jpeg)
         if (fileExtension === 'jpeg') {
           fileExtension = 'jpg';
         }
-        
-        console.log('📝 File extension detected:', fileExtension);
-        console.log('📝 Original URI:', asset.uri);
 
-        const mimeType =
-          fileExtension === 'jpg' ? 'image/jpeg' : `image/${fileExtension}`;
+        const mimeType = fileExtension === 'jpg' ? 'image/jpeg' : `image/${fileExtension}`;
 
-        // Upload to Supabase
         const { url, error } = await uploadProfilePicture(
           userId,
           {
@@ -157,39 +134,21 @@ export default function ProfileEditModal({
           console.log('❌ Upload error:', error);
           setUploadingImage(false);
         } else if (url) {
-          console.log('✅ Upload successful!');
-          console.log('📍 URL returned from Supabase:', url);
-          
           // Update local state immediately for preview
           const separator = url.includes('?') ? '&' : '?';
-          const cacheBuster = `${separator}t=${Date.now()}`;
-          const newUri = url + cacheBuster;
-          console.log('🖼️  Setting profile image URI with cache buster:', newUri);
-          setProfileImageUri(newUri);
+          setProfileImageUri(`${url}${separator}t=${Date.now()}`);
           setImageError(false);
           setUploadingImage(false);
-          
+
           // Immediately notify parent component of the new image URL
           if (onImageUploaded) {
-            console.log('📤 Notifying parent component of new image URL:', url);
             onImageUploaded(url);
           }
-          
+
           // Wait a moment for database to commit, then refresh profile
-          console.log('🔄 Waiting for database commit, then refreshing profile...');
-          await new Promise(resolve => setTimeout(resolve, 500));
-          
-          // Refresh profile so parent component gets the new URL from database
+          await new Promise((resolve) => setTimeout(resolve, 500));
           await onSave();
-          console.log('✅ Profile refreshed');
-          
-          // Show success message
-          showAlert(
-            'Success', 
-            'Profile picture uploaded successfully!\n\nThe image should now be visible.'
-          );
         } else {
-          console.log('❌ No URL returned from upload');
           showAlert('Error', 'Upload succeeded but no URL was returned. Please try again.');
           setUploadingImage(false);
         }
@@ -206,22 +165,16 @@ export default function ProfileEditModal({
       showAlert('Error', 'Please enter your name');
       return;
     }
-
-    // Wait for any ongoing image upload to complete
     if (uploadingImage) {
       showAlert('Please wait', 'Image is still uploading...');
       return;
     }
 
     setSaving(true);
-
     try {
-      // Update profile in Supabase
       const { error } = await supabase
         .from('profiles')
-        .update({
-          name: name.trim(),
-        })
+        .update({ name: name.trim() })
         .eq('id', userId);
 
       if (error) {
@@ -233,14 +186,7 @@ export default function ProfileEditModal({
 
       setSaving(false);
       await onSave();
-      
-      if (Platform.OS === 'web') {
-        onClose();
-      } else {
-        showAlert('Success', 'Profile updated successfully!', [
-          { text: 'OK', onPress: () => onClose() },
-        ]);
-      }
+      onClose();
     } catch (error) {
       console.log('Unexpected error updating profile:', error);
       showAlert('Error', 'An unexpected error occurred. Please try again.');
@@ -253,270 +199,191 @@ export default function ProfileEditModal({
     setName(currentName);
     setProfileImageUri(currentProfilePicture || null);
     setImageError(false);
-    // Refresh profile one more time before closing to ensure parent has latest data
+    // Refresh profile one more time before closing so parent has latest data
     onSave().then(() => {
       onClose();
     });
   };
 
+  const canSave = name?.trim()?.length > 0 && !saving && !uploadingImage;
+
   return (
-    <Modal
-      visible={visible}
-      animationType="slide"
-      transparent={true}
-      onRequestClose={handleClose}
-      statusBarTranslucent={true}
-    >
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={styles.container}
-      >
+    <BottomSheet visible={visible} onClose={handleClose} maxHeightPct={0.86}>
+      <View style={styles.headerRow}>
+        <Text style={styles.title}>Edit profile</Text>
+        <TouchableOpacity style={styles.closeBtn} onPress={handleClose} activeOpacity={0.7}>
+          <X size={13} color={Brand.chip} strokeWidth={2.6} />
+        </TouchableOpacity>
+      </View>
+
+      {/* avatar */}
+      <View style={styles.avatarSection}>
         <TouchableOpacity
-          style={styles.backdrop}
-          activeOpacity={1}
-          onPress={handleClose}
-        />
-
-        <View
-          style={[
-            styles.modalContent,
-            {
-              backgroundColor: Colors[colorScheme].background,
-            },
-          ]}
-          onStartShouldSetResponder={() => true}
+          style={styles.avatarWrap}
+          onPress={pickImage}
+          disabled={uploadingImage || saving}
+          activeOpacity={0.8}
         >
-          {/* Header */}
-          <View style={styles.header}>
-            <TouchableOpacity onPress={handleClose} disabled={saving}>
-              <ThemedText style={styles.cancelButton}>Cancel</ThemedText>
-            </TouchableOpacity>
-            <ThemedText style={styles.title}>Edit Profile</ThemedText>
-            <TouchableOpacity onPress={handleSave} disabled={saving || uploadingImage}>
-              {saving ? (
-                <ActivityIndicator size="small" color={Colors[colorScheme ?? 'light'].tint} />
-              ) : (
-                <ThemedText
-                  style={[
-                    styles.saveButton,
-                    { color: Colors[colorScheme ?? 'light'].tint },
-                  ]}
-                >
-                  Save
-                </ThemedText>
-              )}
-            </TouchableOpacity>
-          </View>
-
-          <ScrollView
-            style={styles.scrollView}
-            contentContainerStyle={styles.scrollContent}
-            showsVerticalScrollIndicator={false}
-          >
-            {/* Profile Picture */}
-            <View style={styles.profilePictureSection}>
-              <TouchableOpacity
-                style={styles.profilePictureWrapper}
-                onPress={pickImage}
-                disabled={uploadingImage || saving}
-                activeOpacity={0.8}
-              >
-                {profileImageUri && !imageError ? (
-                  <Image
-                    key={profileImageUri}
-                    source={{ uri: profileImageUri }}
-                    style={styles.profilePicture}
-                    onLoad={() => {
-                      console.log('✅ Profile picture loaded in modal');
-                    }}
-                    onError={(event) => {
-                      console.log('❌ Failed to load profile picture in modal');
-                      console.log('URI:', profileImageUri);
-                      console.log('Error:', event.nativeEvent.error);
-                      setImageError(true);
-                    }}
-                  />
-                ) : (
-                  <View
-                    style={[
-                      styles.profilePicturePlaceholder,
-                      {
-                        backgroundColor: Colors[colorScheme].cardBackground,
-                      },
-                    ]}
-                  >
-                    <ThemedText style={styles.initialsText}>{getInitials()}</ThemedText>
-                  </View>
-                )}
-                {uploadingImage && (
-                  <View style={styles.uploadingOverlay}>
-                    <ActivityIndicator size="large" color="#FFFFFF" />
-                  </View>
-                )}
-              </TouchableOpacity>
-
-              {/* Hint text */}
-              <View style={styles.profilePictureTapArea}>
-                <ThemedText style={styles.profilePictureHint}>
-                  Tap picture to change profile picture
-                </ThemedText>
-              </View>
+          {profileImageUri && !imageError ? (
+            <Image
+              key={profileImageUri}
+              source={{ uri: profileImageUri }}
+              style={styles.avatarImage}
+              onError={() => setImageError(true)}
+            />
+          ) : (
+            <View style={styles.avatarPlaceholder}>
+              <Text style={styles.avatarInitials}>{getInitials()}</Text>
             </View>
-
-            {/* Name Input */}
-            <View style={styles.inputSection}>
-              <ThemedText style={styles.label}>Name</ThemedText>
-              <TextInput
-                style={[
-                  styles.input,
-                  {
-                    backgroundColor: Colors[colorScheme].inputBackground,
-                    color: Colors[colorScheme].text,
-                  },
-                ]}
-                value={name}
-                onChangeText={setName}
-                placeholder="Enter your name"
-                placeholderTextColor={Colors[colorScheme].placeholder}
-                editable={!saving}
-                autoCapitalize="words"
-                maxLength={50}
-              />
+          )}
+          {uploadingImage ? (
+            <View style={styles.avatarOverlay}>
+              <ActivityIndicator size="large" color="#FFFFFF" />
             </View>
-          </ScrollView>
-        </View>
-      </KeyboardAvoidingView>
-    </Modal>
+          ) : (
+            <View style={styles.cameraBadge}>
+              <Camera size={14} color="#fff" strokeWidth={2.2} />
+            </View>
+          )}
+        </TouchableOpacity>
+        <Text style={styles.avatarHint}>Tap to change your photo</Text>
+      </View>
+
+      <Text style={styles.fieldLabel}>NAME</Text>
+      <TextInput
+        value={name}
+        onChangeText={setName}
+        placeholder="Your name"
+        placeholderTextColor={Brand.faint}
+        style={styles.input}
+        editable={!saving}
+        autoCapitalize="words"
+        maxLength={50}
+      />
+
+      <TouchableOpacity
+        style={[styles.saveBtn, !canSave && styles.saveBtnDisabled]}
+        onPress={handleSave}
+        disabled={!canSave}
+        activeOpacity={0.85}
+      >
+        {saving ? (
+          <ActivityIndicator color="#fff" />
+        ) : (
+          <Text style={styles.saveBtnText}>Save profile</Text>
+        )}
+      </TouchableOpacity>
+    </BottomSheet>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    justifyContent: 'flex-end',
-  },
-  backdrop: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-  },
-  modalContent: {
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    paddingTop: 20,
-    paddingBottom: Platform.OS === 'ios' ? 40 : 20,
-    maxHeight: '90%',
-    minHeight: '50%',
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: -2,
-    },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
-  },
-  header: {
+  headerRow: {
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingBottom: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(128, 128, 128, 0.2)',
+    alignItems: 'center',
   },
   title: {
-    fontSize: 18,
-    fontWeight: '700',
+    fontSize: 20,
+    fontWeight: '800',
+    letterSpacing: -0.3,
+    color: Brand.ink,
   },
-  cancelButton: {
-    fontSize: 16,
-    opacity: 0.6,
-  },
-  saveButton: {
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  scrollView: {
-    flex: 1,
-  },
-  scrollContent: {
-    paddingHorizontal: 20,
-    paddingTop: 30,
-  },
-  profilePictureSection: {
+  closeBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: Brand.hairline,
     alignItems: 'center',
-    marginBottom: 40,
-  },
-  profilePictureWrapper: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    position: 'relative',
-    marginBottom: 12,
-    overflow: 'hidden',
-  },
-  profilePicture: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-  },
-  profilePicturePlaceholder: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
     justifyContent: 'center',
-    alignItems: 'center',
   },
-  initialsText: {
-    fontSize: 48,
-    fontWeight: '700',
-    opacity: 0.7,
-    textAlign: 'center',
-    lineHeight: 56,
+  avatarSection: {
+    alignItems: 'center',
+    marginTop: 20,
+  },
+  avatarWrap: {
+    width: 108,
+    height: 108,
+    borderRadius: 54,
+  },
+  avatarImage: {
+    width: 108,
+    height: 108,
+    borderRadius: 54,
+  },
+  avatarPlaceholder: {
+    width: 108,
+    height: 108,
+    borderRadius: 54,
+    backgroundColor: Brand.ink,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarInitials: {
+    color: '#fff',
+    fontSize: 38,
+    fontWeight: '800',
     ...(Platform.OS === 'android' && { includeFontPadding: false }),
   },
-  uploadingOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    borderRadius: 60,
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
-    justifyContent: 'center',
+  avatarOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: 54,
+    backgroundColor: 'rgba(0,0,0,0.55)',
     alignItems: 'center',
+    justifyContent: 'center',
   },
-  profilePictureTapArea: {
-    marginTop: 8,
-    paddingVertical: 8,
-    paddingHorizontal: 16,
+  cameraBadge: {
+    position: 'absolute',
+    right: 0,
+    bottom: 2,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: Brand.green,
+    borderWidth: 2.5,
+    borderColor: Brand.card,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  profilePictureHint: {
-    fontSize: 14,
-    opacity: 0.7,
-    textAlign: 'center',
-    fontWeight: '500',
+  avatarHint: {
+    fontSize: 13,
+    color: Brand.muted,
+    marginTop: 10,
   },
-  inputSection: {
-    marginBottom: 24,
-  },
-  label: {
-    fontSize: 16,
-    fontWeight: '600',
+  fieldLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 1.4,
+    color: Brand.muted,
+    marginTop: 20,
     marginBottom: 8,
   },
   input: {
-    borderRadius: 12,
-    padding: 16,
+    width: '100%',
+    height: 50,
+    borderWidth: 1,
+    borderColor: Brand.border2,
+    borderRadius: 14,
+    paddingHorizontal: 15,
     fontSize: 16,
+    color: Brand.ink,
+    backgroundColor: Brand.card,
   },
-  hint: {
-    fontSize: 12,
-    opacity: 0.6,
-    marginTop: 6,
+  saveBtn: {
+    marginTop: 22,
+    width: '100%',
+    height: 54,
+    borderRadius: 18,
+    backgroundColor: Brand.green,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  saveBtnDisabled: {
+    backgroundColor: Brand.chevron,
+  },
+  saveBtnText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '700',
   },
 });
