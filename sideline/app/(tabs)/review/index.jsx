@@ -5,7 +5,7 @@
  */
 import { useFocusEffect } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
-import { ChevronLeft, ChevronRight } from 'lucide-react-native';
+import { ChevronLeft, ChevronRight, Trash2 } from 'lucide-react-native';
 import { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
@@ -136,25 +136,34 @@ export default function GamesListScreen() {
         ) : (
           <View style={styles.list}>
             {games.map((g) => (
-              <TouchableOpacity
-                key={g.id}
-                style={styles.gameRow}
-                onPress={() => router.push(`/(tabs)/review/game/${g.id}`)}
-                onLongPress={() => removeGame(g)}
-                activeOpacity={0.75}
-              >
-                <View style={styles.initialsTile}>
-                  <Text style={styles.initialsText}>{initialsFor(g.opponent)}</Text>
-                </View>
-                <View style={styles.rowInfo}>
-                  <Text style={styles.rowTitle}>vs. {g.opponent}</Text>
-                  <Text style={styles.rowSub}>
-                    {gameDateParts(g.date).label} · {g.noteCount} note
-                    {g.noteCount === 1 ? '' : 's'}
-                  </Text>
-                </View>
-                <ChevronRight size={14} color={Brand.chevron} strokeWidth={2.4} />
-              </TouchableOpacity>
+              <View key={g.id} style={styles.gameRow}>
+                <TouchableOpacity
+                  style={styles.gameRowMain}
+                  onPress={() => router.push(`/(tabs)/review/game/${g.id}`)}
+                  onLongPress={() => removeGame(g)}
+                  activeOpacity={0.75}
+                >
+                  <View style={styles.initialsTile}>
+                    <Text style={styles.initialsText}>{initialsFor(g.opponent)}</Text>
+                  </View>
+                  <View style={styles.rowInfo}>
+                    <Text style={styles.rowTitle}>vs. {g.opponent}</Text>
+                    <Text style={styles.rowSub}>
+                      {gameDateParts(g.date).label} · {g.noteCount} note
+                      {g.noteCount === 1 ? '' : 's'}
+                    </Text>
+                  </View>
+                  <ChevronRight size={14} color={Brand.chevron} strokeWidth={2.4} />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.deleteBtn}
+                  onPress={() => removeGame(g)}
+                  activeOpacity={0.7}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                >
+                  <Trash2 size={17} color={Brand.muted} strokeWidth={2} />
+                </TouchableOpacity>
+              </View>
             ))}
           </View>
         )}
@@ -227,11 +236,25 @@ const styles = StyleSheet.create({
   gameRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 14,
     backgroundColor: Brand.card,
     borderRadius: Shape.cardRadius,
-    padding: 16,
+    paddingVertical: 16,
+    paddingLeft: 16,
+    paddingRight: 8,
     ...Shape.cardShadow,
+  },
+  gameRowMain: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+  },
+  deleteBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   initialsTile: {
     width: 46,
