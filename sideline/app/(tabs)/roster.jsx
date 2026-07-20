@@ -384,28 +384,19 @@ export default function RosterScreen() {
               <View style={styles.dropIconCircle}>
                 <Camera size={24} color={Brand.green} strokeWidth={1.8} />
               </View>
-              <Text style={styles.dropTitle}>Photo or screenshot of your roster</Text>
+              <Text style={styles.dropTitle}>Screenshot of your roster</Text>
               <Text style={styles.dropSub}>
-                Snap a printed team sheet or upload a screenshot, Sideline reads names, numbers
-                and positions so transcription attributes notes correctly.
+                Upload a screenshot of the team sheet, Sideline reads names, numbers and positions
+                so transcription attributes notes correctly.
               </Text>
             </View>
-            <View style={styles.scanBtnRow}>
-              <TouchableOpacity
-                style={styles.scanPrimary}
-                onPress={() => scan.pickImage(true)}
-                activeOpacity={0.85}
-              >
-                <Text style={styles.scanPrimaryText}>Take photo</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.scanOutline}
-                onPress={() => scan.pickImage(false)}
-                activeOpacity={0.85}
-              >
-                <Text style={styles.scanOutlineText}>Upload screenshot</Text>
-              </TouchableOpacity>
-            </View>
+            <TouchableOpacity
+              style={styles.scanPrimary}
+              onPress={() => scan.pickImage()}
+              activeOpacity={0.85}
+            >
+              <Text style={styles.scanPrimaryText}>Upload screenshot</Text>
+            </TouchableOpacity>
           </View>
         )}
 
@@ -724,36 +715,17 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 19.5,
   },
-  scanBtnRow: {
-    flexDirection: 'row',
-    gap: 10,
-    marginTop: 16,
-  },
   scanPrimary: {
-    flex: 1,
+    width: '100%',
     height: 54,
     borderRadius: 18,
     backgroundColor: Brand.green,
     alignItems: 'center',
     justifyContent: 'center',
+    marginTop: 16,
   },
   scanPrimaryText: {
     color: '#fff',
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  scanOutline: {
-    flex: 1,
-    height: 54,
-    borderRadius: 18,
-    borderWidth: 1.5,
-    borderColor: Brand.borderBtn,
-    backgroundColor: Brand.card,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  scanOutlineText: {
-    color: Brand.ink,
     fontSize: 16,
     fontWeight: '700',
   },

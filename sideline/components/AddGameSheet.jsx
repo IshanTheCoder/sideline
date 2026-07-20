@@ -238,19 +238,14 @@ export default function AddGameSheet({ visible, onClose, teamId, onAdded }) {
             <View style={styles.dropIconCircle}>
               <Camera size={24} color={Brand.green} strokeWidth={1.8} />
             </View>
-            <Text style={styles.dropTitle}>Photo or screenshot of your schedule</Text>
+            <Text style={styles.dropTitle}>Screenshot of your schedule</Text>
             <Text style={styles.dropSub}>
-              Snap the printed schedule or upload a screenshot, Sideline reads every game at once.
+              Upload a screenshot of the schedule, Sideline reads every game at once.
             </Text>
           </View>
-          <View style={styles.scanBtnRow}>
-            <TouchableOpacity style={styles.scanBtnPrimary} onPress={() => scan.pickImage(true)} activeOpacity={0.85}>
-              <Text style={styles.scanBtnPrimaryText}>Take photo</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.scanBtnOutline} onPress={() => scan.pickImage(false)} activeOpacity={0.85}>
-              <Text style={styles.scanBtnOutlineText}>Upload screenshot</Text>
-            </TouchableOpacity>
-          </View>
+          <TouchableOpacity style={styles.scanBtnPrimary} onPress={() => scan.pickImage()} activeOpacity={0.85}>
+            <Text style={styles.scanBtnPrimaryText}>Upload screenshot</Text>
+          </TouchableOpacity>
         </View>
       )}
 
@@ -466,36 +461,17 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 19.5,
   },
-  scanBtnRow: {
-    flexDirection: 'row',
-    gap: 10,
-    marginTop: 16,
-  },
   scanBtnPrimary: {
-    flex: 1,
+    width: '100%',
     height: 54,
     borderRadius: 18,
     backgroundColor: Brand.green,
     alignItems: 'center',
     justifyContent: 'center',
+    marginTop: 16,
   },
   scanBtnPrimaryText: {
     color: '#fff',
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  scanBtnOutline: {
-    flex: 1,
-    height: 54,
-    borderRadius: 18,
-    borderWidth: 1.5,
-    borderColor: Brand.borderBtn,
-    backgroundColor: Brand.card,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  scanBtnOutlineText: {
-    color: Brand.ink,
     fontSize: 16,
     fontWeight: '700',
   },

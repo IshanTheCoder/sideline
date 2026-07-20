@@ -22,24 +22,14 @@ export function useScreenshotScan(parseImage, noun) {
     setExcluded([]);
   };
 
-  const pickImage = async (useCamera) => {
+  const pickImage = async () => {
     try {
-      let result;
-      if (useCamera) {
-        const perm = await ImagePicker.requestCameraPermissionsAsync();
-        if (!perm.granted) {
-          showAlert('Camera access needed', `Allow camera access to snap your ${noun}.`);
-          return;
-        }
-        result = await ImagePicker.launchCameraAsync({ quality: 0.8 });
-      } else {
-        const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-        if (!perm.granted) {
-          showAlert('Photos access needed', 'Allow photo access to upload a screenshot.');
-          return;
-        }
-        result = await ImagePicker.launchImageLibraryAsync({ quality: 0.8 });
+      const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!perm.granted) {
+        showAlert('Photos access needed', 'Allow photo access to upload a screenshot.');
+        return;
       }
+      const result = await ImagePicker.launchImageLibraryAsync({ quality: 0.8 });
       const asset = result?.assets?.[0];
       if (!asset?.uri) return;
 
