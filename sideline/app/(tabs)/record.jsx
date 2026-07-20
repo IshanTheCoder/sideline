@@ -1,27 +1,39 @@
-import { useState, useEffect, useRef } from 'react';
-import { Animated, ScrollView, StyleSheet, View, TouchableOpacity, ActivityIndicator, Platform } from 'react-native';
-import { showAlert } from '@/lib/alert';
+/**
+ * Live Capture — redesign: the whole screen is the tap target (tap to start,
+ * tap again to stop; holding works walkie-talkie style), with a set switcher,
+ * a big purely-visual record circle, a live clock, and a confirmation toast
+ * showing the transcribed note's AI label once processing lands. All real:
+ * expo-av recording → Supabase upload → background transcription + labeling.
+ */
 import { Audio } from 'expo-av';
+import * as Crypto from 'expo-crypto';
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
-import * as Crypto from 'expo-crypto';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { IconSymbol } from '@/components/ui/icon-symbol';
-import { RecordButton } from '@/components/RecordButton';
-import { ActiveSessionIndicator } from '@/components/ActiveSessionIndicator';
-import { useAudioPermissions } from '@/hooks/use-audio-permissions';
-import { useThemeColor } from '@/hooks/use-theme-color';
-import { useAuth } from '@/contexts/AuthContext';
-import { useActiveSession } from '@/contexts/ActiveSessionContext';
+import { Check, Mic, Square } from 'lucide-react-native';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  uploadRecording,
+  ActivityIndicator,
+  Animated,
+  Easing,
+  Pressable,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
+import { Brand } from '@/constants/brand';
+import { useActiveSession } from '@/contexts/ActiveSessionContext';
+import { useAuth } from '@/contexts/AuthContext';
+import { useAudioPermissions } from '@/hooks/use-audio-permissions';
+import { showAlert } from '@/lib/alert';
+import {
   createRecordingRecord,
-  deleteGameForUser,
+  formatDuration,
   serializeRecordingNotes,
+  uploadRecording,
 } from '@/lib/recording';
 import { processRecording } from '@/lib/recordingProcessing';
-import { parseAiLabels } from '@/lib/volleyballVocabulary';
+import { SKILL_CATEGORY_LABELS, parseAiLabels } from '@/lib/volleyballVocabulary';
 
 // Speech-tuned recording profile: mono + 128kbps AAC. Whisper downmixes to mono
 // anyway, so stereo just doubles the upload on gym wifi for zero accuracy gain.
@@ -54,141 +66,135 @@ const SPEECH_RECORDING_OPTIONS = {
 };
 
 // vibration cues so the coach knows recording started/stopped without looking
-// at the screen mid-rally — no-ops safely on web
 const hapticStart = () => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
 const hapticStop = () => Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
 
-// rotating one-liners that surface features coaches don't discover on their own
-const COACH_TIPS = [
-  'Say a jersey number — "number 4, great dig" tags the player automatically',
-  'Mention players by name and the summary groups notes per player',
-  'Tap a set button before recording — charts break down feedback by set',
-  'Speak within arm\'s reach of the phone — crowd noise is filtered out',
-  'After the game, check Review → Summary for AI coaching takeaways',
-];
+const WAVE_BARS = [0, 1, 2, 3, 4, 5, 6, 7, 8];
+
+function WaveBar({ index }) {
+  const scale = useRef(new Animated.Value(0.25)).current;
+  useEffect(() => {
+    const dur = 500 + ((index * 37) % 40) * 10;
+    const delay = ((index * 83) % 40) * 10;
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(scale, { toValue: 1, duration: dur, delay, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+        Animated.timing(scale, { toValue: 0.25, duration: dur, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+      ])
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [index, scale]);
+  return <Animated.View style={[styles.waveBar, { transform: [{ scaleY: scale }] }]} />;
+}
+
+function PulseRing({ active }) {
+  const anim = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    if (!active) return;
+    anim.setValue(0);
+    const loop = Animated.loop(
+      Animated.timing(anim, { toValue: 1, duration: 1400, easing: Easing.out(Easing.ease), useNativeDriver: true })
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [active, anim]);
+  if (!active) return null;
+  return (
+    <Animated.View
+      pointerEvents="none"
+      style={[
+        styles.pulseRing,
+        {
+          opacity: anim.interpolate({ inputRange: [0, 1], outputRange: [0.45, 0] }),
+          transform: [{ scale: anim.interpolate({ inputRange: [0, 1], outputRange: [1, 1.2] }) }],
+        },
+      ]}
+    />
+  );
+}
 
 export default function RecordScreen() {
   const router = useRouter();
   const { user } = useAuth();
   const { activeSession, clearActiveSession } = useActiveSession();
-  const { status, requestPermission, isLoading: isPermissionLoading } = useAudioPermissions();
-  const iconColor = useThemeColor({}, 'icon');
+  const { status, requestPermission } = useAudioPermissions();
 
-  // all the state we need to track while recording
   const [isRecording, setIsRecording] = useState(false);
+  const [isBusy, setIsBusy] = useState(false); // start/stop in flight
   const [recordingDuration, setRecordingDuration] = useState(0);
-  const [currentRecording, setCurrentRecording] = useState(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState(null);
-  const [selectedSet, setSelectedSet] = useState('Set 1');
-  const [selectedSetOffsetSeconds, setSelectedSetOffsetSeconds] = useState(null);
+  const [liveSec, setLiveSec] = useState(0);
+  const [selectedSet, setSelectedSet] = useState(1);
+  const [setOffsetSeconds, setSetOffsetSeconds] = useState(null);
   const [processingCount, setProcessingCount] = useState(0);
-  const [lastNote, setLastNote] = useState(null); // { label, transcription } — most recent processed note, shown inline
-  const [tipIndex, setTipIndex] = useState(0);
-  const [toast, setToast] = useState(null); // { type: 'success'|'error', message: string } — the little popup banner
-  const toastOpacity = useRef(new Animated.Value(0)).current;
+  const [toast, setToast] = useState(null); // { num, title, meta } | { error: string }
+  const [noteCount, setNoteCount] = useState(0);
+
+  const recordingRef = useRef(null);
+  const pressAtRef = useRef(0);
+  const armedRef = useRef(false);
+  const pendingReleaseRef = useRef(false);
+  const decideStopRef = useRef(() => {});
   const toastTimer = useRef(null);
+  const noteCountRef = useRef(0);
   const isProcessing = processingCount > 0;
 
-  // ref to the actual audio recorder object — survives re-renders
-  const recordingRef = useRef(null);
-
-  // configure the mic settings as soon as this screen loads
+  // live clock — seconds since the game session started
   useEffect(() => {
-    const setupAudioMode = async () => {
-      try {
-        await Audio.setAudioModeAsync({
-          allowsRecordingIOS: true,
-          playsInSilentModeIOS: true,
-          staysActiveInBackground: true,
-        });
-      } catch (error) {
-        console.error('Failed to set up audio mode:', error);
-      }
-    };
+    const startedAt = activeSession?.startedAt?.getTime?.() ?? Date.now();
+    const tick = () => setLiveSec(Math.max(0, Math.floor((Date.now() - startedAt) / 1000)));
+    tick();
+    const interval = setInterval(tick, 1000);
+    return () => clearInterval(interval);
+  }, [activeSession?.startedAt]);
 
-    setupAudioMode();
+  // recording duration stopwatch
+  useEffect(() => {
+    if (!isRecording) {
+      setRecordingDuration(0);
+      return;
+    }
+    const interval = setInterval(() => setRecordingDuration((p) => p + 1), 1000);
+    return () => clearInterval(interval);
+  }, [isRecording]);
 
-    // when we leave this screen, kill any recording still running
+  // configure the mic as soon as this screen loads; kill any live recording on leave
+  useEffect(() => {
+    Audio.setAudioModeAsync({
+      allowsRecordingIOS: true,
+      playsInSilentModeIOS: true,
+      staysActiveInBackground: true,
+    }).catch((e) => console.error('Failed to set up audio mode:', e));
     return () => {
       if (recordingRef.current) {
         recordingRef.current.stopAndUnloadAsync().catch(console.error);
       }
+      if (toastTimer.current) clearTimeout(toastTimer.current);
     };
   }, []);
 
-  // rotate the coaching tip every 10s while idle — keeps discovery passive, not naggy
-  useEffect(() => {
-    if (isRecording) return;
-    const interval = setInterval(() => {
-      setTipIndex((i) => (i + 1) % COACH_TIPS.length);
-    }, 10000);
-    return () => clearInterval(interval);
-  }, [isRecording]);
+  const showToast = useCallback((payload, durationMs = 3200) => {
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    setToast(payload);
+    toastTimer.current = setTimeout(() => setToast(null), durationMs);
+  }, []);
 
-  // ticks up every second while recording — like a stopwatch
-  useEffect(() => {
-    let interval = null;
-    
-    if (isRecording) {
-      interval = setInterval(() => {
-        setRecordingDuration((prev) => prev + 1);
-      }, 1000);
-    } else {
-      // reset the clock when we stop
-      setRecordingDuration(0);
-    }
-    
-    return () => {
-      if (interval) {
-        clearInterval(interval);
-      }
-    };
-  }, [isRecording]);
-
-  const startRecording = async () => {
+  const startRecording = useCallback(async () => {
+    if (recordingRef.current || isBusy) return;
+    setIsBusy(true);
     try {
-      setIsLoading(true);
-      clearError(); // wipe old errors before starting fresh
-      setSelectedSetOffsetSeconds(null);
-      
-      // ask for mic access if we don't have it yet
       if (status !== 'granted') {
         const granted = await requestPermission();
         if (!granted) {
-          setIsLoading(false);
-          const errorMsg = 'Microphone permission is required to record. Please enable it in Settings.';
-          setError(errorMsg);
-          showAlert(
-            'Permission Required',
-            errorMsg,
-            [{ text: 'OK' }]
-          );
+          showToast({ error: 'Microphone access is required — enable it in Settings.' }, 5000);
           return;
         }
       }
-
-      // tell the OS we want to use the mic
-      try {
-        await Audio.setAudioModeAsync({
-          allowsRecordingIOS: true,
-          playsInSilentModeIOS: true,
-          staysActiveInBackground: true,
-        });
-      } catch (audioModeError) {
-        console.error('Failed to set audio mode:', audioModeError);
-        const errorMsg = 'Failed to configure audio settings. Please try again.';
-        setError(errorMsg);
-        setIsLoading(false);
-        showAlert(
-          'Audio Configuration Error',
-          errorMsg,
-          [{ text: 'OK' }]
-        );
-        return;
-      }
-
-      // spin up a new recording — speech-tuned profile first, stock preset as safety net
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: true,
+        playsInSilentModeIOS: true,
+        staysActiveInBackground: true,
+      });
       let recording;
       try {
         ({ recording } = await Audio.Recording.createAsync(SPEECH_RECORDING_OPTIONS));
@@ -196,71 +202,53 @@ export default function RecordScreen() {
         console.warn('Speech recording profile failed, falling back to HIGH_QUALITY:', presetError);
         ({ recording } = await Audio.Recording.createAsync(Audio.RecordingOptionsPresets.HIGH_QUALITY));
       }
-
       hapticStart();
-
       if (activeSession?.startedAt) {
-        const offsetSeconds = Math.max(
-          0,
-          Math.floor((Date.now() - activeSession.startedAt.getTime()) / 1000)
+        setSetOffsetSeconds(
+          Math.max(0, Math.floor((Date.now() - activeSession.startedAt.getTime()) / 1000))
         );
-        setSelectedSetOffsetSeconds(offsetSeconds);
       }
-
       recordingRef.current = recording;
+      setToast(null);
       setIsRecording(true);
-      setCurrentRecording(null);
-      setIsLoading(false);
-      clearError(); // all good, clear any old error messages
+      // the coach may have already released (fast tap, or a hold shorter than
+      // mic init time) before createAsync resolved — apply that release now
+      if (pendingReleaseRef.current) {
+        pendingReleaseRef.current = false;
+        decideStopRef.current();
+      }
     } catch (error) {
       console.error('Failed to start recording:', error);
-      setIsLoading(false);
-      const errorMsg = getErrorMessage(error, 'Failed to start recording. Please try again.');
-      setError(errorMsg);
-      showAlert(
-        'Recording Error',
-        errorMsg,
-        [{ text: 'OK', onPress: clearError }]
-      );
+      showToast({ error: 'Could not start recording — try again.' }, 5000);
+    } finally {
+      setIsBusy(false);
     }
-  };
+  }, [activeSession?.startedAt, isBusy, requestPermission, showToast, status]);
 
-  const stopRecording = async () => {
+  const stopRecording = useCallback(async () => {
+    const recording = recordingRef.current;
+    if (!recording) return;
+    recordingRef.current = null;
+    setIsRecording(false);
+    setIsBusy(true);
+
     try {
-      setIsLoading(true);
-      clearError();
-
-      if (!recordingRef.current) {
-        setIsLoading(false);
-        setError('No active recording found.');
-        return;
-      }
-
       if (!user?.id) {
-        setIsLoading(false);
-        setError('You must be logged in to save recordings.');
+        showToast({ error: 'You must be logged in to save recordings.' }, 5000);
         return;
       }
-
       let uri = null;
       try {
-        await recordingRef.current.stopAndUnloadAsync();
-        uri = recordingRef.current.getURI();
+        await recording.stopAndUnloadAsync();
+        uri = recording.getURI();
         hapticStop();
       } catch (stopError) {
         console.error('Failed to stop recording:', stopError);
-        showToast('error', 'Could not read recording file. Please try again.');
-        recordingRef.current = null;
-        setIsRecording(false);
-        setIsLoading(false);
+        showToast({ error: 'Could not read the recording — try again.' }, 5000);
         return;
       }
-
       if (!uri) {
-        showToast('error', 'Recording file not found. Please try again.');
-        recordingRef.current = null;
-        setIsRecording(false);
-        setIsLoading(false);
+        showToast({ error: 'Recording file not found — try again.' }, 5000);
         return;
       }
 
@@ -272,677 +260,449 @@ export default function RecordScreen() {
       }
 
       const capturedDuration = recordingDuration;
-      const capturedSetMarkers = getSelectedSetMarker();
+      const capturedSet = selectedSet;
+      const capturedOffset = setOffsetSeconds ?? 0;
       const capturedSessionId = activeSession?.id ?? null;
-      const capturedSession = activeSession
-        ? { opponent_name: activeSession.opponentName, date: activeSession.date.toISOString() }
-        : { opponent_name: 'Current Game', date: new Date().toISOString() };
       const timestamp = new Date().toISOString();
+      setSetOffsetSeconds(null);
 
-      recordingRef.current = null;
-      setIsRecording(false);
-      setSelectedSetOffsetSeconds(null);
-      setIsLoading(false);
-      clearError();
+      noteCountRef.current += 1;
+      const noteNum = noteCountRef.current;
+      setNoteCount(noteNum);
+      setProcessingCount((c) => c + 1);
 
-      showToast('success', 'Recording saved — uploading…');
-
+      // upload + transcribe in the background so the coach can keep watching the court
       (async () => {
         try {
-          const { url: audioUrl, error: uploadError } = await uploadRecording(
-            user.id,
-            recordingId,
-            uri
-          );
-
+          const { url: audioUrl, error: uploadError } = await uploadRecording(user.id, recordingId, uri);
           if (uploadError || !audioUrl) {
             console.error('Upload error:', uploadError);
-            showToast('error', 'Upload failed — recording was not saved. Check your connection and try again.', 7000);
+            showToast({ error: 'Upload failed — check your connection and try again.' }, 6000);
             return;
           }
-
-          const { data: recordingRecord, error: dbError } = await createRecordingRecord({
+          const { data: record, error: dbError } = await createRecordingRecord({
             id: recordingId,
             user_id: user.id,
             game_session_id: capturedSessionId,
             audio_url: audioUrl,
             duration: capturedDuration,
             timestamp,
-            manual_notes: capturedSetMarkers.length > 0
-              ? serializeRecordingNotes('', capturedSetMarkers)
-              : undefined,
+            manual_notes: serializeRecordingNotes('', [
+              { label: `Set ${capturedSet}`, offsetSeconds: capturedOffset, createdAt: timestamp },
+            ]),
           });
-
-          if (dbError || !recordingRecord) {
+          if (dbError || !record) {
             console.error('Database error:', dbError);
-            showToast('error', 'Upload succeeded but database save failed. Recording is safe.', 6000);
+            showToast({ error: 'Saved audio but the database save failed.' }, 6000);
             return;
           }
-
-          showToast('success', 'Recording uploaded');
-
-          setProcessingCount((count) => count + 1);
-          processRecording(recordingId, user.id)
-            .then((result) => {
-              if (result.success) {
-                showToast('success', 'Transcription complete');
-                // surface the finished note inline so the coach can glance-confirm
-                // it heard them right without leaving the record screen mid-game
-                const { displayLabel } = parseAiLabels(result.label ?? null);
-                setLastNote({
-                  label: displayLabel || null,
-                  transcription: result.transcription || null,
-                });
-              } else {
-                console.error('Transcription failed:', result.error?.message);
-              }
-            })
-            .catch((err) => {
-              console.error('Transcription error:', err?.message);
-            })
-            .finally(() => {
-              setProcessingCount((count) => Math.max(0, count - 1));
+          const result = await processRecording(recordingId, user.id);
+          if (result.success) {
+            const parsed = parseAiLabels(result.label ?? null);
+            const player = parsed.taggedPlayers?.[0];
+            const tag = parsed.skillCategory ? SKILL_CATEGORY_LABELS[parsed.skillCategory] : null;
+            showToast({
+              num: noteNum,
+              title: parsed.displayLabel || 'Note captured',
+              meta: [player, tag, `Set ${capturedSet}`].filter(Boolean).join(' · '),
             });
+          } else {
+            showToast({
+              num: noteNum,
+              title: 'Note saved',
+              meta: `Set ${capturedSet} · transcription failed — audio is safe`,
+            });
+          }
         } catch (err) {
-          console.error('Background upload error:', err);
-          showToast('error', 'Upload failed — recording will sync when connection returns.', 6000);
+          console.error('Background processing error:', err);
+          showToast({ error: 'Upload failed — the note will sync when connection returns.' }, 6000);
+        } finally {
+          setProcessingCount((c) => Math.max(0, c - 1));
         }
       })();
-    } catch (error) {
-      console.error('Failed to stop recording:', error);
-      showToast('error', 'Failed to save recording. Please try again.', 8000);
-      recordingRef.current = null;
-      setIsRecording(false);
-      setSelectedSetOffsetSeconds(null);
-      setIsLoading(false);
-    }
-  };
-
-  const handleRecordPress = async () => {
-    if (isRecording) {
-      await stopRecording();
-    } else {
-      if (!activeSession) {
-        showAlert(
-          'Add game details',
-          'Please add opponent, date, and match type before recording.',
-          [
-            { text: 'Cancel', style: 'cancel' },
-            {
-              text: 'Set Details',
-              onPress: () => router.push('/(tabs)/record-details'),
-            },
-          ]
-        );
-        return;
-      }
-      await startRecording();
-    }
-  };
-
-  const endGameAndNavigate = async () => {
-    if (isRecording) {
-      await stopRecording();
-    }
-
-    showToast('success', 'Processing recordings in background...');
-    resetSessionDetails();
-    router.push('/(tabs)/review');
-  };
-
-  const discardCurrentGameAndGoToDetails = async () => {
-    try {
-      setIsLoading(true);
-      clearError();
-
-      if (recordingRef.current) {
-        await recordingRef.current.stopAndUnloadAsync().catch(() => undefined);
-        recordingRef.current = null;
-      }
-
-      setIsRecording(false);
-      setSelectedSet(null);
-      setSelectedSetOffsetSeconds(null);
-      setCurrentRecording(null);
-
-      if (activeSession?.id && user?.id) {
-        const { error: deleteError } = await deleteGameForUser(user.id, activeSession.id);
-        if (deleteError) {
-          console.error('Failed to delete discarded game session:', deleteError);
-          showToast('error', 'Could not fully delete game session. It may still appear in Games.', 7000);
-        }
-      }
-
-      clearActiveSession();
-      router.replace('/(tabs)/record-details');
-    } catch (error) {
-      console.error('Failed to discard current game:', error);
-      clearActiveSession();
-      router.replace('/(tabs)/record-details');
     } finally {
-      setIsLoading(false);
+      setIsBusy(false);
     }
-  };
+  }, [activeSession?.id, recordingDuration, selectedSet, setOffsetSeconds, showToast, user?.id]);
 
-  const handleBackPress = () => {
-    if (isLoading) return;
-
-    if (isRecording || activeSession?.id) {
-      showAlert(
-        'Discard this game?',
-        'This will stop recording and delete this game session and any recordings from it.',
-        [
-          { text: 'Keep Game', style: 'cancel' },
-          {
-            text: 'Discard Game',
-            style: 'destructive',
-            onPress: discardCurrentGameAndGoToDetails,
-          },
-        ]
-      );
+  // whole-screen tap target: tap starts, tap again stops; a genuine hold
+  // records walkie-talkie style and stops on release. Only blocks on an
+  // in-flight start/stop or an already-running recording — a prior note
+  // still uploading/transcribing in the background must never block the
+  // next capture, or back-to-back plays get silently dropped.
+  const onSurfaceDown = () => {
+    if (isBusy || recordingRef.current) {
+      pressAtRef.current = 0;
       return;
     }
-
-    router.replace('/(tabs)/record-details');
+    pressAtRef.current = Date.now();
+    armedRef.current = false;
+    pendingReleaseRef.current = false;
+    startRecording();
   };
-
-  const handleDonePress = () => {
-    if (isLoading) return;
-    showAlert(
-      'End game recordings?',
-      'You will not be able to record anymore for this game.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'End Game',
-          style: 'destructive',
-          onPress: endGameAndNavigate,
-        },
-      ]
-    );
-  };
-
-  // translates raw errors into human-friendly messages
-  const getErrorMessage = (error, defaultMessage) => {
-    if (error instanceof Error) {
-      const message = error.message.toLowerCase();
-      
-      // mic permission issues
-      if (message.includes('permission') || message.includes('denied')) {
-        return 'Microphone permission is required. Please enable it in Settings.';
-      }
-      
-      // wifi went on vacation
-      if (message.includes('network') || message.includes('fetch') || message.includes('upload')) {
-        return 'Network error. Please check your connection and try again.';
-      }
-      
-      // cloud storage hiccup
-      if (message.includes('storage') || message.includes('bucket')) {
-        return 'Storage error. Please try again or contact support.';
-      }
-      
-      // database said no
-      if (message.includes('database') || message.includes('insert') || message.includes('constraint')) {
-        return 'Database error. Your recording may have been saved but not registered.';
-      }
-      
-      // who are you again?
-      if (message.includes('auth') || message.includes('login') || message.includes('session')) {
-        return 'Authentication error. Please log in again.';
-      }
-      
-      // can't read the recording file
-      if (message.includes('read') || message.includes('file') || message.includes('empty')) {
-        return 'Could not read recording file. Please try recording again.';
-      }
-      
-      return error.message || defaultMessage;
+  const decideStop = () => {
+    if (pressAtRef.current && Date.now() - pressAtRef.current < 350 && !armedRef.current) {
+      armedRef.current = true; // it was a tap — keep recording until the next tap
+      return;
     }
-    
-    return defaultMessage;
+    armedRef.current = false;
+    stopRecording();
   };
-
-  // reset errors so the user gets a clean slate
-  const clearError = () => {
-    setError(null);
-  };
-
-  const showToast = (type, message, durationMs = 5000) => {
-    if (toastTimer.current) clearTimeout(toastTimer.current);
-    setToast({ type, message });
-    Animated.timing(toastOpacity, { toValue: 1, duration: 250, useNativeDriver: true }).start();
-    toastTimer.current = setTimeout(() => {
-      Animated.timing(toastOpacity, { toValue: 0, duration: 300, useNativeDriver: true }).start(() => setToast(null));
-    }, durationMs);
-  };
-
-  const getStatusText = () => {
-    switch (status) {
-      case 'granted':
-        return null; // no need to show anything if we have permission
-      case 'denied':
-        return '❌ Microphone permission denied';
-      case 'undetermined':
-        return '⏳ Microphone permission not requested';
-      default:
-        return null;
+  decideStopRef.current = decideStop;
+  const onSurfaceUp = () => {
+    if (!recordingRef.current) {
+      // mic is still initializing (Audio.Recording.createAsync hasn't
+      // resolved yet) — apply this release once it has, so a fast
+      // press-and-release before the mic is ready still stops correctly
+      pendingReleaseRef.current = true;
+      return;
     }
+    decideStop();
   };
 
-  const resetSessionDetails = () => {
-    clearActiveSession();
-    setLastNote(null);
-  };
-
-  const getSelectedSetMarker = () => {
-    if (!selectedSet) return [];
-    const offsetSeconds = selectedSetOffsetSeconds ?? 0;
-    return [
+  const endGame = () => {
+    showAlert('End game?', 'Capture stops and you can review the notes.', [
+      { text: 'Keep going', style: 'cancel' },
       {
-        label: selectedSet,
-        offsetSeconds: offsetSeconds,
-        createdAt: new Date().toISOString(),
+        text: 'End game',
+        style: 'destructive',
+        onPress: async () => {
+          if (recordingRef.current) await stopRecording();
+          const sessionId = activeSession?.id;
+          clearActiveSession();
+          if (sessionId) {
+            router.replace(`/(tabs)/review/game/${sessionId}`);
+          } else {
+            router.replace('/(tabs)/review');
+          }
+        },
       },
-    ];
+    ]);
   };
+
+  // On react-native-web, a Pressable's onPressIn can still fire on a tap
+  // that lands on a nested TouchableOpacity (End game, set chips) since the
+  // two components use different responder implementations — stop it there
+  // so tapping a control doesn't also start a stray recording.
+  const swallow = (e) => e?.stopPropagation?.();
+
+  const idleHint =
+    status !== 'granted'
+      ? 'Tap anywhere to allow the microphone'
+      : noteCount === 0
+        ? 'Eyes on the court. Say what you saw.'
+        : 'Ready for the next one.';
 
   return (
-    <ThemedView style={styles.container}>
-      {/* top nav bar */}
-      <View style={styles.header}>
+    <Pressable style={styles.container} onPressIn={onSurfaceDown} onPressOut={onSurfaceUp}>
+      {/* top row */}
+      <View style={styles.topRow}>
         <TouchableOpacity
-          style={styles.navButton}
-          onPress={handleBackPress}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          style={styles.endBtn}
+          onPress={endGame}
+          onPressIn={swallow}
+          onPressOut={swallow}
+          activeOpacity={0.7}
         >
-          <IconSymbol name="chevron.left" size={32} color={iconColor} />
+          <Text style={styles.endBtnText}>End game</Text>
         </TouchableOpacity>
-        
-        <TouchableOpacity
-          style={styles.doneButton}
-          onPress={handleDonePress}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-        >
-          <ThemedText style={styles.doneButtonText}>Done</ThemedText>
-        </TouchableOpacity>
+        <View style={styles.liveRow}>
+          <View style={styles.liveDot} />
+          <Text style={styles.liveText}>LIVE · {formatDuration(liveSec)}</Text>
+        </View>
       </View>
 
-      {/* little toast popup for background task updates */}
-      {toast && (
-        <Animated.View
-          style={[
-            styles.toast,
-            toast.type === 'success' ? styles.toastSuccess : styles.toastError,
-            { opacity: toastOpacity },
-          ]}
-        >
-          <ThemedText style={styles.toastText}>
-            {toast.type === 'success' ? '✅ ' : '⚠️ '}{toast.message}
-          </ThemedText>
-        </Animated.View>
-      )}
+      <Text style={styles.opponent}>vs. {activeSession?.opponentName ?? 'Current Game'}</Text>
 
-      <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
-      >
-        {/* transcription-in-progress banner */}
-        {isProcessing && (
-          <View style={styles.processingBanner}>
-            <ActivityIndicator size="small" color="#5BA3F5" />
-            <ThemedText style={styles.processingText}>Transcribing recording...</ThemedText>
-          </View>
-        )}
+      {/* set switcher */}
+      <View style={styles.setRow}>
+        {[1, 2, 3, 4, 5].map((n) => (
+          <TouchableOpacity
+            key={n}
+            style={[styles.setChip, selectedSet === n && styles.setChipActive]}
+            onPress={() => setSelectedSet(n)}
+            onPressIn={swallow}
+            onPressOut={swallow}
+            activeOpacity={0.8}
+          >
+            <Text style={[styles.setChipText, selectedSet === n && styles.setChipTextActive]}>
+              {n}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
 
-        {/* active game session info */}
-        <View style={styles.gameSessionSection}>
-          <ThemedText style={styles.sectionLabel}>Current Game Session</ThemedText>
-          <ActiveSessionIndicator session={activeSession} />
-        </View>
-
-        <View style={styles.markerSection}>
-          <ThemedText style={styles.markerLabel}>Select set</ThemedText>
-          <View style={styles.markerButtons}>
-            {['Set 1', 'Set 2', 'Set 3', 'Set 4', 'Set 5'].map((label) => (
-              <TouchableOpacity
-                key={label}
-                style={[
-                  styles.markerButton,
-                  selectedSet === label && styles.markerButtonActive,
-                ]}
-                onPress={() => setSelectedSet(label)}
-              >
-                <ThemedText
-                  style={[
-                    styles.markerButtonText,
-                    selectedSet === label && styles.markerButtonTextActive,
-                  ]}
-                >
-                  {label}
-                </ThemedText>
-              </TouchableOpacity>
+      {/* record zone */}
+      <View style={styles.recordZone}>
+        {isRecording ? (
+          <View style={styles.waveRow}>
+            {WAVE_BARS.map((i) => (
+              <WaveBar key={i} index={i} />
             ))}
           </View>
-          <ThemedText style={styles.markerHint}>
-            Recording in: {selectedSet}
-          </ThemedText>
-        </View>
-
-        {/* the big record button — front and center */}
-        <View style={styles.recordSection}>
-          {status !== 'granted' && (
-            <View style={styles.permissionSection}>
-              <ThemedText style={styles.permissionStatus}>
-                {getStatusText()}
-              </ThemedText>
-              
-              <TouchableOpacity
-                style={styles.permissionButton}
-                onPress={() => {
-                  clearError();
-                  requestPermission();
-                }}
-                disabled={isPermissionLoading}
-              >
-                {isPermissionLoading ? (
-                  <ActivityIndicator color="#fff" />
-                ) : (
-                  <ThemedText style={styles.permissionButtonText}>
-                    Request Microphone Permission
-                  </ThemedText>
-                )}
-              </TouchableOpacity>
-            </View>
-          )}
-          
-          {/* error banner with dismiss button */}
-          {error && (
-            <View style={styles.errorContainer}>
-              <ThemedText style={styles.errorText}>
-                {error}
-              </ThemedText>
-              <TouchableOpacity
-                onPress={clearError}
-                style={styles.errorDismissButton}
-              >
-                <IconSymbol name="xmark" size={20} color={iconColor} />
-              </TouchableOpacity>
-            </View>
-          )}
-
-          <View collapsable={false}>
-            <RecordButton
-              isRecording={isRecording}
-              recordingDuration={recordingDuration}
-              onPress={handleRecordPress}
-              disabled={status !== 'granted' || isLoading}
-            />
-          </View>
-          
-          {isLoading && (
-            <ActivityIndicator
-              size="small"
-              style={styles.loadingIndicator}
-            />
-          )}
-          
-          {isRecording && (
-            <ThemedText style={styles.recordingHint}>
-              Tap to stop recording
-            </ThemedText>
-          )}
-          {!isRecording && status === 'granted' && !error && (
-            <ThemedText style={styles.recordingHint}>
-              Tap to start recording
-            </ThemedText>
-          )}
-        </View>
-
-        {/* most recent processed note — glance-confirm without leaving the screen */}
-        {lastNote && !isRecording && (
-          <View style={styles.lastNoteCard}>
-            <ThemedText style={styles.lastNoteHeading}>LAST NOTE</ThemedText>
-            {lastNote.label ? (
-              <ThemedText style={styles.lastNoteLabel}>{lastNote.label}</ThemedText>
-            ) : null}
-            {lastNote.transcription ? (
-              <ThemedText style={styles.lastNoteTranscription} numberOfLines={3}>
-                “{lastNote.transcription}”
-              </ThemedText>
-            ) : null}
+        ) : (
+          <View style={styles.hintBox}>
+            <Text style={styles.hintText}>{isProcessing ? '' : idleHint}</Text>
           </View>
         )}
 
-        {/* rotating discovery tip — one line, changes every 10s */}
-        {!isRecording && (
-          <View style={styles.tipRow}>
-            <IconSymbol name="lightbulb" size={14} color={iconColor} />
-            <ThemedText style={styles.tipText}>{COACH_TIPS[tipIndex]}</ThemedText>
+        <View style={styles.recordButtonWrap} pointerEvents="none">
+          <PulseRing active={isRecording} />
+          <View style={[styles.recordButton, isRecording && styles.recordButtonActive]}>
+            {isRecording ? (
+              <Square size={64} color="#fff" fill="#fff" strokeWidth={0} />
+            ) : (
+              <Mic size={72} color="#fff" strokeWidth={1.6} />
+            )}
+            <Text style={styles.recordButtonText}>
+              {isRecording ? 'Tap anywhere to stop' : 'Tap anywhere'}
+            </Text>
+            {isRecording && (
+              <Text style={styles.recordButtonClock}>{formatDuration(recordingDuration)}</Text>
+            )}
           </View>
-        )}
-      </ScrollView>
-    </ThemedView>
+        </View>
+
+        <View style={styles.statusSlot}>
+          {isProcessing && !toast && (
+            <View style={styles.processingRow}>
+              <ActivityIndicator size="small" color={Brand.green} />
+              <Text style={styles.processingText}>Transcribing…</Text>
+            </View>
+          )}
+          {toast && !isRecording && (
+            <View style={styles.toast}>
+              {toast.error ? (
+                <Text style={styles.toastError}>⚠️ {toast.error}</Text>
+              ) : (
+                <>
+                  <View style={styles.toastNum}>
+                    <Text style={styles.toastNumText}>{toast.num}</Text>
+                  </View>
+                  <View style={styles.toastInfo}>
+                    <Text style={styles.toastTitle} numberOfLines={1}>
+                      {toast.title}
+                    </Text>
+                    {!!toast.meta && <Text style={styles.toastMeta}>{toast.meta}</Text>}
+                  </View>
+                  <Check size={16} color={Brand.successCheck} strokeWidth={2.6} />
+                </>
+              )}
+            </View>
+          )}
+        </View>
+      </View>
+    </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    paddingHorizontal: 20,
+    backgroundColor: Brand.bg,
   },
-  header: {
+  topRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingTop: 50,
-    paddingBottom: 12,
+    paddingTop: 60,
+    paddingHorizontal: 20,
   },
-  scrollView: {
-    flex: 1,
-  },
-  scrollContent: {
-    paddingBottom: 40,
-  },
-  navButton: {
-    padding: 8,
-  },
-  doneButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 8,
-    backgroundColor: 'rgba(128, 128, 128, 0.2)',
-  },
-  doneButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  gameSessionSection: {
-    marginBottom: 24,
-  },
-  sectionLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    opacity: 0.6,
-    marginBottom: 12,
-  },
-  recordSection: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 32,
-    minHeight: 320,
-  },
-  permissionSection: {
-    marginBottom: 24,
-    alignItems: 'center',
-    gap: 12,
-  },
-  permissionStatus: {
-    fontSize: 14,
-    fontWeight: '500',
-    textAlign: 'center',
-    opacity: 0.8,
-  },
-  permissionButton: {
-    backgroundColor: '#007AFF',
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 8,
-    minWidth: 200,
+  endBtn: {
+    height: 36,
+    paddingHorizontal: 14,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: Brand.border,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  permissionButtonText: {
-    color: '#fff',
-    fontSize: 16,
+  endBtnText: {
+    fontSize: 13,
     fontWeight: '600',
+    color: Brand.muted,
   },
-  recordingHint: {
-    marginTop: 24,
-    fontSize: 16,
-    opacity: 0.7,
-    textAlign: 'center',
-  },
-  loadingIndicator: {
-    marginTop: 12,
-  },
-  errorContainer: {
+  liveRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 59, 48, 0.1)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 59, 48, 0.3)',
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 16,
-    maxWidth: '90%',
+    gap: 7,
   },
-  errorText: {
-    flex: 1,
-    fontSize: 14,
-    color: '#FF3B30',
-    marginRight: 8,
+  liveDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: Brand.recordRed,
   },
-  errorDismissButton: {
-    padding: 4,
+  liveText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: Brand.ink,
   },
-  markerSection: {
-    width: '100%',
-    alignItems: 'center',
-    marginBottom: 16,
-    paddingVertical: 12,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(128, 128, 128, 0.2)',
-    gap: 10,
+  opponent: {
+    fontSize: 22,
+    fontWeight: '800',
+    letterSpacing: -0.4,
+    color: Brand.ink,
+    textAlign: 'center',
+    marginTop: 10,
   },
-  markerLabel: {
-    fontSize: 12,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    opacity: 0.7,
-  },
-  markerButtons: {
+  setRow: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'center',
     gap: 8,
+    justifyContent: 'center',
+    marginTop: 14,
   },
-  markerButton: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+  setChip: {
+    width: 52,
+    height: 44,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: 'rgba(128, 128, 128, 0.3)',
+    borderColor: Brand.border,
+    backgroundColor: Brand.card,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  markerButtonActive: {
-    backgroundColor: '#2F80ED',
-    borderColor: '#2F80ED',
+  setChipActive: {
+    backgroundColor: Brand.green,
+    borderColor: Brand.green,
   },
-  markerButtonText: {
-    fontSize: 12,
-    fontWeight: '600',
+  setChipText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: Brand.muted,
   },
-  markerButtonTextActive: {
+  setChipTextActive: {
     color: '#fff',
   },
-  toast: {
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    borderRadius: 10,
-    marginBottom: 12,
+  recordZone: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 26,
+    paddingHorizontal: 28,
   },
-  toastSuccess: {
-    backgroundColor: 'rgba(52, 199, 89, 0.15)',
-    borderWidth: 1,
-    borderColor: 'rgba(52, 199, 89, 0.3)',
+  waveRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: 5,
+    height: 44,
   },
-  toastError: {
-    backgroundColor: 'rgba(255, 59, 48, 0.12)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 59, 48, 0.3)',
+  waveBar: {
+    width: 6,
+    height: 44,
+    borderRadius: 3,
+    backgroundColor: Brand.recordRed,
   },
-  toastText: {
+  hintBox: {
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  hintText: {
     fontSize: 14,
     fontWeight: '500',
+    color: Brand.muted,
   },
-  processingBanner: {
+  recordButtonWrap: {
+    width: 300,
+    height: 300,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pulseRing: {
+    position: 'absolute',
+    width: 300,
+    height: 300,
+    borderRadius: 150,
+    backgroundColor: Brand.recordRed,
+  },
+  recordButton: {
+    width: 300,
+    height: 300,
+    borderRadius: 150,
+    backgroundColor: Brand.green,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    shadowColor: Brand.green,
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.4,
+    shadowRadius: 40,
+    elevation: 12,
+  },
+  recordButtonActive: {
+    backgroundColor: Brand.recordRed,
+    shadowOpacity: 0,
+    elevation: 0,
+  },
+  recordButtonText: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: '800',
+    letterSpacing: 0.4,
+  },
+  recordButtonClock: {
+    color: 'rgba(255,255,255,0.85)',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  statusSlot: {
+    height: 52,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  processingRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    borderRadius: 10,
-    backgroundColor: 'rgba(91, 163, 245, 0.12)',
-    borderWidth: 1,
-    borderColor: 'rgba(91, 163, 245, 0.25)',
-    marginBottom: 12,
+    gap: 8,
   },
   processingText: {
     fontSize: 14,
-    fontWeight: '500',
-    opacity: 0.9,
-  },
-  lastNoteCard: {
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(128, 128, 128, 0.2)',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    marginBottom: 16,
-    gap: 4,
-  },
-  lastNoteHeading: {
-    fontSize: 11,
     fontWeight: '600',
-    letterSpacing: 0.5,
-    opacity: 0.5,
+    color: Brand.muted,
   },
-  lastNoteLabel: {
-    fontSize: 15,
-    fontWeight: '600',
-  },
-  lastNoteTranscription: {
-    fontSize: 13,
-    opacity: 0.7,
-    fontStyle: 'italic',
-  },
-  tipRow: {
+  toast: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    paddingHorizontal: 12,
-    paddingBottom: 8,
+    gap: 10,
+    backgroundColor: Brand.card,
+    borderWidth: 1,
+    borderColor: Brand.border,
+    borderRadius: 16,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    maxWidth: 330,
   },
-  tipText: {
+  toastNum: {
+    width: 30,
+    height: 30,
+    borderRadius: 10,
+    backgroundColor: 'rgba(64,97,58,0.16)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  toastNumText: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: Brand.greenLightInk,
+  },
+  toastInfo: {
+    minWidth: 0,
+    flexShrink: 1,
+  },
+  toastTitle: {
+    fontSize: 13.5,
+    fontWeight: '700',
+    color: Brand.ink,
+  },
+  toastMeta: {
+    fontSize: 12,
+    color: Brand.muted,
+  },
+  toastError: {
     fontSize: 13,
-    opacity: 0.55,
-    textAlign: 'center',
+    fontWeight: '600',
+    color: Brand.danger,
     flexShrink: 1,
   },
 });
