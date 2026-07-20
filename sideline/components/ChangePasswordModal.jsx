@@ -19,7 +19,17 @@ import { Brand } from '@/constants/brand';
 import { showAlert } from '@/lib/alert';
 import { supabase } from '@/lib/supabase';
 
-function PasswordField({ label, value, onChange, placeholder, error, hint, editable, autoComplete }) {
+function PasswordField({
+  label,
+  value,
+  onChange,
+  placeholder,
+  error,
+  hint,
+  editable,
+  autoComplete,
+  allowReveal = true,
+}) {
   const [show, setShow] = useState(false);
   return (
     <View>
@@ -30,20 +40,22 @@ function PasswordField({ label, value, onChange, placeholder, error, hint, edita
           onChangeText={onChange}
           placeholder={placeholder}
           placeholderTextColor={Brand.faint}
-          style={[styles.input, styles.passwordInput, !!error && styles.inputError]}
+          style={[styles.input, allowReveal && styles.passwordInput, !!error && styles.inputError]}
           editable={editable}
-          secureTextEntry={!show}
+          secureTextEntry={!allowReveal || !show}
           autoCapitalize="none"
           autoCorrect={false}
           autoComplete={autoComplete}
         />
-        <TouchableOpacity style={styles.eyeIcon} onPress={() => setShow(!show)} activeOpacity={0.7}>
-          {show ? (
-            <EyeOff size={20} color={Brand.muted} strokeWidth={2} />
-          ) : (
-            <Eye size={20} color={Brand.muted} strokeWidth={2} />
-          )}
-        </TouchableOpacity>
+        {allowReveal ? (
+          <TouchableOpacity style={styles.eyeIcon} onPress={() => setShow(!show)} activeOpacity={0.7}>
+            {show ? (
+              <EyeOff size={20} color={Brand.muted} strokeWidth={2} />
+            ) : (
+              <Eye size={20} color={Brand.muted} strokeWidth={2} />
+            )}
+          </TouchableOpacity>
+        ) : null}
       </View>
       {error ? (
         <Text style={styles.errorText}>{error}</Text>
@@ -205,6 +217,7 @@ export default function ChangePasswordModal({ visible, onClose, userEmail }) {
         error={confirmPasswordError}
         editable={!saving}
         autoComplete="password-new"
+        allowReveal={false}
       />
 
       <Text style={styles.hint}>You’ll stay signed in after changing your password.</Text>
