@@ -10,6 +10,7 @@ import { Check, ChevronLeft, ChevronRight, Pencil, Plus, X } from 'lucide-react-
 import { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
+  Image,
   ScrollView,
   StyleSheet,
   Text,
@@ -180,9 +181,13 @@ export default function SettingsScreen() {
           onPress={() => setShowEditModal(true)}
           activeOpacity={0.8}
         >
-          <View style={styles.profileAvatar}>
-            <Text style={styles.profileAvatarText}>{getInitials()}</Text>
-          </View>
+          {profile?.profile_picture_url ? (
+            <Image source={{ uri: profile.profile_picture_url }} style={styles.profileAvatar} />
+          ) : (
+            <View style={styles.profileAvatar}>
+              <Text style={styles.profileAvatarText}>{getInitials()}</Text>
+            </View>
+          )}
           <View style={styles.profileInfo}>
             <Text style={styles.profileName}>{profile?.name || 'Coach'}</Text>
             <Text style={styles.profileEmail}>{user?.email}</Text>
