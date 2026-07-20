@@ -50,7 +50,7 @@ export default function ScheduleScreen() {
       const { team } = await getActiveTeam(user.id);
       if (team?.id) {
         setTeamId(team.id);
-        const { games: all } = await fetchAllGames(team.id);
+        const { games: all } = await fetchAllGames(team.id, user.id);
         setGames(all);
       }
     } finally {

@@ -84,10 +84,14 @@ export const fetchScheduledGames = async (teamId) => {
   }
 };
 
-// every game for a team regardless of status — the full season, for the
-// Schedule screen's month browser (unlike fetchScheduledGames, this must
-// include already-played games so past months aren't empty).
-export const fetchAllGames = async (teamId) => {
+// every real game for a team — the full season, for the Schedule screen's
+// month browser. "Real" means either still upcoming (status='scheduled') or
+// already played AND actually captured (has at least one recording) — this
+// excludes empty game_sessions rows left behind by abandoned/duplicate
+// capture attempts, which would otherwise inflate the season count with
+// games that never happened. Matches the definition the Games list and
+// Home's Recent games already use (fetchRecordingsForTeam).
+export const fetchAllGames = async (teamId, userId) => {
   try {
     const { data, error } = await supabase
       .from('game_sessions')
@@ -95,7 +99,19 @@ export const fetchAllGames = async (teamId) => {
       .eq('team_id', teamId)
       .order('date', { ascending: true });
     if (error) return { games: [], error };
-    return { games: data ?? [], error: null };
+
+    const { data: recs, error: recsError } = await supabase
+      .from('recordings')
+      .select('game_session_id, game_sessions!inner(team_id)')
+      .eq('user_id', userId)
+      .eq('game_sessions.team_id', teamId);
+    if (recsError) return { games: [], error: recsError };
+
+    const recordedIds = new Set((recs ?? []).map((r) => r.game_session_id));
+    const games = (data ?? []).filter(
+      (g) => g.status === 'scheduled' || recordedIds.has(g.id)
+    );
+    return { games, error: null };
   } catch (error) {
     return { games: [], error };
   }
