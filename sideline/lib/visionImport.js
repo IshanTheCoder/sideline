@@ -9,10 +9,10 @@ import { Platform } from 'react-native';
 
 const groqApiKey = process.env.EXPO_PUBLIC_GROQ_API_KEY;
 
-export const GROQ_VISION_MODELS = [
-  'meta-llama/llama-4-scout-17b-16e-instruct',
-  'llama-3.2-11b-vision-preview',
-];
+// Groq retired its llama vision preview models; qwen/qwen3.6-27b is the only
+// vision-capable model left on the account as of 2026-07-19 (checked via
+// console.groq.com/dashboard and GET /v1/models).
+export const GROQ_VISION_MODELS = ['qwen/qwen3.6-27b'];
 
 export function parseJsonFromModelOutput(content) {
   if (!content || typeof content !== 'string') return null;
@@ -95,7 +95,13 @@ export async function runVisionExtraction({ imageAsset, systemPrompt, userPrompt
         body: JSON.stringify({
           model,
           temperature: 0.1,
-          max_tokens: 1200,
+          max_tokens: 3000,
+          // qwen3.6 is a reasoning model — its hidden <think> tokens count
+          // toward max_tokens and can crowd out the actual JSON answer
+          // (confirmed: default reasoning ate the full budget on a 24-game
+          // schedule with finish_reason 'length' and no JSON). We just want
+          // extraction, not deliberation, so turn thinking off entirely.
+          reasoning_effort: 'none',
           messages: [
             { role: 'system', content: systemPrompt },
             {
