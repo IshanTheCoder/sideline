@@ -70,7 +70,7 @@ function RootLayoutNav() {
     } else if (user && inAuthGroup) {
       // User is signed in but still in auth group, redirect to main app
       console.log('🔄 Redirecting to tabs (user signed in)');
-      router.replace('/(tabs)/home');
+      router.replace('/(tabs)/app');
     }
   }, [user, loading, segments]);
 
@@ -84,7 +84,7 @@ function RootLayoutNav() {
   if (loading || !fontsLoaded) {
     const loadingView = (
       <View style={[styles.loadingContainer, { backgroundColor: backgroundColor || '#000000' }]}>
-        <ActivityIndicator size="large" color="#5BA3F5" />
+        <ActivityIndicator size="large" color="#40613A" />
       </View>
     );
     if (Platform.OS === 'web') {
