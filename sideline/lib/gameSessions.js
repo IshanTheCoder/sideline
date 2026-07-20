@@ -66,7 +66,9 @@ const toDateString = (d) => {
   return `${y}-${m}-${day}`;
 };
 
-// upcoming (scheduled, not yet captured) games for a team, soonest first
+// upcoming (scheduled, not yet captured) games for a team, soonest first —
+// used for the Home hero's "next game" pick, which must only ever consider
+// games that haven't been played yet.
 export const fetchScheduledGames = async (teamId) => {
   try {
     const { data, error } = await supabase
@@ -77,6 +79,23 @@ export const fetchScheduledGames = async (teamId) => {
     if (error) return { games: [], error };
     const games = (data ?? []).filter((g) => g.status === 'scheduled');
     return { games, error: null };
+  } catch (error) {
+    return { games: [], error };
+  }
+};
+
+// every game for a team regardless of status — the full season, for the
+// Schedule screen's month browser (unlike fetchScheduledGames, this must
+// include already-played games so past months aren't empty).
+export const fetchAllGames = async (teamId) => {
+  try {
+    const { data, error } = await supabase
+      .from('game_sessions')
+      .select('*')
+      .eq('team_id', teamId)
+      .order('date', { ascending: true });
+    if (error) return { games: [], error };
+    return { games: data ?? [], error: null };
   } catch (error) {
     return { games: [], error };
   }

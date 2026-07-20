@@ -80,17 +80,6 @@ export function gamesInMonthKey(games, key) {
     .sort((a, b) => (parseGameDate(a.date)?.getDate() ?? 0) - (parseGameDate(b.date)?.getDate() ?? 0));
 }
 
-// Where the toggle starts: the month of the next upcoming game, else the most
-// recent month that has games, else the current month.
-export function defaultMonthKey(games) {
-  const nowKey = currentMonthKey();
-  const keys = [...new Set((games ?? []).map((g) => monthKeyFor(g.date)).filter((k) => k !== null))].sort(
-    (a, b) => a - b
-  );
-  if (!keys.length) return nowKey;
-  return keys.find((k) => k >= nowKey) ?? keys[keys.length - 1];
-}
-
 /**
  * Parses freeform date text from the Add Game form ("Jul 20", "July 20",
  * "7/20", "07/20/2026", "2026-07-20") into 'YYYY-MM-DD', or null if

@@ -20,9 +20,9 @@ import AddGameSheet from '@/components/AddGameSheet';
 import { Brand, Shape } from '@/constants/brand';
 import { useAuth } from '@/contexts/AuthContext';
 import { showAlert } from '@/lib/alert';
-import { deleteScheduledGame, fetchScheduledGames } from '@/lib/gameSessions';
+import { deleteScheduledGame, fetchAllGames } from '@/lib/gameSessions';
 import {
-  defaultMonthKey,
+  currentMonthKey,
   gameDateParts,
   gameWhenLabel,
   gamesInMonthKey,
@@ -38,7 +38,7 @@ export default function ScheduleScreen() {
   const [teamId, setTeamId] = useState(null);
   const [games, setGames] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [monthKey, setMonthKey] = useState(null); // null → follow defaultMonthKey until the user navigates
+  const [monthKey, setMonthKey] = useState(currentMonthKey());
   const [addGameOpen, setAddGameOpen] = useState(false);
 
   const load = useCallback(async () => {
@@ -50,21 +50,24 @@ export default function ScheduleScreen() {
       const { team } = await getActiveTeam(user.id);
       if (team?.id) {
         setTeamId(team.id);
-        const { games: scheduled } = await fetchScheduledGames(team.id);
-        setGames(scheduled);
+        const { games: all } = await fetchAllGames(team.id);
+        setGames(all);
       }
     } finally {
       setLoading(false);
     }
   }, [user?.id]);
 
+  // reset to the real-world current month every time this screen is opened,
+  // rather than remembering wherever the user last stepped the month arrows to.
   useFocusEffect(
     useCallback(() => {
+      setMonthKey(currentMonthKey());
       load();
     }, [load])
   );
 
-  const curKey = monthKey ?? defaultMonthKey(games);
+  const curKey = monthKey;
   const month = monthKeyParts(curKey);
   const monthGames = useMemo(() => gamesInMonthKey(games, curKey), [games, curKey]);
   const stepMonth = (delta) => setMonthKey(curKey + delta);
