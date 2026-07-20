@@ -1,1629 +1,823 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+/**
+ * Game Detail — redesign: notes grouped by SET with player/tag chips, a dark
+ * Game Analysis button, and a note bottom sheet with real audio playback,
+ * the transcript, manual notes, and the tag editor (skill / position /
+ * feedback / players) kept below Manual Notes. Long-press a note to delete.
+ */
 import { useFocusEffect } from '@react-navigation/native';
+import { Audio } from 'expo-av';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { BarChart3, ChevronLeft, ChevronRight, Pause, Play, X } from 'lucide-react-native';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
-  FlatList,
-  KeyboardAvoidingView,
-  Modal,
-  PanResponder,
   Platform,
   ScrollView,
   StyleSheet,
+  Text,
   TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
-import { Audio } from 'expo-av';
-import * as FileSystem from 'expo-file-system/legacy';
-import Slider from '@react-native-community/slider';
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { IconSymbol } from '@/components/ui/icon-symbol';
-import { Colors } from '@/constants/theme';
-import { useColorScheme } from '@/hooks/use-color-scheme';
+import BottomSheet from '@/components/BottomSheet';
+import { Brand, Shape, playerAccent } from '@/constants/brand';
 import { useAuth } from '@/contexts/AuthContext';
 import { showAlert } from '@/lib/alert';
+import { getCustomBuckets } from '@/lib/customBuckets';
 import {
+  createSignedRecordingUrl,
   deleteRecordingForUser,
   fetchRecordingsForGame,
+  formatDuration,
   parseRecordingNotes,
-  createSignedRecordingUrl,
   saveRecordingNotes,
   serializeRecordingNotes,
   updateRecording,
 } from '@/lib/recording';
-import { generateMissingLabels, processRecording } from '@/lib/recordingProcessing';
+import { fetchRosterForUser } from '@/lib/roster';
+import { gameDateParts } from '@/lib/scheduleFormat';
 import {
-  parseAiLabels,
-  SKILL_CATEGORY_LABELS,
-  POSITION_LABELS,
   FEEDBACK_TYPE_LABELS,
+  POSITION_LABELS,
+  SKILL_CATEGORY_LABELS,
+  parseAiLabels,
+  serializeAiLabels,
 } from '@/lib/volleyballVocabulary';
 
-export default function GameRecordingsScreen() {
+const setNumberFor = (rec) => {
+  const { setMarkers } = parseRecordingNotes(rec.manual_notes);
+  const label = setMarkers?.[0]?.label;
+  const m = label?.match(/(\d+)/);
+  return m ? Number(m[1]) : 1;
+};
+
+export default function GameDetailScreen() {
   const { id } = useLocalSearchParams();
   const router = useRouter();
-  const colorScheme = useColorScheme();
   const { user } = useAuth();
+
   const [recordings, setRecordings] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  
-  // Audio playback state
-  const [playingRecordingId, setPlayingRecordingId] = useState(null);
-  const [sound, setSound] = useState(null);
+  const [activeNoteId, setActiveNoteId] = useState(null);
+  const [roster, setRoster] = useState([]);
+  const [customBuckets, setCustomBuckets] = useState([]);
+
+  // audio player state
   const soundRef = useRef(null);
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [durationMs, setDurationMs] = useState(null);
-  const [positionMs, setPositionMs] = useState(0);
-  const [loadingAudio, setLoadingAudio] = useState(false);
-  const [isSeeking, setIsSeeking] = useState(false);
-  const [seekingValue, setSeekingValue] = useState(null);
-  const wasPlayingRef = useRef(false);
-  const isSeekingRef = useRef(false);
-  const [modalVisible, setModalVisible] = useState(false);
-  const [selectedRecording, setSelectedRecording] = useState(null);
-  const currentRecordingIdRef = useRef(null);
-  const isLoadingAudioRef = useRef(false);
-  const [editingNotes, setEditingNotes] = useState('');
-  const [originalNotes, setOriginalNotes] = useState('');
-  const [savingNotes, setSavingNotes] = useState(false);
-  const [editingTranscription, setEditingTranscription] = useState('');
-  const [originalTranscription, setOriginalTranscription] = useState('');
-  const [savingTranscription, setSavingTranscription] = useState(false);
-  const [playerExpanded, setPlayerExpanded] = useState(true);
-  const [transcriptionScrollIndicator, setTranscriptionScrollIndicator] = useState({
-    show: false,
-    height: 0,
-    top: 0,
-  });
-  const transcriptionScrollRef = useRef(null);
-  const transcriptionContentSize = useRef({ height: 0, width: 0 });
-  const transcriptionLayoutHeight = useRef(0);
-  const [isScrollingTranscription, setIsScrollingTranscription] = useState(false);
-  const modalScrollRef = useRef(null);
-  const [generatingLabels, setGeneratingLabels] = useState(false);
-  const [retryingTranscription, setRetryingTranscription] = useState(false);
-  const gameId = useMemo(() => {
-    if (Array.isArray(id)) return id[0];
-    return id;
-  }, [id]);
+  const [playing, setPlaying] = useState(false);
+  const [playMs, setPlayMs] = useState(0);
+  const [durationMs, setDurationMs] = useState(0);
+  const [audioLoading, setAudioLoading] = useState(false);
 
-  const loadRecordings = useCallback(async () => {
-    if (!user?.id || !gameId) {
+  // note-sheet editing state
+  const [manualNote, setManualNote] = useState('');
+  const [meta, setMeta] = useState({});
+  const [label, setLabel] = useState('');
+
+  const load = useCallback(async () => {
+    if (!user?.id || !id) return;
+    try {
+      const { data } = await fetchRecordingsForGame(user.id, String(id));
+      setRecordings(data ?? []);
+      const { data: players } = await fetchRosterForUser(user.id);
+      setRoster(players ?? []);
+      const buckets = await getCustomBuckets(user.id);
+      setCustomBuckets(buckets ?? []);
+    } finally {
       setLoading(false);
-      setRecordings([]);
-      return;
     }
-
-    setLoading(true);
-    setError(null);
-
-    const { data, error: fetchError } = await fetchRecordingsForGame(
-      user.id,
-      gameId
-    );
-
-    if (fetchError) {
-      setError(fetchError.message);
-    } else {
-      // Sort recordings chronologically (oldest to newest)
-      const sortedData = (data ?? []).sort((a, b) => {
-        const dateA = new Date(a.created_at).getTime();
-        const dateB = new Date(b.created_at).getTime();
-        return dateA - dateB;
-      });
-      setRecordings(sortedData);
-    }
-
-    setLoading(false);
-  }, [user?.id, gameId]);
-
-  useEffect(() => {
-    loadRecordings();
-  }, [loadRecordings]);
+  }, [user?.id, id]);
 
   useFocusEffect(
     useCallback(() => {
-      loadRecordings();
-    }, [loadRecordings])
+      load();
+    }, [load])
   );
 
-  useEffect(() => {
-    if (modalVisible && selectedRecording) {
-      const { notes } = parseRecordingNotes(selectedRecording.manual_notes ?? null);
-      setEditingNotes(notes);
-      setOriginalNotes(notes);
-      const transcription = selectedRecording.transcription ?? '';
-      setEditingTranscription(transcription);
-      setOriginalTranscription(transcription);
-    }
-  }, [modalVisible, selectedRecording]);
-
-  // Set up audio mode on mount
-  useEffect(() => {
-    const setupAudio = async () => {
-      try {
-        await Audio.setAudioModeAsync({
-          playsInSilentModeIOS: true,
-          staysActiveInBackground: false,
-          shouldDuckAndroid: true,
-        });
-      } catch (err) {
-        console.error('Error setting audio mode:', err);
-      }
-    };
-    
-    setupAudio();
-    
-    return () => {
-      // Cleanup on unmount
-      isLoadingAudioRef.current = false;
-      currentRecordingIdRef.current = null;
-      
-      if (soundRef.current) {
-        soundRef.current.stopAsync().catch(() => undefined);
-        soundRef.current.unloadAsync().catch(() => undefined);
-        soundRef.current = null;
-      }
-    };
-  }, []);
-
-  const stopAndUnloadAudio = async () => {
-    // Clear the current recording ref immediately to prevent callbacks
-    const wasLoaded = soundRef.current !== null;
-    currentRecordingIdRef.current = null;
-    
+  const unloadSound = useCallback(async () => {
+    setPlaying(false);
+    setPlayMs(0);
+    setDurationMs(0);
     if (soundRef.current) {
       try {
-        const status = await soundRef.current.getStatusAsync();
-        if (status.isLoaded) {
-          // Stop first, then unload
-          if (status.isPlaying) {
-            await soundRef.current.stopAsync();
-          }
-          await soundRef.current.unloadAsync();
-        }
-      } catch (err) {
-        console.error('Error stopping audio:', err);
-        // Force unload even if there's an error
-        try {
-          await soundRef.current.unloadAsync();
-        } catch (unloadErr) {
-          console.error('Error force unloading:', unloadErr);
-        }
-      }
+        await soundRef.current.unloadAsync();
+      } catch {}
       soundRef.current = null;
     }
-    
-    // Reset all audio state
-    setSound(null);
-    setIsPlaying(false);
-    setPositionMs(0);
-    setDurationMs(null);
-    
-    // If we actually stopped something, add a small delay for cleanup
-    if (wasLoaded) {
-      await new Promise(resolve => setTimeout(resolve, 50));
+  }, []);
+
+  useEffect(() => () => {
+    unloadSound();
+  }, [unloadSound]);
+
+  const game = recordings[0]?.game_sessions;
+  const opponent = game?.opponent_name ?? 'Game';
+  const dateLabel = game?.date ? gameDateParts(game.date).label : '';
+  const matchType = game?.match_type || 'Regular season';
+
+  const sets = useMemo(() => {
+    const bySet = new Map();
+    for (const rec of recordings) {
+      const setNum = setNumberFor(rec);
+      if (!bySet.has(setNum)) bySet.set(setNum, []);
+      bySet.get(setNum).push(rec);
     }
-  };
+    return [...bySet.entries()]
+      .sort((a, b) => a[0] - b[0])
+      .map(([num, notes]) => ({ num, notes }));
+  }, [recordings]);
 
-  const loadAudio = async (recording) => {
-    // Prevent multiple simultaneous loads
-    if (isLoadingAudioRef.current) {
-      console.log('Already loading audio, skipping');
-      return;
-    }
+  const activeNote = recordings.find((r) => r.id === activeNoteId) ?? null;
 
-    try {
-      isLoadingAudioRef.current = true;
-      setLoadingAudio(true);
-      
-      // Stop and unload previous sound completely - wait for it to finish
-      await stopAndUnloadAudio();
-      
-      // Small delay to ensure previous audio is fully stopped
-      await new Promise(resolve => setTimeout(resolve, 100));
-
-      // Set the active recording ID before loading
-      const recordingId = recording.id;
-      currentRecordingIdRef.current = recordingId;
-      setPlayingRecordingId(recordingId);
-
-      // Create signed URL for private storage access
-      console.log('Creating signed URL for audio_url:', recording.audio_url);
-      const { url: signedUrl, error: signedError } = await createSignedRecordingUrl(
-        recording.audio_url
-      );
-
-      console.log('Signed URL result:', { signedUrl, signedError });
-
-      if (signedError || !signedUrl) {
-        console.error('Error creating signed URL:', signedError);
-        console.error('Recording audio_url was:', recording.audio_url);
-        showAlert('Error', 'Failed to access audio file. Please try again.');
-        setLoadingAudio(false);
-        isLoadingAudioRef.current = false;
-        setPlayingRecordingId(null);
-        currentRecordingIdRef.current = null;
-        return;
-      }
-
-      // Check if user switched recordings during the delay
-      if (currentRecordingIdRef.current !== recordingId) {
-        setLoadingAudio(false);
-        isLoadingAudioRef.current = false;
-        return;
-      }
-
-      const urlPath = signedUrl.split('?')[0];
-      const isWebm = urlPath.endsWith('.webm');
-
-      if (isWebm && Platform.OS === 'ios') {
-        showAlert('Unsupported Format', 'This recording was made on the web and cannot be played on iOS. Please use a browser to listen to it.');
-        setPlayingRecordingId(null);
-        currentRecordingIdRef.current = null;
-        setLoadingAudio(false);
-        isLoadingAudioRef.current = false;
-        return;
-      }
-
-      let playUri = signedUrl;
-      if (Platform.OS !== 'web') {
-        const ext = isWebm ? 'webm' : 'm4a';
-        const localPath = `${FileSystem.cacheDirectory}audio_${recordingId}.${ext}`;
-        const info = await FileSystem.getInfoAsync(localPath);
-        if (!info.exists) {
-          await FileSystem.downloadAsync(signedUrl, localPath);
-        }
-        playUri = localPath;
-      }
-
-      console.log('Loading audio from:', playUri);
-      const { sound: newSound } = await Audio.Sound.createAsync(
-        { uri: playUri },
-        { shouldPlay: false },
-        (status) => {
-          // Only update state if this is still the active recording
-          if (currentRecordingIdRef.current !== recordingId) {
-            return;
-          }
-          
-          if (!status.isLoaded) {
-            if (status.error) {
-              console.error('Audio status error:', status.error);
-              console.error('Failed to load audio from URL:', signedUrl);
-            }
-            return;
-          }
-          
-          setIsPlaying(status.isPlaying);
-          if (!isSeekingRef.current) {
-            setPositionMs(status.positionMillis ?? 0);
-          }
-          setDurationMs(status.durationMillis ?? null);
-          
-          // Auto-stop when finished
-          if (status.didJustFinish) {
-            setIsPlaying(false);
-            setPositionMs(0);
-            setPlayingRecordingId(null);
-            currentRecordingIdRef.current = null;
-          }
-        }
-      );
-      console.log('Audio loaded successfully');
-
-      // Check if user switched recordings while we were loading
-      if (currentRecordingIdRef.current !== recordingId) {
-        await newSound.unloadAsync();
-        setLoadingAudio(false);
-        isLoadingAudioRef.current = false;
-        return;
-      }
-
-      soundRef.current = newSound;
-      setSound(newSound);
-      
-      // Expand player when loading new audio
-      setPlayerExpanded(true);
-      
-      // Now play the audio
-      await newSound.playAsync();
-      setIsPlaying(true);
-    } catch (err) {
-      console.error('Error loading audio:', err);
-      showAlert('Error', 'Failed to load audio file');
-      setPlayingRecordingId(null);
-      currentRecordingIdRef.current = null;
-      await stopAndUnloadAudio();
-    } finally {
-      setLoadingAudio(false);
-      isLoadingAudioRef.current = false;
-    }
-  };
-
-  const handleTogglePlay = async (recording) => {
-    // Prevent multiple rapid clicks
-    if (isLoadingAudioRef.current) {
-      return;
-    }
-
-    try {
-      // If clicking on a different recording, stop current and load new one
-      if (playingRecordingId !== recording.id) {
-        // First stop the current audio completely
-        await stopAndUnloadAudio();
-        setPlayingRecordingId(null);
-        
-        // Then load and play the new one
-        await loadAudio(recording);
-        return;
-      }
-
-      // Otherwise toggle play/pause for current recording
-      if (!sound) {
-        await loadAudio(recording);
-        return;
-      }
-      
-      const status = await sound.getStatusAsync();
-      if (!status.isLoaded) {
-        // If sound is not loaded properly, reload it
-        await stopAndUnloadAudio();
-        await loadAudio(recording);
-        return;
-      }
-      
-      if (status.isPlaying) {
-        await sound.pauseAsync();
-        setIsPlaying(false);
-      } else {
-        await sound.playAsync();
-        setIsPlaying(true);
-      }
-    } catch (err) {
-      console.error('Error toggling playback:', err);
-      setIsPlaying(false);
-      // If there's an error, try to clean up
-      await stopAndUnloadAudio();
-    }
-  };
-
-  const handleSeekStart = async () => {
-    if (!sound) return;
-    wasPlayingRef.current = isPlaying;
-    setIsSeeking(true);
-    isSeekingRef.current = true;
-    try {
-      const status = await sound.getStatusAsync();
-      if (status.isLoaded && status.isPlaying) {
-        await sound.pauseAsync();
-      }
-    } catch (err) {
-      console.error('Error seeking:', err);
-    }
-  };
-
-  const handleSeekComplete = async (value) => {
-    if (!sound) return;
-    try {
-      await sound.setPositionAsync(Math.floor(value));
-      setPositionMs(Math.floor(value));
-      if (wasPlayingRef.current) {
-        await sound.playAsync();
-      }
-    } catch (err) {
-      console.error('Error seeking:', err);
-    } finally {
-      setIsSeeking(false);
-      isSeekingRef.current = false;
-      setSeekingValue(null);
-    }
-  };
-
-
-  const executeDeleteRecording = async (recording) => {
-    if (playingRecordingId === recording.id) {
-      await stopAndUnloadAudio();
-      setPlayingRecordingId(null);
-    }
-
-    const { error: deleteError } = await deleteRecordingForUser(
-      user.id,
-      recording.id,
-      recording.audio_url
-    );
-
-    if (deleteError) {
-      if (Platform.OS === 'web') window.alert('Delete failed: ' + deleteError.message);
-      else showAlert('Delete failed', deleteError.message);
-      return;
-    }
-
-    setRecordings((prev) => prev.filter((item) => item.id !== recording.id));
-  };
-
-  const handleDelete = (recording) => {
-    if (!user?.id) return;
-
-    if (Platform.OS === 'web') {
-      const confirmed = window.confirm('Delete recording? This will permanently remove the audio file and its notes.');
-      if (confirmed) executeDeleteRecording(recording);
-      return;
-    }
-
-    showAlert(
-      'Delete recording?',
-      'This will permanently remove the audio file and its notes.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: () => executeDeleteRecording(recording),
-        },
-      ]
-    );
-  };
-
-  const formatTime = (ms) => {
-    const totalSeconds = Math.floor(ms / 1000);
-    const mins = Math.floor(totalSeconds / 60);
-    const secs = totalSeconds % 60;
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
-  };
-
-  const cleanLabel = (text) => {
-    if (!text) return '';
-    let cleaned = text.replace(/[\u{1F300}-\u{1F9FF}]|[\u{2600}-\u{26FF}]|[\u{2700}-\u{27BF}]/gu, '').trim();
-    cleaned = cleaned.replace(/^["']|["']$/g, '').trim();
-    cleaned = cleaned.replace(/\s+in\s+(volleyball|basketball|soccer|football|baseball|tennis|hockey)$/gi, '').trim();
-    return cleaned;
-  };
-
-  /** Normalize bucket value: null/empty = "Any"; literal "other" = "Other"; else label from map or raw value */
-  const bucketDisplay = (value, labelsMap) => {
-    if (value == null || value === '' || String(value).toLowerCase() === 'null') return 'Any';
-    if (String(value).toLowerCase() === 'other') return 'Other';
-    return labelsMap[value] ?? value;
-  };
-
-  /** Parse ai_labels (plain or JSON) and return display label + volleyball metadata for UI */
-  const getRecordingLabelInfo = (recording) => {
-    const parsed = parseAiLabels(recording?.ai_labels ?? null);
-    const displayLabel = cleanLabel(parsed.displayLabel) || 'Untitled Recording';
-    const skillLabel = bucketDisplay(parsed.skillCategory, SKILL_CATEGORY_LABELS);
-    const positionLabel = bucketDisplay(parsed.position, POSITION_LABELS);
-    const feedbackLabel = bucketDisplay(parsed.feedbackType, FEEDBACK_TYPE_LABELS);
-    return {
-      displayLabel,
-      skillLabel,
-      positionLabel,
-      feedbackLabel,
+  const openNote = async (rec) => {
+    await unloadSound();
+    const parsed = parseAiLabels(rec.ai_labels);
+    setLabel(parsed.displayLabel || 'Untitled note');
+    setMeta({
+      skillCategory: parsed.skillCategory,
+      position: parsed.position,
+      feedbackType: parsed.feedbackType,
+      taggedPlayers: parsed.taggedPlayers ?? [],
+      isOpponentNote: parsed.isOpponentNote,
       playPattern: parsed.playPattern,
-      ruleNote: parsed.ruleNote ?? null,
-    };
+      ruleNote: parsed.ruleNote,
+    });
+    setManualNote(parseRecordingNotes(rec.manual_notes).notes ?? '');
+    setActiveNoteId(rec.id);
   };
 
-  const handleBackPress = async () => {
-    // Stop and clean up any playing audio before navigating back
-    if (playingRecordingId && soundRef.current) {
-      await stopAndUnloadAudio();
-      setPlayingRecordingId(null);
-    }
-    // Return to the games list from game details.
-    router.replace('/(tabs)/review');
+  const closeNote = async () => {
+    await unloadSound();
+    setActiveNoteId(null);
+    load();
   };
 
-  const handleSaveNotes = async () => {
-    if (!user?.id || !selectedRecording) return;
-
-    // Only save if notes have actually changed
-    if (editingNotes === originalNotes) {
-      setSavingNotes(false);
-      return;
-    }
-
+  const togglePlay = async () => {
+    if (!activeNote) return;
     try {
-      setSavingNotes(true);
-      const { setMarkers } = parseRecordingNotes(selectedRecording.manual_notes ?? null);
-      const serializedNotes = serializeRecordingNotes(editingNotes, setMarkers);
-      
-      const { error } = await saveRecordingNotes(
-        user.id,
-        selectedRecording.id,
-        serializedNotes
-      );
-
-      if (error) {
-        showAlert('Error', 'Failed to save notes');
+      if (soundRef.current) {
+        if (playing) {
+          await soundRef.current.pauseAsync();
+          setPlaying(false);
+        } else {
+          await soundRef.current.playAsync();
+          setPlaying(true);
+        }
         return;
       }
-
-      // Update the local recording data
-      setRecordings((prev) =>
-        prev.map((rec) =>
-          rec.id === selectedRecording.id
-            ? { ...rec, manual_notes: serializedNotes }
-            : rec
-        )
-      );
-
-      // Update selected recording and original notes after successful save
-      setOriginalNotes(editingNotes);
-      setSelectedRecording((prev) =>
-        prev ? { ...prev, manual_notes: serializedNotes } : prev
-      );
-    } catch (err) {
-      console.error('Error saving notes:', err);
-      showAlert('Error', 'Failed to save notes');
-    } finally {
-      setSavingNotes(false);
-    }
-  };
-
-  const handleSaveTranscription = async () => {
-    if (!user?.id || !selectedRecording) return;
-    if (editingTranscription === originalTranscription) return;
-
-    try {
-      setSavingTranscription(true);
-      const { error } = await updateRecording(user.id, selectedRecording.id, {
-        transcription: editingTranscription,
-      });
-
-      if (error) {
-        showAlert('Error', 'Failed to save transcription');
+      // iOS can't decode .webm (web recordings) — give a clear reason instead
+      // of letting Audio.Sound.createAsync fail with a generic error
+      if (Platform.OS === 'ios' && String(activeNote.audio_url).toLowerCase().includes('.webm')) {
+        showAlert(
+          'Unsupported Format',
+          'This recording was made on the web and cannot be played on iOS. Please use a browser to listen to it.'
+        );
         return;
       }
-
-      setRecordings((prev) =>
-        prev.map((rec) =>
-          rec.id === selectedRecording.id
-            ? { ...rec, transcription: editingTranscription }
-            : rec
-        )
+      setAudioLoading(true);
+      const { url, error } = await createSignedRecordingUrl(activeNote.audio_url);
+      if (error || !url) {
+        showAlert('Playback failed', 'Could not load this note’s audio.');
+        return;
+      }
+      await Audio.setAudioModeAsync({ allowsRecordingIOS: false, playsInSilentModeIOS: true });
+      const { sound } = await Audio.Sound.createAsync(
+        { uri: url },
+        { shouldPlay: true },
+        (st) => {
+          if (!st.isLoaded) return;
+          setPlayMs(st.positionMillis ?? 0);
+          setDurationMs(st.durationMillis ?? 0);
+          if (st.didJustFinish) {
+            setPlaying(false);
+            setPlayMs(0);
+            sound.setPositionAsync(0).catch(() => {});
+          }
+        }
       );
-      setOriginalTranscription(editingTranscription);
-      setSelectedRecording((prev) =>
-        prev ? { ...prev, transcription: editingTranscription } : prev
-      );
-    } catch (err) {
-      console.error('Error saving transcription:', err);
-      showAlert('Error', 'Failed to save transcription');
+      soundRef.current = sound;
+      setPlaying(true);
+    } catch (e) {
+      console.error('Playback error:', e);
+      showAlert('Playback failed', e?.message ?? 'Could not play this recording.');
     } finally {
-      setSavingTranscription(false);
+      setAudioLoading(false);
     }
   };
 
-  const handleTranscriptionScroll = (event) => {
-    const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent;
-    const contentHeight = contentSize.height;
-    const scrollViewHeight = layoutMeasurement.height;
-    
-    // Store for drag calculations
-    transcriptionContentSize.current = contentSize;
-    transcriptionLayoutHeight.current = scrollViewHeight;
-    
-    // Always show scrollbar
-    if (contentHeight > scrollViewHeight) {
-      // Content is scrollable - show proportional scrollbar
-      const indicatorHeight = Math.max(
-        (scrollViewHeight / contentHeight) * scrollViewHeight,
-        40
-      );
-      const scrollPercentage = contentOffset.y / (contentHeight - scrollViewHeight);
-      const maxIndicatorTop = scrollViewHeight - indicatorHeight;
-      const indicatorTop = scrollPercentage * maxIndicatorTop;
-      
-      setTranscriptionScrollIndicator({
-        show: true,
-        height: indicatorHeight,
-        top: indicatorTop,
-      });
-    } else {
-      // Content is NOT scrollable - hide scrollbar or show minimal
-      setTranscriptionScrollIndicator({
-        show: false,
-        height: 0,
-        top: 0,
-      });
-    }
-  };
-
-  const handleScrollbarPress = (event) => {
-    if (!transcriptionScrollRef.current) return;
-    
-    const { locationY } = event.nativeEvent;
-    const contentHeight = transcriptionContentSize.current.height;
-    const scrollViewHeight = transcriptionLayoutHeight.current;
-    
-    if (contentHeight <= scrollViewHeight) return; // No scrolling needed
-    
-    // Calculate scroll position based on tap location
-    const scrollPercentage = locationY / scrollViewHeight;
-    const maxScrollOffset = contentHeight - scrollViewHeight;
-    const targetOffset = scrollPercentage * maxScrollOffset;
-    
-    // Scroll to the calculated position
-    transcriptionScrollRef.current.scrollTo({
-      y: Math.max(0, Math.min(targetOffset, maxScrollOffset)),
-      animated: true,
+  const persistMeta = async (nextMeta) => {
+    setMeta(nextMeta);
+    if (!activeNote || !user?.id) return;
+    await updateRecording(user.id, activeNote.id, {
+      ai_labels: serializeAiLabels(label, nextMeta),
     });
   };
 
-  // PanResponder for scrollbar dragging
-  const scrollbarPanResponder = useMemo(
-    () =>
-      PanResponder.create({
-        onStartShouldSetPanResponder: () => true,
-        onStartShouldSetPanResponderCapture: () => true,
-        onMoveShouldSetPanResponder: () => true,
-        onMoveShouldSetPanResponderCapture: () => true,
-        onPanResponderTerminationRequest: () => false,
-        
-        onPanResponderGrant: (evt) => {
-          // User touched the scrollbar
-          setIsScrollingTranscription(true);
-          handleScrollbarPress(evt);
-        },
-        
-        onPanResponderMove: (evt, gestureState) => {
-          if (!transcriptionScrollRef.current) return;
-          
-          const contentHeight = transcriptionContentSize.current.height;
-          const scrollViewHeight = transcriptionLayoutHeight.current;
-          
-          if (contentHeight <= scrollViewHeight) return;
-          
-          // Calculate scroll position based on current touch Y position
-          const touchY = evt.nativeEvent.locationY;
-          const scrollPercentage = Math.max(0, Math.min(1, touchY / scrollViewHeight));
-          const maxScrollOffset = contentHeight - scrollViewHeight;
-          const targetOffset = scrollPercentage * maxScrollOffset;
-          
-          // Scroll immediately (not animated for smooth dragging)
-          transcriptionScrollRef.current.scrollTo({
-            y: Math.max(0, Math.min(targetOffset, maxScrollOffset)),
-            animated: false,
-          });
-        },
-        
-        onPanResponderRelease: () => {
-          // User released the scrollbar
-          setTimeout(() => setIsScrollingTranscription(false), 100);
-        },
-      }),
-    []
-  );
-
-  const handleRetryTranscriptions = async () => {
-    if (!user || !gameId) return;
-    setRetryingTranscription(true);
-    try {
-      const untranscribed = recordings.filter((r) => !r.transcription);
-      if (untranscribed.length === 0) {
-        showAlert('All Done', 'Every recording already has a transcription.');
-        return;
-      }
-      let okCount = 0;
-      let failCount = 0;
-      for (const rec of untranscribed) {
-        const result = await processRecording(rec.id, user.id);
-        if (result.success) { okCount++; } else { failCount++; }
-      }
-      await loadRecordings();
-      showAlert(
-        'Transcription Complete',
-        `Transcribed ${okCount} recording${okCount !== 1 ? 's' : ''}.${failCount > 0 ? ` ${failCount} failed — check the Diagnostics in Settings.` : ''}`
-      );
-    } catch (error) {
-      console.error('Retry transcription error:', error);
-      showAlert('Error', `Transcription failed: ${error.message || 'Unknown error'}`);
-    } finally {
-      setRetryingTranscription(false);
-    }
-  };
-
-  const handleGenerateLabels = async () => {
-    if (!user || !gameId) return;
-    
-    setGeneratingLabels(true);
-    try {
-      const result = await generateMissingLabels(user.id, gameId);
-      
-      if (result.error) {
-        const detail = result.errors?.length ? `\n\n${result.errors.join('\n')}` : '';
-        showAlert('Error', `Failed to generate recording names.${detail}`);
-      } else if (result.processedCount === 0 && result.failedCount === 0) {
-        const skipped = result.skippedCount || 0;
-        const detail = result.errors?.length ? `\n\n${result.errors.join('\n')}` : '';
-        showAlert(
-          'No Transcriptions',
-          skipped > 0
-            ? `${skipped} recording${skipped !== 1 ? 's have' : ' has'} no transcription yet. Tap "Retry Transcriptions" first, then try again.${detail}`
-            : `No recordings with transcriptions found in this game.${detail}`
-        );
-      } else {
-        await loadRecordings();
-        const parts = [`Generated ${result.processedCount} recording name${result.processedCount !== 1 ? 's' : ''}.`];
-        if (result.failedCount > 0) {
-          parts.push(`${result.failedCount} failed.`);
-          if (result.errors?.length) parts.push(`\n${result.errors.join('\n')}`);
-        }
-        showAlert('Names Generated', parts.join(' '));
-      }
-    } catch (error) {
-      console.error('Error generating labels:', error);
-      showAlert('Error', 'An unexpected error occurred while generating labels.');
-    } finally {
-        setGeneratingLabels(false);
-      }
-  };
-
-  const renderRecordingItem = ({ item, index }) => {
-    const { setMarkers } = parseRecordingNotes(item.manual_notes ?? null);
-    const isCurrentlyPlaying = playingRecordingId === item.id;
-    const showPlayer = isCurrentlyPlaying && playerExpanded;
-    const sliderValue = isSeeking && isCurrentlyPlaying ? (seekingValue ?? positionMs) : positionMs;
-    const sliderMax = durationMs ?? 1;
-    const isFirst = index === 0;
-    
-    return (
-      <View
-        style={[
-          styles.recordingItem,
-          {
-            backgroundColor: colorScheme === 'dark' ? '#2A2A2A' : '#F5F5F5',
-            borderColor: isCurrentlyPlaying 
-              ? Colors[colorScheme ?? 'light'].tint 
-              : (colorScheme === 'dark' ? '#3A3A3A' : '#E5E5E5'),
-            borderWidth: isCurrentlyPlaying ? 2 : 1,
-          },
-        ]}
-      >
-        {/* Main content area */}
-        <TouchableOpacity
-          style={styles.recordingMainContent}
-          onPress={() => handleTogglePlay(item)}
-          activeOpacity={0.7}
-        >
-          {/* Play button */}
-          <View style={[
-            styles.iconContainer,
-            isCurrentlyPlaying && { backgroundColor: 'rgba(30, 144, 255, 0.2)' }
-          ]}>
-            {loadingAudio && isCurrentlyPlaying ? (
-              <ActivityIndicator size="small" color={Colors[colorScheme ?? 'light'].tint} />
-            ) : (
-              <IconSymbol
-                name={isCurrentlyPlaying && isPlaying ? 'pause.fill' : 'play.fill'}
-                size={24}
-                color={Colors[colorScheme ?? 'light'].tint}
-              />
-            )}
-          </View>
-          
-          {/* Recording info */}
-          <View style={styles.recordingInfo}>
-            {(() => {
-              const labelInfo = getRecordingLabelInfo(item);
-              return (
-                <>
-                  <ThemedText style={styles.recordingTitle} numberOfLines={2}>
-                    {labelInfo.displayLabel}
-                  </ThemedText>
-                  {(() => {
-                    const chips = [labelInfo.skillLabel, labelInfo.positionLabel, labelInfo.feedbackLabel]
-                      .filter((v) => v && v !== 'Any');
-                    if (chips.length === 0) return null;
-                    return (
-                      <View style={styles.volleyballChipsRow}>
-                        {chips.map((chip, ci) => (
-                          <View key={ci} style={[styles.volleyballChip, { backgroundColor: colorScheme === 'dark' ? '#333' : '#E8E8E8' }]}>
-                            <ThemedText style={styles.volleyballChipText}>{chip}</ThemedText>
-                          </View>
-                        ))}
-                      </View>
-                    );
-                  })()}
-                </>
-              );
-            })()}
-            {setMarkers.length > 0 && (
-              <View style={styles.markerRow}>
-                <ThemedText style={styles.markerText}>
-                  {setMarkers
-                    .map((marker) => marker.label)
-                    .join(' • ')}
-                </ThemedText>
-              </View>
-            )}
-          </View>
-        </TouchableOpacity>
-        
-        {/* Delete button - top right */}
-        <TouchableOpacity
-          style={styles.deleteButton}
-          onPress={() => handleDelete(item)}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-        >
-          <IconSymbol
-            name="trash"
-            size={20}
-            color={colorScheme === 'dark' ? '#FF6B6B' : '#D32F2F'}
-          />
-        </TouchableOpacity>
-        
-        {/* Edit button - right side, below delete button */}
-        <TouchableOpacity
-          style={styles.editButton}
-          onPress={() => {
-            setSelectedRecording(item);
-            setModalVisible(true);
-          }}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          accessibilityLabel="Edit recording"
-        >
-          <IconSymbol
-            name="pencil"
-            size={20}
-            color={Colors[colorScheme ?? 'light'].tint}
-          />
-        </TouchableOpacity>
-        
-        {/* Audio player controls (shown when playing and expanded) */}
-        {isCurrentlyPlaying && (
-          <View style={styles.playerControlsContainer}>
-            {playerExpanded ? (
-              <View style={styles.playerControls}>
-                <View style={styles.playerHeader}>
-                  <ThemedText style={styles.timeText}>
-                    {formatTime(positionMs)} / {formatTime(durationMs ?? 0)}
-                  </ThemedText>
-                  <TouchableOpacity
-                    onPress={() => setPlayerExpanded(false)}
-                    style={styles.collapseButton}
-                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                  >
-                    <IconSymbol
-                      name="chevron.up"
-                      size={20}
-                      color={Colors[colorScheme ?? 'light'].tint}
-                    />
-                  </TouchableOpacity>
-                </View>
-                <Slider
-                  style={styles.slider}
-                  minimumValue={0}
-                  maximumValue={sliderMax}
-                  value={sliderValue}
-                  onSlidingStart={handleSeekStart}
-                  onValueChange={(value) => setSeekingValue(value)}
-                  onSlidingComplete={handleSeekComplete}
-                  minimumTrackTintColor={Colors[colorScheme ?? 'light'].tint}
-                  maximumTrackTintColor={colorScheme === 'dark' ? '#444' : '#DDD'}
-                  thumbTintColor={Colors[colorScheme ?? 'light'].tint}
-                  disabled={!sound || !durationMs}
-                />
-              </View>
-            ) : (
-              <TouchableOpacity
-                onPress={() => setPlayerExpanded(true)}
-                style={styles.collapsedPlayer}
-                activeOpacity={0.7}
-              >
-                <ThemedText style={styles.collapsedText}>
-                  {formatTime(positionMs)} / {formatTime(durationMs ?? 0)}
-                </ThemedText>
-                <IconSymbol
-                  name="chevron.down"
-                  size={20}
-                  color={Colors[colorScheme ?? 'light'].tint}
-                />
-              </TouchableOpacity>
-            )}
-          </View>
-        )}
-      </View>
+  const persistManualNote = async () => {
+    if (!activeNote || !user?.id) return;
+    const { setMarkers } = parseRecordingNotes(activeNote.manual_notes);
+    await saveRecordingNotes(
+      user.id,
+      activeNote.id,
+      serializeRecordingNotes(manualNote, setMarkers ?? [])
     );
   };
 
-  const headerTitle =
-    recordings[0]?.game_sessions?.opponent_name
-      ? `vs. ${recordings[0]?.game_sessions?.opponent_name}`
-      : 'Game Recordings';
-  const headerMatchType = recordings[0]?.game_sessions?.match_type ?? null;
-
-  const openMatchReflection = () => {
-    router.push({ pathname: '/(tabs)/review/game/summary/[id]', params: { id: gameId } });
+  const deleteNote = (rec) => {
+    showAlert('Delete note?', 'The audio and transcript will be removed.', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: async () => {
+          const { error } = await deleteRecordingForUser(user.id, rec.id, rec.audio_url);
+          if (error) {
+            showAlert('Could not delete', error.message);
+            return;
+          }
+          load();
+        },
+      },
+    ]);
   };
 
+  const totalSec = Math.round(durationMs / 1000) || activeNote?.duration || 0;
+  const playPct = durationMs > 0 ? Math.min(100, (playMs / durationMs) * 100) : 0;
+
+  const skillOptions = {
+    ...SKILL_CATEGORY_LABELS,
+    ...Object.fromEntries(customBuckets.filter((b) => b.type === 'skill').map((b) => [b.name, b.name])),
+  };
+  const positionOptions = {
+    ...POSITION_LABELS,
+    ...Object.fromEntries(customBuckets.filter((b) => b.type === 'position').map((b) => [b.name, b.name])),
+  };
+  const feedbackOptions = {
+    ...FEEDBACK_TYPE_LABELS,
+    ...Object.fromEntries(customBuckets.filter((b) => b.type === 'feedback').map((b) => [b.name, b.name])),
+  };
+
+  const activeParsed = activeNote ? parseAiLabels(activeNote.ai_labels) : null;
+
   return (
-    <ThemedView style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={handleBackPress}
-          activeOpacity={0.7}
-        >
-          <IconSymbol
-            name="chevron.left"
-            size={28}
-            color={Colors[colorScheme ?? 'light'].text}
-          />
-        </TouchableOpacity>
-        <View style={styles.titleContainer}>
-          <ThemedText type="title" style={styles.title} numberOfLines={1}>
-            {headerTitle}
-          </ThemedText>
-          {headerMatchType ? (
-            <ThemedText style={styles.matchTypeText} numberOfLines={1}>
-              {headerMatchType}
-            </ThemedText>
-          ) : null}
-        </View>
-        <TouchableOpacity
-          style={styles.headerRightButton}
-          onPress={openMatchReflection}
-          activeOpacity={0.7}
-          accessibilityLabel="Post-Game Summary"
-        >
-          <IconSymbol
-            name="doc.text"
-            size={32}
-            color={Colors[colorScheme ?? 'light'].tint}
-          />
-        </TouchableOpacity>
-      </View>
-
-      {loading && (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={Colors[colorScheme ?? 'light'].tint} />
-          <ThemedText style={styles.loadingText}>Loading recordings...</ThemedText>
-        </View>
-      )}
-
-      {!loading && error && (
-        <View style={styles.errorContainer}>
-          <ThemedText style={styles.errorText}>{error}</ThemedText>
-          <TouchableOpacity style={styles.retryButton} onPress={loadRecordings}>
-            <ThemedText style={[styles.retryButtonText, { color: Colors[colorScheme ?? 'light'].tint }]}>
-              Retry
-            </ThemedText>
-          </TouchableOpacity>
-        </View>
-      )}
-
-      {!loading && !error && recordings.length === 0 && (
-        <View style={styles.emptyContainer}>
-          <ThemedText style={styles.emptyTitle}>No recordings for this game</ThemedText>
-          <ThemedText style={styles.emptySubtitle}>
-            Recordings will appear here after you finish a session.
-          </ThemedText>
-        </View>
-      )}
-
-      {!loading && !error && recordings.length > 0 && (
-        <>
-          {/* Action buttons: view analysis + retry transcriptions + generate labels */}
-          <View style={styles.generateLabelsContainer}>
-            <TouchableOpacity
-              style={[
-                styles.generateLabelsButton,
-                styles.viewAnalysisButton,
-                { backgroundColor: Colors[colorScheme ?? 'light'].tint },
-              ]}
-              onPress={openMatchReflection}
-              activeOpacity={0.7}
-              accessibilityLabel="View Post-Game Analysis"
-            >
-              <IconSymbol name="chart.bar" size={18} color="#FFFFFF" />
-              <ThemedText style={styles.generateLabelsButtonText}>
-                View Post-Game Analysis
-              </ThemedText>
-            </TouchableOpacity>
-            {recordings.some((r) => !r.transcription) && (
-              <TouchableOpacity
-                style={[
-                  styles.generateLabelsButton,
-                  styles.retryTranscriptionButton,
-                  { borderColor: Colors[colorScheme ?? 'light'].tint }
-                ]}
-                onPress={handleRetryTranscriptions}
-                disabled={retryingTranscription}
-                activeOpacity={0.7}
-              >
-                {retryingTranscription ? (
-                  <ActivityIndicator size="small" color={Colors[colorScheme ?? 'light'].tint} />
-                ) : (
-                  <>
-                    <IconSymbol name="arrow.clockwise" size={18} color={Colors[colorScheme ?? 'light'].tint} />
-                    <ThemedText style={[styles.generateLabelsButtonText, { color: Colors[colorScheme ?? 'light'].tint }]}>
-                      Retry Transcriptions
-                    </ThemedText>
-                  </>
-                )}
-              </TouchableOpacity>
-            )}
-            <TouchableOpacity
-              style={[
-                styles.generateLabelsButton,
-                { backgroundColor: Colors[colorScheme ?? 'light'].tint }
-              ]}
-              onPress={handleGenerateLabels}
-              disabled={generatingLabels}
-              activeOpacity={0.7}
-            >
-              {generatingLabels ? (
-                <ActivityIndicator size="small" color="#FFFFFF" />
-              ) : (
-                <>
-                  <IconSymbol name="sparkles" size={18} color="#FFFFFF" />
-                  <ThemedText style={styles.generateLabelsButtonText}>
-                    Generate Recording Names
-                  </ThemedText>
-                </>
-              )}
-            </TouchableOpacity>
-          </View>
-
-          <FlatList
-            data={recordings}
-            renderItem={renderRecordingItem}
-            keyExtractor={(item) => item.id}
-            contentContainerStyle={styles.listContent}
-            ItemSeparatorComponent={() => <View style={styles.separator} />}
-          />
-        </>
-      )}
-
-      {/* Recording Details Modal */}
-      <Modal
-        animationType="slide"
-        transparent={true}
-        visible={modalVisible}
-        onRequestClose={() => {
-          handleSaveNotes();
-          setModalVisible(false);
-        }}
+    <View style={styles.container}>
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
       >
-        <TouchableOpacity 
-          style={styles.modalOverlay}
-          activeOpacity={1}
-          onPress={async () => {
-            await handleSaveNotes();
-            setModalVisible(false);
-          }}
-        >
-          <View 
-            onStartShouldSetResponder={() => true}
-            style={[
-              styles.modalContent,
-              { backgroundColor: colorScheme === 'dark' ? '#1A1A1A' : '#FFFFFF' }
-            ]}
+        {/* header */}
+        <View style={styles.headerRow}>
+          <TouchableOpacity
+            style={styles.backBtn}
+            onPress={() => (router.canGoBack() ? router.back() : router.replace('/(tabs)/app'))}
+            activeOpacity={0.7}
           >
-            {/* Modal Header */}
-            <View style={styles.modalHeader}>
-              <ThemedText style={styles.modalTitle} numberOfLines={1}>
-                {selectedRecording ? getRecordingLabelInfo(selectedRecording).displayLabel : 'Recording Details'}
-              </ThemedText>
-              <View style={styles.modalHeaderActions}>
-                <TouchableOpacity
-                  onPress={async () => {
-                    await handleSaveNotes();
-                    setModalVisible(false);
-                    if (selectedRecording?.id) router.push(`/(tabs)/review/${selectedRecording.id}`);
-                  }}
-                  style={styles.editDetailButton}
+            <ChevronLeft size={18} color={Brand.ink} strokeWidth={2.4} />
+          </TouchableOpacity>
+          <View style={styles.headerText}>
+            <Text style={styles.title} numberOfLines={1}>
+              vs. {opponent}
+            </Text>
+            <Text style={styles.subtitle}>
+              {[dateLabel, matchType].filter(Boolean).join(' · ')}
+            </Text>
+          </View>
+        </View>
+
+        {/* game analysis */}
+        <TouchableOpacity
+          style={styles.analysisBtn}
+          onPress={() => router.push(`/(tabs)/review/game/summary/${id}`)}
+          activeOpacity={0.85}
+        >
+          <BarChart3 size={17} color="#fff" strokeWidth={2} />
+          <Text style={styles.analysisBtnText}>Game Analysis</Text>
+        </TouchableOpacity>
+
+        {/* notes grouped by set */}
+        {loading ? (
+          <View style={styles.loadingBox}>
+            <ActivityIndicator color={Brand.green} />
+          </View>
+        ) : sets.length === 0 ? (
+          <View style={styles.emptyCard}>
+            <Text style={styles.emptyText}>No notes for this game yet.</Text>
+          </View>
+        ) : (
+          <View style={styles.setList}>
+            {sets.map((set) => (
+              <View key={set.num}>
+                <Text style={styles.setEyebrow}>SET {set.num}</Text>
+                <View style={styles.noteList}>
+                  {set.notes.map((rec) => {
+                    const parsed = parseAiLabels(rec.ai_labels);
+                    const player = parsed.taggedPlayers?.[0];
+                    const accent = playerAccent(roster, player);
+                    const tag = parsed.skillCategory
+                      ? SKILL_CATEGORY_LABELS[parsed.skillCategory] ?? parsed.skillCategory
+                      : parsed.feedbackType
+                        ? FEEDBACK_TYPE_LABELS[parsed.feedbackType] ?? parsed.feedbackType
+                        : null;
+                    return (
+                      <TouchableOpacity
+                        key={rec.id}
+                        style={styles.noteRow}
+                        onPress={() => openNote(rec)}
+                        onLongPress={() => deleteNote(rec)}
+                        activeOpacity={0.75}
+                      >
+                        <View style={styles.playTile}>
+                          <Play size={15} color={Brand.green} fill={Brand.green} strokeWidth={0} />
+                        </View>
+                        <View style={styles.noteInfo}>
+                          <Text style={styles.noteTitle} numberOfLines={1}>
+                            {parsed.displayLabel || 'Untitled note'}
+                          </Text>
+                          <View style={styles.chipRow}>
+                            {!!player && (
+                              <View style={[styles.playerChip, { backgroundColor: accent.bg }]}>
+                                <Text style={[styles.playerChipText, { color: accent.ink }]}>
+                                  {player}
+                                </Text>
+                              </View>
+                            )}
+                            {!!tag && (
+                              <View style={styles.tagChip}>
+                                <Text style={styles.tagChipText}>{tag}</Text>
+                              </View>
+                            )}
+                            <Text style={styles.durText}>{formatDuration(rec.duration ?? 0)}</Text>
+                          </View>
+                        </View>
+                        <ChevronRight size={14} color={Brand.chevron} strokeWidth={2.4} />
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </View>
+            ))}
+          </View>
+        )}
+      </ScrollView>
+
+      {/* note sheet */}
+      <BottomSheet visible={!!activeNote} onClose={closeNote} maxHeightPct={0.78}>
+        {activeNote && (
+          <View>
+            <View style={styles.sheetHeader}>
+              <Text style={styles.sheetTitle}>{label}</Text>
+              <TouchableOpacity style={styles.sheetClose} onPress={closeNote} activeOpacity={0.7}>
+                <X size={13} color={Brand.chip} strokeWidth={2.6} />
+              </TouchableOpacity>
+            </View>
+            <View style={styles.sheetChips}>
+              {!!activeParsed?.taggedPlayers?.[0] && (
+                <View
+                  style={[
+                    styles.playerChip,
+                    { backgroundColor: playerAccent(roster, activeParsed.taggedPlayers[0]).bg },
+                  ]}
                 >
-                  <ThemedText style={[styles.editDetailButtonText, { color: Colors[colorScheme ?? 'light'].tint }]}>Edit</ThemedText>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  onPress={async () => {
-                    await handleSaveNotes();
-                    setModalVisible(false);
-                  }}
-                  style={styles.closeButton}
-                >
-                  <IconSymbol
-                    name="xmark.circle.fill"
-                    size={28}
-                    color={colorScheme === 'dark' ? '#999' : '#666'}
-                  />
-                </TouchableOpacity>
+                  <Text
+                    style={[
+                      styles.playerChipText,
+                      { color: playerAccent(roster, activeParsed.taggedPlayers[0]).ink },
+                    ]}
+                  >
+                    {activeParsed.taggedPlayers[0]}
+                  </Text>
+                </View>
+              )}
+              {!!activeParsed?.skillCategory && (
+                <View style={styles.tagChip}>
+                  <Text style={styles.tagChipText}>
+                    {SKILL_CATEGORY_LABELS[activeParsed.skillCategory] ?? activeParsed.skillCategory}
+                  </Text>
+                </View>
+              )}
+              <View style={styles.tagChip}>
+                <Text style={styles.tagChipText}>Set {setNumberFor(activeNote)}</Text>
               </View>
             </View>
 
-            <KeyboardAvoidingView
-              behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-              style={styles.keyboardAvoidingView}
-              keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
-            >
-              <ScrollView 
-                ref={modalScrollRef}
-                style={styles.modalScroll} 
-                contentContainerStyle={styles.modalScrollContent}
-                showsVerticalScrollIndicator={false}
-                keyboardShouldPersistTaps="handled"
-                scrollEnabled={!isScrollingTranscription}
-                nestedScrollEnabled={true}
-                directionalLockEnabled={true}
-              >
-                {/* Transcription Section */}
-                <View style={styles.modalSection}>
-                  <View style={styles.notesSectionHeader}>
-                    <ThemedText style={styles.modalSectionTitle}>Transcription</ThemedText>
-                    {savingTranscription && (
-                      <View style={styles.savingIndicator}>
-                        <ActivityIndicator size="small" color={Colors[colorScheme ?? 'light'].tint} />
-                        <ThemedText style={styles.savingText}>Saving...</ThemedText>
-                      </View>
-                    )}
-                  </View>
-                  <TextInput
-                    style={[
-                      styles.transcriptionInput,
-                      {
-                        color: Colors[colorScheme ?? 'light'].text,
-                        backgroundColor: colorScheme === 'dark' ? '#2A2A2A' : '#F5F5F5',
-                      },
-                    ]}
-                    placeholder="No transcription yet"
-                    placeholderTextColor={colorScheme === 'dark' ? '#666' : '#999'}
-                    value={editingTranscription}
-                    onChangeText={setEditingTranscription}
-                    onBlur={handleSaveTranscription}
-                    multiline
-                    scrollEnabled={true}
-                    textAlignVertical="top"
-                  />
-                </View>
+            {/* audio row */}
+            <View style={styles.audioRow}>
+              <TouchableOpacity style={styles.playBtn} onPress={togglePlay} activeOpacity={0.8}>
+                {audioLoading ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : playing ? (
+                  <Pause size={15} color="#fff" fill="#fff" strokeWidth={0} />
+                ) : (
+                  <Play size={15} color="#fff" fill="#fff" strokeWidth={0} />
+                )}
+              </TouchableOpacity>
+              <View style={styles.progressTrack}>
+                <View style={[styles.progressFill, { width: `${playPct}%` }]} />
+              </View>
+              <Text style={styles.audioClock}>
+                {formatDuration(Math.round(playMs / 1000))} / {formatDuration(totalSec)}
+              </Text>
+            </View>
 
-                {/* Manual Notes Section */}
-                <View style={styles.modalSection}>
-                  <View style={styles.notesSectionHeader}>
-                    <ThemedText style={styles.modalSectionTitle}>Manual Notes</ThemedText>
-                    {savingNotes && (
-                      <View style={styles.savingIndicator}>
-                        <ActivityIndicator size="small" color={Colors[colorScheme ?? 'light'].tint} />
-                        <ThemedText style={styles.savingText}>Saving...</ThemedText>
-                      </View>
-                    )}
+            <Text style={styles.sheetEyebrow}>TRANSCRIPT</Text>
+            <View style={styles.transcriptBox}>
+              <Text style={styles.transcriptText}>
+                {activeNote.transcription
+                  ? `“${activeNote.transcription}”`
+                  : 'No transcription yet — it will appear once processing finishes.'}
+              </Text>
+            </View>
+
+            <Text style={styles.sheetEyebrow}>MANUAL NOTES</Text>
+            <TextInput
+              value={manualNote}
+              onChangeText={setManualNote}
+              onBlur={persistManualNote}
+              placeholder="Add context for Monday…"
+              placeholderTextColor={Brand.faint}
+              multiline
+              style={styles.notesInput}
+            />
+
+            {/* tag editor — the old Edit screen's tags live here now */}
+            <Text style={styles.sheetEyebrow}>SKILL</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+              <View style={styles.editChipRow}>
+                {Object.entries(skillOptions).map(([value, text]) => {
+                  const sel = meta.skillCategory === value;
+                  return (
+                    <TouchableOpacity
+                      key={value}
+                      style={[styles.editChip, sel && styles.editChipActive]}
+                      onPress={() =>
+                        persistMeta({ ...meta, skillCategory: sel ? undefined : value })
+                      }
+                      activeOpacity={0.8}
+                    >
+                      <Text style={[styles.editChipText, sel && styles.editChipTextActive]}>
+                        {text}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </ScrollView>
+
+            <Text style={styles.sheetEyebrow}>POSITION</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+              <View style={styles.editChipRow}>
+                {Object.entries(positionOptions).map(([value, text]) => {
+                  const sel = meta.position === value;
+                  return (
+                    <TouchableOpacity
+                      key={value}
+                      style={[styles.editChip, sel && styles.editChipActive]}
+                      onPress={() => persistMeta({ ...meta, position: sel ? undefined : value })}
+                      activeOpacity={0.8}
+                    >
+                      <Text style={[styles.editChipText, sel && styles.editChipTextActive]}>
+                        {text}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </ScrollView>
+
+            <Text style={styles.sheetEyebrow}>FEEDBACK TYPE</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+              <View style={styles.editChipRow}>
+                {Object.entries(feedbackOptions).map(([value, text]) => {
+                  const sel = meta.feedbackType === value;
+                  return (
+                    <TouchableOpacity
+                      key={value}
+                      style={[styles.editChip, sel && styles.editChipActive]}
+                      onPress={() =>
+                        persistMeta({ ...meta, feedbackType: sel ? undefined : value })
+                      }
+                      activeOpacity={0.8}
+                    >
+                      <Text style={[styles.editChipText, sel && styles.editChipTextActive]}>
+                        {text}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </ScrollView>
+
+            {roster.length > 0 && (
+              <>
+                <Text style={styles.sheetEyebrow}>PLAYERS</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                  <View style={styles.editChipRow}>
+                    {roster.map((p) => {
+                      const first = p.name.split(/\s+/)[0];
+                      const tagged = meta.taggedPlayers ?? [];
+                      const sel = tagged.some((t) => t === p.name || t === first);
+                      return (
+                        <TouchableOpacity
+                          key={p.id}
+                          style={[styles.editChip, sel && styles.editChipActive]}
+                          onPress={() =>
+                            persistMeta({
+                              ...meta,
+                              taggedPlayers: sel
+                                ? tagged.filter((t) => t !== p.name && t !== first)
+                                : [...tagged, first],
+                            })
+                          }
+                          activeOpacity={0.8}
+                        >
+                          <Text style={[styles.editChipText, sel && styles.editChipTextActive]}>
+                            {p.name}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
                   </View>
-                  <TextInput
-                    style={[
-                      styles.notesInput,
-                      {
-                        color: Colors[colorScheme ?? 'light'].text,
-                        backgroundColor: colorScheme === 'dark' ? '#2A2A2A' : '#F5F5F5',
-                      },
-                    ]}
-                    placeholder="Type your notes here..."
-                    placeholderTextColor={colorScheme === 'dark' ? '#666' : '#999'}
-                    value={editingNotes}
-                    onChangeText={setEditingNotes}
-                    multiline
-                    scrollEnabled={false}
-                    textAlignVertical="top"
-                    onFocus={() => {
-                      // Scroll to bottom when user taps on notes input
-                      setTimeout(() => {
-                        modalScrollRef.current?.scrollToEnd({ animated: true });
-                      }, 100);
-                    }}
-                  />
-                </View>
-              </ScrollView>
-            </KeyboardAvoidingView>
+                </ScrollView>
+              </>
+            )}
           </View>
-        </TouchableOpacity>
-      </Modal>
-
-    </ThemedView>
+        )}
+      </BottomSheet>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: Brand.bg,
+  },
+  scroll: {
+    flex: 1,
+  },
+  scrollContent: {
     paddingHorizontal: 20,
-    paddingTop: 50,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingBottom: 16,
-  },
-  backButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  backText: {
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  title: {
-    flex: 1,
-    fontSize: 24,
-    textAlign: 'center',
-  },
-  titleContainer: {
-    flex: 1,
-    marginHorizontal: 8,
-    alignItems: 'center',
-  },
-  matchTypeText: {
-    marginTop: 2,
-    fontSize: 12,
-    opacity: 0.7,
-  },
-  headerRightButton: {
-    padding: 10,
-    minWidth: 48,
-    minHeight: 48,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  listContent: {
+    paddingTop: 66,
     paddingBottom: 40,
   },
-  recordingItem: {
-    padding: 16,
-    borderRadius: 12,
-    borderWidth: 1,
-  },
-  recordingMainContent: {
+  headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 12,
   },
-  iconContainer: {
+  headerText: {
+    flex: 1,
+    minWidth: 0,
+  },
+  backBtn: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: 'rgba(30, 144, 255, 0.1)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  recordingInfo: {
-    flex: 1,
-    paddingRight: 80,
-  },
-  recordingTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 4,
-  },
-  volleyballChipsRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 6,
-    marginTop: 4,
-    marginBottom: 2,
-  },
-  volleyballChip: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 10,
-  },
-  volleyballChipText: {
-    fontSize: 12,
-    opacity: 0.9,
-  },
-  markerRow: {
-    marginTop: 6,
-  },
-  markerText: {
-    fontSize: 12,
-    opacity: 0.6,
-  },
-  deleteButton: {
-    position: 'absolute',
-    top: 16,
-    right: 16,
-    padding: 4,
-  },
-  editButton: {
-    position: 'absolute',
-    top: 50,
-    right: 16,
-    padding: 4,
-  },
-  playerControlsContainer: {
-    marginTop: 16,
-  },
-  playerControls: {
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(128, 128, 128, 0.2)',
-  },
-  playerHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  collapseButton: {
-    padding: 4,
-  },
-  timeText: {
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  slider: {
-    width: '100%',
-    height: 30,
-  },
-  collapsedPlayer: {
-    paddingTop: 12,
-    paddingBottom: 4,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(128, 128, 128, 0.2)',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  collapsedText: {
-    fontSize: 13,
-    fontWeight: '600',
-    opacity: 0.8,
-  },
-  separator: {
-    height: 12,
-  },
-  loadingContainer: {
+    backgroundColor: Brand.card,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 40,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.07,
+    shadowRadius: 3,
+    elevation: 2,
   },
-  loadingText: {
+  title: {
+    fontSize: 22,
+    fontWeight: '800',
+    letterSpacing: -0.4,
+    color: Brand.ink,
+  },
+  subtitle: {
+    fontSize: 13,
+    color: Brand.muted,
+  },
+  analysisBtn: {
     marginTop: 12,
-    fontSize: 14,
-    opacity: 0.6,
-  },
-  errorContainer: {
+    width: '100%',
+    height: 54,
+    borderRadius: 18,
+    backgroundColor: Brand.ink,
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 32,
-    paddingHorizontal: 20,
+    gap: 10,
   },
-  errorText: {
-    fontSize: 14,
-    opacity: 0.7,
-    textAlign: 'center',
-    marginBottom: 16,
-  },
-  retryButton: {
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    borderRadius: 8,
-    backgroundColor: 'rgba(30, 144, 255, 0.1)',
-  },
-  retryButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  emptyContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 48,
-    paddingHorizontal: 20,
-  },
-  emptyTitle: {
-    fontSize: 20,
+  analysisBtnText: {
+    color: '#fff',
+    fontSize: 16,
     fontWeight: '700',
-    marginBottom: 8,
   },
-  emptySubtitle: {
-    fontSize: 15,
-    opacity: 0.6,
-    textAlign: 'center',
-    lineHeight: 22,
+  loadingBox: {
+    paddingVertical: 40,
+    alignItems: 'center',
   },
-  modalOverlay: {
+  emptyCard: {
+    backgroundColor: Brand.card,
+    borderRadius: Shape.cardRadius,
+    padding: 18,
+    marginTop: 24,
+    ...Shape.cardShadow,
+  },
+  emptyText: {
+    fontSize: 13.5,
+    color: Brand.muted,
+  },
+  setList: {
+    marginTop: 24,
+    gap: 18,
+  },
+  setEyebrow: {
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 1.4,
+    color: Brand.muted,
+    marginBottom: 10,
+  },
+  noteList: {
+    gap: 10,
+  },
+  noteRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 13,
+    backgroundColor: Brand.card,
+    borderRadius: 18,
+    paddingVertical: 14,
+    paddingHorizontal: 15,
+    ...Shape.cardShadow,
+  },
+  playTile: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(64,97,58,0.12)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  noteInfo: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'flex-end',
+    minWidth: 0,
   },
-  modalContent: {
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    height: '80%',
-    maxHeight: '85%',
+  noteTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: Brand.ink,
   },
-  modalHeader: {
+  chipRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 6,
+    flexWrap: 'wrap',
+  },
+  playerChip: {
+    paddingVertical: 3,
+    paddingHorizontal: 9,
+    borderRadius: 9,
+    backgroundColor: Brand.greenTint,
+  },
+  playerChipText: {
+    fontSize: 11.5,
+    fontWeight: '700',
+    color: Brand.green,
+  },
+  tagChip: {
+    paddingVertical: 3,
+    paddingHorizontal: 9,
+    borderRadius: 9,
+    backgroundColor: Brand.hairline,
+  },
+  tagChipText: {
+    fontSize: 11.5,
+    fontWeight: '600',
+    color: Brand.chip,
+  },
+  durText: {
+    fontSize: 11.5,
+    color: Brand.faint,
+  },
+  // note sheet
+  sheetHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    paddingHorizontal: 20,
-    paddingTop: 20,
-    paddingBottom: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(128, 128, 128, 0.2)',
+    gap: 12,
   },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: '700',
+  sheetTitle: {
     flex: 1,
-    paddingRight: 16,
-    lineHeight: 24,
+    fontSize: 20,
+    fontWeight: '800',
+    letterSpacing: -0.3,
+    color: Brand.ink,
+    lineHeight: 25,
   },
-  modalHeaderActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  editDetailButton: {
-    paddingVertical: 6,
-    paddingHorizontal: 10,
-  },
-  editDetailButtonText: {
-    fontSize: 15,
-    fontWeight: '600',
-  },
-  closeButton: {
-    padding: 4,
-    marginTop: -4,
-  },
-  keyboardAvoidingView: {
-    flex: 1,
-    maxHeight: '100%',
-  },
-  modalScroll: {
-    flex: 1,
-    paddingHorizontal: 20,
-  },
-  modalScrollContent: {
-    paddingBottom: 200,
-    paddingTop: 10,
-  },
-  modalSection: {
-    marginTop: 20,
-  },
-  modalSectionTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    marginBottom: 12,
-  },
-  transcriptionBox: {
-    position: 'relative',
-    minHeight: 200,
-    maxHeight: 800,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(128, 128, 128, 0.2)',
-    overflow: 'hidden',
-  },
-  transcriptionScrollView: {
-    flex: 1,
-  },
-  transcriptionContent: {
-    padding: 16,
-  },
-  transcriptionText: {
-    fontSize: 15,
-    lineHeight: 22,
-  },
-  transcriptionScrollbarTrack: {
-    position: 'absolute',
-    right: 0,
-    top: 0,
-    bottom: 0,
-    width: 20,
-    justifyContent: 'flex-start',
-    zIndex: 1000,
-  },
-  transcriptionScrollbar: {
-    position: 'absolute',
-    right: 7,
-    width: 6,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 3,
-    opacity: 1.0,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.4,
-    shadowRadius: 3,
-    elevation: 5,
-    pointerEvents: 'none',
-  },
-  notesSectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  savingIndicator: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  savingText: {
-    fontSize: 12,
-    opacity: 0.7,
-  },
-  notesInput: {
-    padding: 16,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(128, 128, 128, 0.2)',
-    minHeight: 150,
-    maxHeight: 300,
-    fontSize: 15,
-    lineHeight: 22,
-  },
-  transcriptionInput: {
-    padding: 16,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(128, 128, 128, 0.2)',
-    minHeight: 100,
-    maxHeight: 200,
-    fontSize: 15,
-    lineHeight: 22,
-  },
-  generateLabelsContainer: {
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(128, 128, 128, 0.1)',
-  },
-  generateLabelsButton: {
-    flexDirection: 'row',
+  sheetClose: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: Brand.hairline,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    borderRadius: 12,
-    gap: 8,
-    minHeight: 44,
   },
-  viewAnalysisButton: {
-    marginBottom: 8,
-  },
-  retryTranscriptionButton: {
-    backgroundColor: 'transparent',
-    borderWidth: 1.5,
-    marginBottom: 8,
-  },
-  generateLabelsButtonText: {
-    color: '#FFFFFF',
-    fontSize: 15,
-    fontWeight: '600',
-  },
-  statsSummaryBox: {
-    marginHorizontal: 20,
-    marginBottom: 12,
-    padding: 14,
-    borderRadius: 12,
-  },
-  statsSummaryTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    marginBottom: 10,
-    opacity: 0.9,
-  },
-  statsSummaryRow: {
+  sheetChips: {
     flexDirection: 'row',
+    gap: 6,
+    marginTop: 10,
     flexWrap: 'wrap',
-    gap: 20,
   },
-  statsSummaryCol: {
-    minWidth: 120,
+  audioRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: Brand.bg,
+    borderRadius: 16,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    marginTop: 16,
   },
-  statsSummaryLabel: {
-    fontSize: 12,
+  playBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: Brand.green,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  progressTrack: {
+    flex: 1,
+    height: 5,
+    borderRadius: 3,
+    backgroundColor: Brand.border2,
+    overflow: 'hidden',
+  },
+  progressFill: {
+    height: '100%',
+    borderRadius: 3,
+    backgroundColor: Brand.green,
+  },
+  audioClock: {
+    fontSize: 12.5,
     fontWeight: '600',
-    marginBottom: 4,
-    opacity: 0.8,
+    color: Brand.muted,
   },
-  statsSummaryItem: {
+  sheetEyebrow: {
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 1.4,
+    color: Brand.muted,
+    marginTop: 20,
+    marginBottom: 8,
+  },
+  transcriptBox: {
+    backgroundColor: Brand.transcriptBg,
+    borderRadius: 16,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+  },
+  transcriptText: {
+    fontSize: 15.5,
+    lineHeight: 24,
+    color: Brand.inkSoft,
+  },
+  notesInput: {
+    width: '100%',
+    minHeight: 84,
+    borderWidth: 1,
+    borderColor: Brand.border2,
+    borderRadius: 16,
+    paddingVertical: 13,
+    paddingHorizontal: 15,
+    fontSize: 15,
+    color: Brand.inkSoft,
+    backgroundColor: Brand.card,
+    textAlignVertical: 'top',
+  },
+  editChipRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  editChip: {
+    height: 36,
+    paddingHorizontal: 13,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: Brand.border2,
+    backgroundColor: Brand.card,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  editChipActive: {
+    backgroundColor: Brand.green,
+    borderColor: Brand.green,
+  },
+  editChipText: {
     fontSize: 13,
-    marginBottom: 2,
+    fontWeight: '600',
+    color: Brand.ink,
+  },
+  editChipTextActive: {
+    color: '#fff',
   },
 });

@@ -1,447 +1,263 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+/**
+ * All games — redesign: the "View all" list behind Home's Recent games.
+ * Initials-tile rows with date + note count, pull-to-refresh, and
+ * long-press to delete a game (recordings included).
+ */
+import { useFocusEffect } from '@react-navigation/native';
+import { useRouter } from 'expo-router';
+import { ChevronLeft, ChevronRight } from 'lucide-react-native';
+import { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
-  FlatList,
-  Platform,
+  RefreshControl,
+  ScrollView,
   StyleSheet,
+  Text,
   TouchableOpacity,
   View,
 } from 'react-native';
-import { useRouter } from 'expo-router';
-import { useFocusEffect } from '@react-navigation/native';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { IconSymbol } from '@/components/ui/icon-symbol';
-import { Colors } from '@/constants/theme';
-import { useColorScheme } from '@/hooks/use-color-scheme';
+import { Brand, Shape } from '@/constants/brand';
 import { useAuth } from '@/contexts/AuthContext';
-import {
-  deleteGameForUser,
-  fetchRecordingsForUser,
-  formatDuration,
-} from '@/lib/recording';
-import { parseAiLabels } from '@/lib/volleyballVocabulary';
 import { showAlert } from '@/lib/alert';
+import { deleteGameForUser, fetchRecordingsForTeam } from '@/lib/recording';
+import { gameDateParts, initialsFor } from '@/lib/scheduleFormat';
+import { getActiveTeam } from '@/lib/teams';
 
-export default function ReviewScreen() {
+export default function GamesListScreen() {
   const router = useRouter();
-  const colorScheme = useColorScheme();
   const { user } = useAuth();
-  const [recordings, setRecordings] = useState([]);
+  const [games, setGames] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState(null);
 
-  const titleText = useMemo(() => '🏟️ Games', []);
-
-  const loadRecordings = useCallback(async (opts) => {
+  const load = useCallback(async () => {
     if (!user?.id) {
       setLoading(false);
-      setRecordings([]);
       return;
     }
-
-    if (opts?.isRefresh) {
-      setRefreshing(true);
-    } else {
-      setLoading(true);
-    }
-
-    setError(null);
-    const { data, error: fetchError } = await fetchRecordingsForUser(user.id);
-
-    if (fetchError) {
-      if (
-        fetchError.message.includes('does not exist') ||
-        fetchError.message.includes('column') ||
-        (fetchError).code === 'PGRST116'
-      ) {
-        setRecordings([]);
-        setError(null);
-      } else {
-        const msg = fetchError.message || '';
-        const isNetworkError = msg.includes('fetch') || msg.includes('network') || msg.includes('Network') || msg.includes('TypeError');
-        setError(isNetworkError ? 'Network error — check your connection and try again.' : msg);
-      }
-    } else {
-      setRecordings(data ?? []);
-    }
-
-    setLoading(false);
-    setRefreshing(false);
-  }, [user?.id]);
-
-  useEffect(() => {
-    if (user?.id) {
-      loadRecordings();
-    } else {
+    try {
+      // Scope the games list to the active team so it matches Home.
+      const { team } = await getActiveTeam(user.id);
+      const { data } = team?.id
+        ? await fetchRecordingsForTeam(user.id, team.id)
+        : { data: [] };
+      const map = new Map();
+      (data ?? []).forEach((rec) => {
+        const gameId = rec.game_session_id ?? 'unassigned';
+        const opponent = rec.game_sessions?.opponent_name ?? 'Untitled game';
+        const date = rec.game_sessions?.date ?? rec.created_at;
+        const latest = new Date(rec.created_at).getTime();
+        const existing = map.get(gameId);
+        if (existing) {
+          existing.noteCount += 1;
+          existing.latest = Math.max(existing.latest, latest);
+        } else {
+          map.set(gameId, { id: gameId, opponent, date, noteCount: 1, latest });
+        }
+      });
+      setGames([...map.values()].sort((a, b) => b.latest - a.latest));
+    } finally {
       setLoading(false);
+      setRefreshing(false);
     }
-  }, [user?.id, loadRecordings]);
+  }, [user?.id]);
 
   useFocusEffect(
     useCallback(() => {
-      if (user?.id) {
-        loadRecordings();
-      }
-    }, [user?.id, loadRecordings])
+      load();
+    }, [load])
   );
 
-  const formatDate = (dateString) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-    });
-  };
-
-  const groupedGames = useMemo(() => {
-    const map = new Map();
-
-    recordings.forEach((rec) => {
-      const gameId = rec.game_session_id ?? 'unassigned';
-      const opponent = rec.game_sessions?.opponent_name ?? 'Default Session';
-      const title = `vs. ${opponent}`;
-      const dateLabel = rec.game_sessions?.date
-        ? formatDate(rec.game_sessions.date)
-        : formatDate(rec.created_at);
-      const matchType = rec.game_sessions?.match_type ?? null;
-
-      if (!map.has(gameId)) {
-        map.set(gameId, {
-          id: gameId,
-          title,
-          dateLabel,
-          matchType,
-          recordings: [],
-        });
-      }
-
-      map.get(gameId)?.recordings.push(rec);
-    });
-
-    return Array.from(map.values());
-  }, [recordings]);
-
-  const executeDeleteGame = async (gameId) => {
-    const removedRecordings = recordings.filter((rec) =>
-      gameId === 'unassigned'
-        ? rec.game_session_id === null
-        : rec.game_session_id === gameId
-    );
-    setRecordings((prev) =>
-      prev.filter((rec) =>
-        gameId === 'unassigned'
-          ? rec.game_session_id !== null
-          : rec.game_session_id !== gameId
-      )
-    );
-
-    const { error: deleteError } = await deleteGameForUser(user.id, gameId);
-    if (deleteError) {
-      setRecordings((prev) => [...prev, ...removedRecordings]);
-      if (Platform.OS === 'web') window.alert('Delete failed: ' + deleteError.message);
-      else showAlert('Delete failed', deleteError.message);
-    }
-  };
-
-  const handleDeleteGame = (gameId) => {
-    if (!user?.id) return;
-
-    if (Platform.OS === 'web') {
-      const confirmed = window.confirm('Delete game? This will permanently remove all recordings for this game.');
-      if (confirmed) executeDeleteGame(gameId);
-      return;
-    }
-
+  const removeGame = (game) => {
     showAlert(
       'Delete game?',
-      'This will permanently remove all recordings for this game.',
+      `vs. ${game.opponent} and all of its notes will be permanently removed.`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
           text: 'Delete',
           style: 'destructive',
-          onPress: () => executeDeleteGame(gameId),
+          onPress: async () => {
+            const { error } = await deleteGameForUser(user.id, game.id);
+            if (error) {
+              showAlert('Could not delete', error.message);
+              return;
+            }
+            load();
+          },
         },
       ]
     );
   };
 
-  const renderGameItem = ({ item }) => {
-    const totalDuration = item.recordings.reduce(
-      (sum, rec) => sum + (rec.duration ?? 0),
-      0
-    );
-    return (
-      <TouchableOpacity
-        style={[
-          styles.gameItem,
-          {
-            backgroundColor: colorScheme === 'dark' ? '#2A2A2A' : '#F5F5F5',
-            borderColor: colorScheme === 'dark' ? '#3A3A3A' : '#E5E5E5',
-          },
-        ]}
-        onPress={() => router.push(`/(tabs)/review/game/${item.id}`)}
-        activeOpacity={0.7}
-      >
-        <View style={styles.iconContainer}>
-          <IconSymbol
-            name="calendar"
-            size={24}
-            color={Colors[colorScheme ?? 'light'].tint}
-          />
-        </View>
-        <View style={styles.recordingInfo}>
-          <ThemedText style={styles.recordingTitle}>{item.title}</ThemedText>
-          <View style={styles.recordingMeta}>
-            <ThemedText style={styles.metaText}>
-              {item.dateLabel}
-            </ThemedText>
-            {item.matchType ? (
-              <>
-                <View style={styles.metaSeparator} />
-                <ThemedText style={styles.metaText}>
-                  {item.matchType}
-                </ThemedText>
-              </>
-            ) : null}
-            <View style={styles.metaSeparator} />
-            <ThemedText style={styles.metaText}>
-              {item.recordings.length} recordings
-            </ThemedText>
-            <View style={styles.metaSeparator} />
-            <ThemedText style={styles.metaText}>
-              {formatDuration(totalDuration)}
-            </ThemedText>
-          </View>
-        </View>
-        <TouchableOpacity
-          style={styles.deleteButton}
-          onPress={() => handleDeleteGame(item.id)}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-        >
-          <IconSymbol
-            name="trash"
-            size={20}
-            color={colorScheme === 'dark' ? '#FF6B6B' : '#D32F2F'}
-          />
-        </TouchableOpacity>
-      </TouchableOpacity>
-    );
-  };
-
   return (
-    <ThemedView style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => router.replace('/(tabs)/home')}
-          activeOpacity={0.7}
-        >
-          <IconSymbol
-            name="chevron.left"
-            size={28}
-            color={Colors[colorScheme ?? 'light'].text}
+    <View style={styles.container}>
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => {
+              setRefreshing(true);
+              load();
+            }}
+            tintColor={Brand.green}
           />
-        </TouchableOpacity>
-        <ThemedText type="title" style={styles.title}>
-          {titleText}
-        </ThemedText>
-      </View>
-
-      {loading && (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={Colors[colorScheme ?? 'light'].tint} />
-          <ThemedText style={styles.loadingText}>Loading recordings...</ThemedText>
-        </View>
-      )}
-
-      {!loading && error && (
-        <View style={styles.errorContainer}>
-          <ThemedText style={styles.errorText}>{error}</ThemedText>
+        }
+      >
+        <View style={styles.headerRow}>
           <TouchableOpacity
-            style={styles.retryButton}
-            onPress={() => loadRecordings()}
+            style={styles.backBtn}
+            onPress={() => (router.canGoBack() ? router.back() : router.replace('/(tabs)/app'))}
+            activeOpacity={0.7}
           >
-            <ThemedText style={[styles.retryButtonText, { color: Colors[colorScheme ?? 'light'].tint }]}>
-              Retry
-            </ThemedText>
+            <ChevronLeft size={18} color={Brand.ink} strokeWidth={2.4} />
           </TouchableOpacity>
-        </View>
-      )}
-
-      {!loading && !error && recordings.length === 0 && (
-        <View style={styles.emptyContainer}>
-          <View
-            style={[
-              styles.emptyIconCircle,
-              {
-                backgroundColor:
-                  colorScheme === 'dark'
-                    ? 'rgba(255, 255, 255, 0.05)'
-                    : 'rgba(0, 0, 0, 0.05)',
-              },
-            ]}
-          >
-            <IconSymbol
-              name="mic.slash"
-              size={48}
-              color={colorScheme === 'dark' ? '#666' : '#999'}
-            />
+          <View>
+            <Text style={styles.title}>Games</Text>
+            <Text style={styles.subtitle}>
+              {games.length} game{games.length === 1 ? '' : 's'} captured
+            </Text>
           </View>
-          <ThemedText style={styles.emptyTitle}>No games yet</ThemedText>
-          <ThemedText style={styles.emptySubtitle}>
-            Your recordings will appear under each game once you record.
-          </ThemedText>
         </View>
-      )}
 
-      {!loading && !error && recordings.length > 0 && (
-        <FlatList
-              data={groupedGames}
-              renderItem={renderGameItem}
-              keyExtractor={(item) => item.id}
-              contentContainerStyle={styles.listContent}
-              ItemSeparatorComponent={() => <View style={styles.separator} />}
-              refreshing={refreshing}
-              onRefresh={() => loadRecordings({ isRefresh: true })}
-            />
-      )}
-    </ThemedView>
+        {loading ? (
+          <View style={styles.loadingBox}>
+            <ActivityIndicator color={Brand.green} />
+          </View>
+        ) : games.length === 0 ? (
+          <View style={styles.emptyCard}>
+            <Text style={styles.emptyText}>
+              No captured games yet — your first game’s notes will land here.
+            </Text>
+          </View>
+        ) : (
+          <View style={styles.list}>
+            {games.map((g) => (
+              <TouchableOpacity
+                key={g.id}
+                style={styles.gameRow}
+                onPress={() => router.push(`/(tabs)/review/game/${g.id}`)}
+                onLongPress={() => removeGame(g)}
+                activeOpacity={0.75}
+              >
+                <View style={styles.initialsTile}>
+                  <Text style={styles.initialsText}>{initialsFor(g.opponent)}</Text>
+                </View>
+                <View style={styles.rowInfo}>
+                  <Text style={styles.rowTitle}>vs. {g.opponent}</Text>
+                  <Text style={styles.rowSub}>
+                    {gameDateParts(g.date).label} · {g.noteCount} note
+                    {g.noteCount === 1 ? '' : 's'}
+                  </Text>
+                </View>
+                <ChevronRight size={14} color={Brand.chevron} strokeWidth={2.4} />
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
+      </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: Brand.bg,
+  },
+  scroll: {
+    flex: 1,
+  },
+  scrollContent: {
     paddingHorizontal: 20,
-    paddingTop: 50,
-  },
-  header: {
-    paddingBottom: 16,
-  },
-  backButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  backText: {
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  title: {
-    fontSize: 28,
-    marginTop: 12,
-  },
-  listContent: {
+    paddingTop: 66,
     paddingBottom: 40,
   },
-  gameItem: {
+  headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 16,
-    borderRadius: 12,
-    borderWidth: 1,
+    gap: 12,
   },
-  iconContainer: {
+  backBtn: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: 'rgba(30, 144, 255, 0.1)',
-    justifyContent: 'center',
+    backgroundColor: Brand.card,
     alignItems: 'center',
-    marginRight: 12,
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.07,
+    shadowRadius: 3,
+    elevation: 2,
   },
-  recordingInfo: {
-    flex: 1,
+  title: {
+    fontSize: 22,
+    fontWeight: '800',
+    letterSpacing: -0.4,
+    color: Brand.ink,
   },
-  recordingTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 4,
+  subtitle: {
+    fontSize: 13,
+    color: Brand.muted,
   },
-  recordingMeta: {
+  loadingBox: {
+    paddingVertical: 40,
+    alignItems: 'center',
+  },
+  emptyCard: {
+    backgroundColor: Brand.card,
+    borderRadius: Shape.cardRadius,
+    padding: 18,
+    marginTop: 18,
+    ...Shape.cardShadow,
+  },
+  emptyText: {
+    fontSize: 13.5,
+    color: Brand.muted,
+    lineHeight: 20,
+  },
+  list: {
+    gap: 10,
+    marginTop: 18,
+  },
+  gameRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    flexWrap: 'wrap',
-    rowGap: 4,
+    gap: 14,
+    backgroundColor: Brand.card,
+    borderRadius: Shape.cardRadius,
+    padding: 16,
+    ...Shape.cardShadow,
   },
-  metaText: {
-    fontSize: 13,
-    opacity: 0.6,
-    flexShrink: 0,
-  },
-  metaSeparator: {
-    width: 4,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: '#999',
-    marginHorizontal: 8,
-    flexShrink: 0,
-  },
-  separator: {
-    height: 12,
-  },
-  deleteButton: {
-    paddingLeft: 12,
-  },
-  loadingContainer: {
+  initialsTile: {
+    width: 46,
+    height: 46,
+    borderRadius: 14,
+    backgroundColor: Brand.greenTint,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 40,
   },
-  loadingText: {
-    marginTop: 12,
-    fontSize: 14,
-    opacity: 0.6,
-  },
-  errorContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 32,
-    paddingHorizontal: 20,
-  },
-  errorText: {
-    fontSize: 14,
-    opacity: 0.7,
-    textAlign: 'center',
-    marginBottom: 16,
-  },
-  retryButton: {
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    borderRadius: 8,
-    backgroundColor: 'rgba(30, 144, 255, 0.1)',
-  },
-  retryButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  emptyContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 48,
-    paddingHorizontal: 20,
-  },
-  emptyIconCircle: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  emptyTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    marginTop: 20,
-    marginBottom: 8,
-  },
-  emptySubtitle: {
+  initialsText: {
     fontSize: 15,
-    opacity: 0.6,
-    textAlign: 'center',
-    lineHeight: 22,
+    fontWeight: '800',
+    color: Brand.green,
+  },
+  rowInfo: {
+    flex: 1,
+    minWidth: 0,
+  },
+  rowTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: Brand.ink,
+  },
+  rowSub: {
+    fontSize: 13,
+    color: Brand.muted,
+    marginTop: 2,
   },
 });

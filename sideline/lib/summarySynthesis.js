@@ -226,6 +226,97 @@ export async function synthesizePlayerSummaries(excerpts, rosterNames = []) {
   }
 }
 
+const PRACTICE_PLAN_SYSTEM = `You are a volleyball coaching assistant that turns one game's notes into a concrete practice plan. Given the coach's in-game notes (labels + transcriptions), produce a JSON object with:
+- "hero": {"drill": one specific drill name (3-6 words) that addresses the single most repeated problem, "evidence": one sentence tying it to the notes, e.g. "5 of your 12 notes were the same note, platforms collapse when the pace goes up."}
+- "players": array (max 4, most-noted first) of {"name": player first name from the notes, "insight": 1-2 sentence specific summary of what the notes say about them, "drill": a short drill suggestion with reps/minutes, or "None, reinforce publicly" for pure praise}
+- "plan": array of exactly 3 {"name": drill name, "why": short phrase naming players/skills it targets, "mins": like "15 min"}
+
+CRITICAL RULES:
+- Ground everything ONLY in the provided notes. Do NOT invent problems or players.
+- Be specific and tactical — never vague ("work hard", "stay focused" are banned).
+- Use player first names exactly as they appear in the notes.
+- Output the JSON object only, no other text.`;
+
+/**
+ * One-call practice plan for the Game Analysis screen: the "do one thing"
+ * hero, per-player insight cards with drill suggestions, and a 3-drill
+ * numbered practice plan.
+ * @param {{ displayLabel: string, transcription?: string }[]} items
+ * @returns {Promise<{ hero: {drill: string, evidence: string}|null, players: Array<{name: string, insight: string, drill: string}>, plan: Array<{name: string, why: string, mins: string}>, error: Error|null }>}
+ */
+export async function synthesizePracticePlan(items) {
+  if (!getGroqApiKey()) {
+    return { hero: null, players: [], plan: [], error: new Error('Missing Groq API key') };
+  }
+  if (!items?.length) {
+    return { hero: null, players: [], plan: [], error: null };
+  }
+
+  const input = items
+    .slice(0, 25)
+    .map((i) => (i.transcription ? `Label: ${i.displayLabel}\nTranscription: ${i.transcription}` : i.displayLabel))
+    .join('\n---\n');
+
+  const userPrompt = `From these in-game notes, produce the practice-plan JSON object.\n\n${input}`;
+
+  try {
+    const data = await groqChat({
+      messages: [
+        { role: 'system', content: PRACTICE_PLAN_SYSTEM },
+        { role: 'user', content: userPrompt },
+      ],
+      max_tokens: 900,
+      temperature: 0.3,
+    });
+
+    const content = data.choices?.[0]?.message?.content?.trim();
+    if (!content) return { hero: null, players: [], plan: [], error: new Error('Empty Groq response') };
+
+    const parsed = parseJsonObject(content);
+    if (!parsed || typeof parsed !== 'object') {
+      return { hero: null, players: [], plan: [], error: new Error('Invalid Groq response format') };
+    }
+
+    const hero =
+      parsed.hero && typeof parsed.hero.drill === 'string'
+        ? {
+            drill: parsed.hero.drill.trim(),
+            evidence: typeof parsed.hero.evidence === 'string' ? parsed.hero.evidence.trim() : '',
+          }
+        : null;
+    const players = Array.isArray(parsed.players)
+      ? parsed.players
+          .filter((p) => p && typeof p.name === 'string' && typeof p.insight === 'string')
+          .map((p) => ({
+            name: p.name.trim(),
+            insight: p.insight.trim(),
+            drill: typeof p.drill === 'string' ? p.drill.trim() : '',
+          }))
+          .slice(0, 4)
+      : [];
+    const plan = Array.isArray(parsed.plan)
+      ? parsed.plan
+          .filter((d) => d && typeof d.name === 'string')
+          .map((d) => ({
+            name: d.name.trim(),
+            why: typeof d.why === 'string' ? d.why.trim() : '',
+            mins: typeof d.mins === 'string' ? d.mins.trim() : '',
+          }))
+          .slice(0, 3)
+      : [];
+
+    return { hero, players, plan, error: null };
+  } catch (err) {
+    console.error('synthesizePracticePlan error:', err);
+    return {
+      hero: null,
+      players: [],
+      plan: [],
+      error: err instanceof Error ? err : new Error(String(err)),
+    };
+  }
+}
+
 const OPPONENT_SCOUTING_SYSTEM = `You are a volleyball scouting assistant. Given a coach's in-game observations about the OPPOSING team from a single match, produce 3–6 concrete, actionable scouting points the coach can use to exploit that opponent next time.
 
 CRITICAL RULES:
