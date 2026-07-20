@@ -1,22 +1,27 @@
-import React from 'react';
-import { View, StyleSheet, TouchableOpacity, Platform, Image, Text, ScrollView } from 'react-native';
+/**
+ * Auth / welcome screen — redesign: black background, whistle logo,
+ * SIDELINE wordmark, green Get Started. Entry point for signed-out users.
+ */
 import { useRouter } from 'expo-router';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { useColorScheme } from '@/hooks/use-color-scheme';
-import { Colors } from '@/constants/theme';
+import { StatusBar } from 'expo-status-bar';
+import { ChevronLeft } from 'lucide-react-native';
+import {
+  Image,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
+import { Brand } from '@/constants/brand';
 
 export default function WelcomeScreen() {
   const router = useRouter();
-  const colorScheme = useColorScheme();
-  const colors = Colors[colorScheme ?? 'light'];
-
-  const logoSource = colorScheme === 'dark'
-    ? require('@/assets/images/whistle-logo.png')
-    : require('@/assets/images/app-logo.png');
 
   return (
-    <ThemedView style={styles.container}>
+    <View style={styles.container}>
+      <StatusBar style="light" />
       {/* Web only: escape hatch back to the marketing site */}
       {Platform.OS === 'web' && (
         <TouchableOpacity
@@ -25,174 +30,135 @@ export default function WelcomeScreen() {
           activeOpacity={0.7}
           accessibilityLabel="Back to the Sideline website"
         >
-          <Text style={styles.backToSiteText}>← Back to site</Text>
+          <ChevronLeft size={17} color={Brand.greenLink} strokeWidth={2.6} />
+          <Text style={styles.backToSiteText}>Back to site</Text>
         </TouchableOpacity>
       )}
-      <ScrollView
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
-        <View style={styles.content}>
-          <View style={styles.logoContainer}>
-            <Image
-              source={logoSource}
-              style={styles.whistleLogo}
-              resizeMode="contain"
-            />
-            <Text style={styles.logoText}>SIDELINE</Text>
-          </View>
+      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        <View style={styles.center}>
+          <Image
+            source={require('@/assets/images/whistle.png')}
+            style={styles.whistle}
+            resizeMode="contain"
+          />
+          <Text style={styles.wordmark}>SIDELINE</Text>
+          <Text style={styles.title}>Welcome to Sideline</Text>
+          <Text style={styles.subtitle}>
+            Your coaching assistant for capturing and organizing game observations
+          </Text>
+        </View>
 
-          <View style={styles.textContainer}>
-            <ThemedText type="title" style={styles.title}>
-              Welcome to Sideline
-            </ThemedText>
-            <ThemedText style={styles.description}>
-              Your coaching assistant for capturing and organizing game observations
-            </ThemedText>
-          </View>
-
-          <View style={styles.buttonContainer}>
-            <TouchableOpacity
-              style={[styles.primaryButton, { backgroundColor: '#3B6FA8' }]}
-              onPress={() => router.push('/(auth)/signup')}
-              activeOpacity={0.8}
-            >
-              <ThemedText style={styles.primaryButtonText}>Get Started</ThemedText>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.secondaryButton}
-              onPress={() => router.push('/(auth)/login')}
-              activeOpacity={0.8}
-            >
-              <ThemedText style={styles.secondaryButtonText}>
-                Already have an account?{' '}
-                <ThemedText style={styles.loginLink}>Login</ThemedText>
-              </ThemedText>
-            </TouchableOpacity>
-          </View>
+        <View style={styles.bottom}>
+          <TouchableOpacity
+            style={styles.primaryButton}
+            onPress={() => router.push('/(auth)/signup')}
+            activeOpacity={0.85}
+          >
+            <Text style={styles.primaryButtonText}>Get Started</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.loginRow}
+            onPress={() => router.push('/(auth)/login')}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.loginText}>
+              Already have an account? <Text style={styles.loginLink}>Login</Text>
+            </Text>
+          </TouchableOpacity>
         </View>
       </ScrollView>
-    </ThemedView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: Brand.authBg,
   },
   backToSite: {
     position: 'absolute',
-    top: 18,
-    left: 18,
+    top: 56,
+    left: 22,
     zIndex: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
     paddingVertical: 6,
-    paddingHorizontal: 10,
   },
   backToSiteText: {
-    color: '#8FAF7E',
-    fontSize: 15,
-    fontWeight: '600',
+    color: Brand.greenLink,
+    fontSize: 16,
+    fontWeight: '700',
   },
   scrollContent: {
     flexGrow: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingBottom: 60,
+    paddingHorizontal: 30,
+    paddingTop: 56,
+    paddingBottom: 40,
   },
-  content: {
-    width: '100%',
-    maxWidth: 400,
-    alignItems: 'center',
-  },
-  logoContainer: {
-    marginTop: -100,
-    marginBottom: 36,
+  center: {
+    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    width: '100%',
-    overflow: 'visible',
+    paddingBottom: 20,
   },
-  whistleLogo: {
-    width: 360,
-    height: 360,
-    marginBottom: -70,
-    marginTop: 60,
+  whistle: {
+    width: 220,
+    height: 220,
   },
-  logoText: {
-    marginTop: 0,
-    transform: [{ translateY: 48 }],
-    fontSize: 68,
+  wordmark: {
+    fontSize: 56,
     fontWeight: '900',
-    color: '#5A8A6D',
-    letterSpacing: -1.5,
+    letterSpacing: 1,
+    color: Brand.greenWordmark,
+    lineHeight: 60,
+    marginTop: 8,
     textAlign: 'center',
-    width: '100%',
-    lineHeight: 80,
     includeFontPadding: false,
-    textAlignVertical: 'center',
-  },
-  textContainer: {
-    marginTop: 20,
-    marginBottom: 30,
-    alignItems: 'center',
   },
   title: {
-    fontSize: 36,
-    fontWeight: '700',
-    lineHeight: 42,
-    paddingVertical: 2,
-    marginBottom: 12,
+    fontSize: 30,
+    fontWeight: '800',
+    color: '#FFFFFF',
+    marginTop: 22,
+    letterSpacing: -0.4,
     textAlign: 'center',
   },
-  description: {
+  subtitle: {
     fontSize: 16,
-    lineHeight: 24,
+    color: Brand.onDarkMuted,
     textAlign: 'center',
-    opacity: 0.8,
-    paddingHorizontal: 16,
+    lineHeight: 24,
+    marginTop: 12,
+    maxWidth: 300,
   },
-  buttonContainer: {
+  bottom: {
     width: '100%',
-    gap: 16,
   },
   primaryButton: {
     width: '100%',
-    paddingVertical: 16,
-    borderRadius: 12,
+    height: 60,
+    borderRadius: 16,
+    backgroundColor: Brand.green,
     alignItems: 'center',
     justifyContent: 'center',
-    ...Platform.select({
-      ios: {
-        shadowColor: '#3B6FA8',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.3,
-        shadowRadius: 8,
-      },
-      android: {
-        elevation: 4,
-      },
-    }),
   },
   primaryButtonText: {
     color: '#FFFFFF',
     fontSize: 18,
-    fontWeight: '600',
+    fontWeight: '800',
   },
-  secondaryButton: {
-    width: '100%',
-    paddingVertical: 12,
+  loginRow: {
+    marginTop: 22,
     alignItems: 'center',
-    justifyContent: 'center',
   },
-  secondaryButtonText: {
+  loginText: {
     fontSize: 16,
-    opacity: 0.7,
+    color: Brand.onDarkMuted,
   },
   loginLink: {
-    color: '#3B6FA8',
-    fontWeight: '600',
-    opacity: 1,
+    color: Brand.greenLink,
+    fontWeight: '700',
   },
 });

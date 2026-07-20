@@ -1,30 +1,49 @@
-import React, { useState } from 'react';
+/**
+ * Signup — redesign: black auth background matching welcome/login, white
+ * Google button, on-dark inputs with uppercase eyebrow labels, and a simple
+ * sport chip (volleyball) instead of the old themed selector. Signup logic
+ * (Supabase email/password + profile insert, Google OAuth + sport modal) is
+ * unchanged from the previous version.
+ */
+import { useRouter } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
+import { ChevronLeft } from 'lucide-react-native';
+import { useState } from 'react';
 import {
-  View,
+  ActivityIndicator,
+  Platform,
+  ScrollView,
   StyleSheet,
+  Text,
   TextInput,
   TouchableOpacity,
-  ActivityIndicator,
-  ScrollView,
-  Platform,
+  View,
 } from 'react-native';
-import { useRouter } from 'expo-router';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { SportButtonSelector } from '@/components/SportButtonSelector';
+import { EyeIcon, EyeOffIcon, GoogleLogoIcon } from '@/components/icons/AuthIcons';
 import { SportSelectionModal } from '@/components/SportSelectionModal';
-import { supabase } from '@/lib/supabase';
+import { Brand } from '@/constants/brand';
 import { showAlert } from '@/lib/alert';
 import { signInWithGoogle } from '@/lib/googleAuth';
-import { IconSymbol } from '@/components/ui/icon-symbol';
-import { useColorScheme } from '@/hooks/use-color-scheme';
-import { Colors } from '@/constants/theme';
-import { EyeIcon, EyeOffIcon, GoogleLogoIcon } from '@/components/icons/AuthIcons';
+import { supabase } from '@/lib/supabase';
+
+// on-dark surfaces for the auth forms (kept in sync with login.jsx)
+const Dark = {
+  inputBg: 'rgba(255,255,255,0.06)',
+  inputBorder: 'rgba(255,255,255,0.16)',
+  placeholder: 'rgba(255,255,255,0.35)',
+  label: 'rgba(255,255,255,0.55)',
+  divider: 'rgba(255,255,255,0.14)',
+  dividerText: 'rgba(255,255,255,0.45)',
+  iconMuted: 'rgba(255,255,255,0.5)',
+  backBtnBg: 'rgba(255,255,255,0.09)',
+  error: '#FF8A7A',
+  errorBorder: '#FF6B5C',
+};
+
+const SPORTS = ['Volleyball'];
 
 export default function SignupScreen() {
   const router = useRouter();
-  const colorScheme = useColorScheme();
-  const colors = Colors[colorScheme ?? 'light'];
   const [teamName, setTeamName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -37,34 +56,29 @@ export default function SignupScreen() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [errors, setErrors] = useState({});
 
-  // Email validation regex
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
   const validateForm = () => {
-    const newErrors: typeof errors = {};
+    const newErrors = {};
 
-    // Team name validation
     if (!teamName.trim()) {
       newErrors.teamName = 'Team name is required';
     } else if (teamName.trim().length < 2) {
       newErrors.teamName = 'Team name must be at least 2 characters';
     }
 
-    // Email validation
     if (!email.trim()) {
       newErrors.email = 'Email is required';
     } else if (!emailRegex.test(email)) {
       newErrors.email = 'Please enter a valid email address';
     }
 
-    // Password validation
     if (!password) {
       newErrors.password = 'Password is required';
     } else if (password.length < 6) {
       newErrors.password = 'Password must be at least 6 characters';
     }
 
-    // Confirm password validation
     if (!confirmPassword) {
       newErrors.confirmPassword = 'Please confirm your password';
     } else if (password !== confirmPassword) {
@@ -82,7 +96,6 @@ export default function SignupScreen() {
 
     setLoading(true);
     try {
-      // Sign up with Supabase
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: email.trim(),
         password: password,
@@ -129,62 +142,47 @@ export default function SignupScreen() {
         console.error('Profile creation error:', profileError);
         // Show error to user but don't completely fail the signup
         const errorMsg = 'Your account was created, but there was an issue setting up your profile. You can update your profile later.\n\nError: ' + profileError.message;
-        
+
         if (Platform.OS === 'web') {
           window.alert(errorMsg);
           router.push('/(auth)/login');
         } else {
-          showAlert(
-            'Profile Creation Warning',
-            errorMsg,
-            [
-              {
-                text: 'OK',
-                onPress: () => router.push('/(auth)/login'),
-              },
-            ]
-          );
+          showAlert('Profile Creation Warning', errorMsg, [
+            { text: 'OK', onPress: () => router.push('/(auth)/login') },
+          ]);
         }
         setLoading(false);
         return;
       }
 
-      // Success - show confirmation message
       console.log('✅ Account created successfully!');
       const successMsg = 'Account created successfully! Please check your email to verify your account.';
-      
+
       if (Platform.OS === 'web') {
         window.alert(successMsg);
-        // Clear the form
         setTeamName('');
         setEmail('');
         setPassword('');
         setConfirmPassword('');
         router.push('/(auth)/login');
       } else {
-        showAlert(
-          'Success',
-          successMsg,
-          [
-            {
-              text: 'OK',
-              onPress: () => {
-                // Clear the form
-                setTeamName('');
-                setEmail('');
-                setPassword('');
-                setConfirmPassword('');
-                router.push('/(auth)/login');
-              },
+        showAlert('Success', successMsg, [
+          {
+            text: 'OK',
+            onPress: () => {
+              setTeamName('');
+              setEmail('');
+              setPassword('');
+              setConfirmPassword('');
+              router.push('/(auth)/login');
             },
-          ]
-        );
+          },
+        ]);
       }
       setLoading(false);
     } catch (error) {
       console.error('Signup error:', error);
       const errorMsg = error.message || 'An unexpected error occurred during signup. Please try again.';
-      
       if (Platform.OS === 'web') {
         window.alert(`Error: ${errorMsg}`);
       } else {
@@ -229,7 +227,7 @@ export default function SignupScreen() {
         .single();
 
       if (selectError && selectError.code !== 'PGRST116') {
-        // PGRST116 is the "no rows returned" error, which is expected for new users
+        // PGRST116 is the "no rows returned" error, expected for new users
         console.error('Profile fetch error:', selectError);
         showAlert('Error', 'Failed to check profile. Please try again.');
         setLoading(false);
@@ -237,7 +235,6 @@ export default function SignupScreen() {
       }
 
       if (!profile) {
-        // Create profile with Google account info and selected sport
         const { error: profileError } = await supabase
           .from('profiles')
           .insert({
@@ -257,7 +254,6 @@ export default function SignupScreen() {
           return;
         }
       } else {
-        // Update existing profile with selected sport
         const { error: updateError } = await supabase
           .from('profiles')
           .update({ sport: selectedSport })
@@ -273,7 +269,6 @@ export default function SignupScreen() {
       }
 
       // AuthContext will handle navigation via the RootLayoutNav
-      // No need to manually navigate - the useEffect in _layout.tsx will handle it
     } catch (error) {
       console.error('Sport selection error:', error);
       showAlert(
@@ -287,201 +282,194 @@ export default function SignupScreen() {
   };
 
   return (
-    <ThemedView style={styles.container}>
+    <View style={styles.container}>
+      <StatusBar style="light" />
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
       >
-        <View style={styles.header}>
-          <TouchableOpacity
-            style={styles.backButton}
-            onPress={() => router.back()}
-          >
-            <IconSymbol name="xmark" size={22} color="#3B6FA8" />
-          </TouchableOpacity>
-          <ThemedText type="title" style={styles.title}>
-            Create Account
-          </ThemedText>
-        </View>
-
-        {/* Google Sign-In Button */}
+        {/* header */}
         <TouchableOpacity
-          style={styles.googleButton}
+          style={styles.backBtn}
+          onPress={() => router.back()}
+          activeOpacity={0.7}
+          accessibilityLabel="Go back"
+        >
+          <ChevronLeft size={18} color="#fff" strokeWidth={2.4} />
+        </TouchableOpacity>
+        <Text style={styles.title}>Create your account</Text>
+        <Text style={styles.subtitle}>
+          Three-second voice notes on game day, practice plans after.
+        </Text>
+
+        {/* Google */}
+        <TouchableOpacity
+          style={styles.googleBtn}
           onPress={handleGoogleSignup}
           disabled={loading}
-          activeOpacity={0.8}
+          activeOpacity={0.85}
         >
           {loading ? (
-            <ActivityIndicator color="#FFFFFF" />
+            <ActivityIndicator color={Brand.ink} />
           ) : (
             <>
-              <GoogleLogoIcon size={20} />
-              <ThemedText style={styles.googleButtonText}>
-                Sign up with Google
-              </ThemedText>
+              <GoogleLogoIcon size={19} color={Brand.ink} />
+              <Text style={styles.googleBtnText}>Continue with Google</Text>
             </>
           )}
         </TouchableOpacity>
 
         <View style={styles.divider}>
           <View style={styles.dividerLine} />
-          <ThemedText style={styles.dividerText}>OR</ThemedText>
+          <Text style={styles.dividerText}>OR</Text>
           <View style={styles.dividerLine} />
         </View>
 
-        {/* Team Name Input */}
-        <View style={styles.inputContainer}>
-          <ThemedText style={styles.label}>Team's Name</ThemedText>
+        {/* team name */}
+        <Text style={styles.fieldLabel}>TEAM NAME</Text>
+        <TextInput
+          style={[styles.input, errors.teamName && styles.inputError]}
+          placeholder="e.g. Varsity Volleyball 2026"
+          placeholderTextColor={Dark.placeholder}
+          value={teamName}
+          onChangeText={(text) => {
+            setTeamName(text);
+            if (errors.teamName) setErrors({ ...errors, teamName: undefined });
+          }}
+          autoCapitalize="words"
+          keyboardAppearance="dark"
+          editable={!loading}
+        />
+        {errors.teamName && <Text style={styles.errorText}>{errors.teamName}</Text>}
+
+        {/* email */}
+        <Text style={styles.fieldLabel}>EMAIL</Text>
+        <TextInput
+          style={[styles.input, errors.email && styles.inputError]}
+          placeholder="coach@school.edu"
+          placeholderTextColor={Dark.placeholder}
+          value={email}
+          onChangeText={(text) => {
+            setEmail(text);
+            if (errors.email) setErrors({ ...errors, email: undefined });
+          }}
+          keyboardType="email-address"
+          autoCapitalize="none"
+          autoCorrect={false}
+          keyboardAppearance="dark"
+          editable={!loading}
+        />
+        {errors.email && <Text style={styles.errorText}>{errors.email}</Text>}
+
+        {/* password */}
+        <Text style={styles.fieldLabel}>PASSWORD</Text>
+        <View style={styles.passwordWrap}>
+          <TextInput
+            style={[styles.input, styles.passwordInput, errors.password && styles.inputError]}
+            placeholder="At least 6 characters"
+            placeholderTextColor={Dark.placeholder}
+            value={password}
+            onChangeText={(text) => {
+              setPassword(text);
+              if (errors.password) setErrors({ ...errors, password: undefined });
+            }}
+            secureTextEntry={!showPassword}
+            keyboardAppearance="dark"
+            editable={!loading}
+          />
+          <TouchableOpacity
+            style={styles.eyeIcon}
+            onPress={() => setShowPassword(!showPassword)}
+            activeOpacity={0.7}
+          >
+            {showPassword ? (
+              <EyeOffIcon size={22} color={Dark.iconMuted} />
+            ) : (
+              <EyeIcon size={22} color={Dark.iconMuted} />
+            )}
+          </TouchableOpacity>
+        </View>
+        {errors.password && <Text style={styles.errorText}>{errors.password}</Text>}
+
+        {/* confirm password */}
+        <Text style={styles.fieldLabel}>CONFIRM PASSWORD</Text>
+        <View style={styles.passwordWrap}>
           <TextInput
             style={[
               styles.input,
-              { color: colors.text, backgroundColor: colors.background },
-              errors.teamName && styles.inputError,
+              styles.passwordInput,
+              errors.confirmPassword && styles.inputError,
             ]}
-            placeholder="Enter name"
-            placeholderTextColor={colors.text + '80'}
-            value={teamName}
+            placeholder="Type it again"
+            placeholderTextColor={Dark.placeholder}
+            value={confirmPassword}
             onChangeText={(text) => {
-              setTeamName(text);
-              if (errors.teamName) setErrors({ ...errors, teamName: undefined });
+              setConfirmPassword(text);
+              if (errors.confirmPassword) setErrors({ ...errors, confirmPassword: undefined });
             }}
-            autoCapitalize="words"
+            secureTextEntry={!showConfirmPassword}
+            keyboardAppearance="dark"
             editable={!loading}
           />
-          {errors.teamName && (
-            <ThemedText style={styles.errorText}>{errors.teamName}</ThemedText>
-          )}
+          <TouchableOpacity
+            style={styles.eyeIcon}
+            onPress={() => setShowConfirmPassword(!showConfirmPassword)}
+            activeOpacity={0.7}
+          >
+            {showConfirmPassword ? (
+              <EyeOffIcon size={22} color={Dark.iconMuted} />
+            ) : (
+              <EyeIcon size={22} color={Dark.iconMuted} />
+            )}
+          </TouchableOpacity>
+        </View>
+        {errors.confirmPassword && (
+          <Text style={styles.errorText}>{errors.confirmPassword}</Text>
+        )}
+
+        {/* sport */}
+        <Text style={styles.fieldLabel}>SPORT</Text>
+        <View style={styles.sportRow}>
+          {SPORTS.map((s) => {
+            const sel = sport === s;
+            return (
+              <TouchableOpacity
+                key={s}
+                style={[styles.sportChip, sel && styles.sportChipActive]}
+                onPress={() => setSport(s)}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.sportEmoji}>🏐</Text>
+                <Text style={[styles.sportChipText, sel && styles.sportChipTextActive]}>{s}</Text>
+              </TouchableOpacity>
+            );
+          })}
         </View>
 
-        {/* Email Input */}
-        <View style={styles.inputContainer}>
-          <ThemedText style={styles.label}>Email</ThemedText>
-          <TextInput
-            style={[
-              styles.input,
-              { color: colors.text, backgroundColor: colors.background },
-              errors.email && styles.inputError,
-            ]}
-            placeholder="Enter email"
-            placeholderTextColor={colors.text + '80'}
-            value={email}
-            onChangeText={(text) => {
-              setEmail(text);
-              if (errors.email) setErrors({ ...errors, email: undefined });
-            }}
-            keyboardType="email-address"
-            autoCapitalize="none"
-            autoCorrect={false}
-            editable={!loading}
-          />
-          {errors.email && (
-            <ThemedText style={styles.errorText}>{errors.email}</ThemedText>
-          )}
-        </View>
-
-        {/* Password Input */}
-        <View style={styles.inputContainer}>
-          <ThemedText style={styles.label}>Password</ThemedText>
-          <View style={styles.passwordInputContainer}>
-            <TextInput
-              style={[
-                styles.input,
-                styles.passwordInput,
-                { color: colors.text, backgroundColor: colors.background },
-                errors.password && styles.inputError,
-              ]}
-              placeholder="Enter password"
-              placeholderTextColor={colors.text + '80'}
-              value={password}
-              onChangeText={(text) => {
-                setPassword(text);
-                if (errors.password) setErrors({ ...errors, password: undefined });
-              }}
-              secureTextEntry={!showPassword}
-              editable={!loading}
-            />
-            <TouchableOpacity
-              style={styles.eyeIcon}
-              onPress={() => setShowPassword(!showPassword)}
-            >
-              {showPassword ? (
-                <EyeOffIcon size={24} color={colors.icon} />
-              ) : (
-                <EyeIcon size={24} color={colors.icon} />
-              )}
-            </TouchableOpacity>
-          </View>
-          {errors.password && (
-            <ThemedText style={styles.errorText}>{errors.password}</ThemedText>
-          )}
-        </View>
-
-        {/* Confirm Password Input */}
-        <View style={styles.inputContainer}>
-          <ThemedText style={styles.label}>Confirm Password</ThemedText>
-          <View style={styles.passwordInputContainer}>
-            <TextInput
-              style={[
-                styles.input,
-                styles.passwordInput,
-                { color: colors.text, backgroundColor: colors.background },
-                errors.confirmPassword && styles.inputError,
-              ]}
-              placeholder="Confirm password"
-              placeholderTextColor={colors.text + '80'}
-              value={confirmPassword}
-              onChangeText={(text) => {
-                setConfirmPassword(text);
-                if (errors.confirmPassword) setErrors({ ...errors, confirmPassword: undefined });
-              }}
-              secureTextEntry={!showConfirmPassword}
-              editable={!loading}
-            />
-            <TouchableOpacity
-              style={styles.eyeIcon}
-              onPress={() => setShowConfirmPassword(!showConfirmPassword)}
-            >
-              {showConfirmPassword ? (
-                <EyeOffIcon size={24} color={colors.icon} />
-              ) : (
-                <EyeIcon size={24} color={colors.icon} />
-              )}
-            </TouchableOpacity>
-          </View>
-          {errors.confirmPassword && (
-            <ThemedText style={styles.errorText}>{errors.confirmPassword}</ThemedText>
-          )}
-        </View>
-
-        {/* Sport Button Selector */}
-        <SportButtonSelector selectedSport={sport} onSportChange={setSport} />
-
-        {/* Sign Up Button */}
+        {/* sign up */}
         <TouchableOpacity
-          style={[styles.signupButton, loading && styles.signupButtonDisabled]}
+          style={[styles.primaryBtn, loading && styles.primaryBtnDisabled]}
           onPress={handleSignup}
           disabled={loading}
-          activeOpacity={0.8}
+          activeOpacity={0.85}
         >
           {loading ? (
             <ActivityIndicator color="#FFFFFF" />
           ) : (
-            <ThemedText style={styles.signupButtonText}>Sign Up</ThemedText>
+            <Text style={styles.primaryBtnText}>Create Account</Text>
           )}
         </TouchableOpacity>
 
-        {/* Login Link */}
-        <View style={styles.loginContainer}>
-          <ThemedText style={styles.loginText}>
-            Already have an account?{' '}
-            <ThemedText
-              style={styles.loginLink}
-              onPress={() => router.push('/(auth)/login')}
-            >
-              Login
-            </ThemedText>
-          </ThemedText>
-        </View>
+        <TouchableOpacity
+          style={styles.switchRow}
+          onPress={() => router.push('/(auth)/login')}
+          activeOpacity={0.7}
+        >
+          <Text style={styles.switchText}>
+            Already have an account? <Text style={styles.switchLink}>Login</Text>
+          </Text>
+        </TouchableOpacity>
       </ScrollView>
 
       {/* Sport Selection Modal for Google Sign-up */}
@@ -494,154 +482,172 @@ export default function SignupScreen() {
         onSelect={handleSportSelection}
         initialSport={sport}
       />
-    </ThemedView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: Brand.authBg,
   },
   scrollContent: {
-    padding: 24,
-    paddingTop: 60,
-    paddingBottom: 60,
+    flexGrow: 1,
+    paddingHorizontal: 26,
+    paddingTop: 56,
+    paddingBottom: 48,
   },
-  header: {
-    marginBottom: 32,
-    position: 'relative',
-  },
-  backButton: {
-    position: 'absolute',
-    left: 0,
-    top: 0,
-    zIndex: 1,
-    padding: 4,
+  backBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: Dark.backBtnBg,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   title: {
-    fontSize: 32,
-    fontWeight: '700',
-    textAlign: 'center',
+    fontSize: 30,
+    fontWeight: '800',
+    letterSpacing: -0.4,
+    color: '#FFFFFF',
+    marginTop: 26,
   },
-  googleButton: {
+  subtitle: {
+    fontSize: 15,
+    color: Brand.onDarkMuted,
+    marginTop: 6,
+    lineHeight: 22,
+  },
+  googleBtn: {
+    marginTop: 28,
+    width: '100%',
+    height: 54,
+    borderRadius: 16,
+    backgroundColor: '#FFFFFF',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#4285F4',
-    paddingVertical: 14,
-    borderRadius: 8,
-    marginBottom: 24,
-    gap: 8,
-    ...Platform.select({
-      ios: {
-        shadowColor: '#4285F4',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.2,
-        shadowRadius: 4,
-      },
-      android: {
-        elevation: 2,
-      },
-    }),
+    gap: 10,
   },
-  googleButtonText: {
-    color: '#FFFFFF',
+  googleBtnText: {
+    color: Brand.ink,
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: '700',
   },
   divider: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 24,
+    marginTop: 22,
+    marginBottom: 4,
   },
   dividerLine: {
     flex: 1,
     height: 1,
-    backgroundColor: '#E0E0E0',
+    backgroundColor: Dark.divider,
   },
   dividerText: {
-    marginHorizontal: 16,
-    fontSize: 14,
-    opacity: 0.6,
+    marginHorizontal: 14,
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 1.2,
+    color: Dark.dividerText,
   },
-  inputContainer: {
-    marginBottom: 20,
-  },
-  label: {
-    fontSize: 16,
-    fontWeight: '600',
+  fieldLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 1.4,
+    color: Dark.label,
+    marginTop: 20,
     marginBottom: 8,
-    opacity: 0.8,
   },
   input: {
+    width: '100%',
+    height: 52,
     borderWidth: 1,
-    borderColor: '#E0E0E0',
-    borderRadius: 8,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    borderColor: Dark.inputBorder,
+    borderRadius: 14,
+    paddingHorizontal: 15,
     fontSize: 16,
-    minHeight: 50,
+    color: '#FFFFFF',
+    backgroundColor: Dark.inputBg,
   },
-  passwordInputContainer: {
+  passwordWrap: {
     position: 'relative',
     width: '100%',
   },
   passwordInput: {
-    paddingRight: 50, // Make room for the eye icon
+    paddingRight: 50,
   },
   eyeIcon: {
     position: 'absolute',
-    right: 12,
-    top: 13,
-    padding: 4,
+    right: 14,
+    top: 15,
   },
   inputError: {
-    borderColor: '#FF6B4A',
+    borderColor: Dark.errorBorder,
   },
   errorText: {
-    color: '#FF6B4A',
-    fontSize: 12,
-    marginTop: 4,
+    color: Dark.error,
+    fontSize: 12.5,
+    marginTop: 6,
   },
-  signupButton: {
-    backgroundColor: '#3B6FA8',
-    paddingVertical: 16,
-    borderRadius: 8,
+  sportRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  sportChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    height: 46,
+    paddingHorizontal: 16,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: Dark.inputBorder,
+    backgroundColor: Dark.inputBg,
+  },
+  sportChipActive: {
+    backgroundColor: Brand.green,
+    borderColor: Brand.green,
+  },
+  sportEmoji: {
+    fontSize: 16,
+  },
+  sportChipText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  sportChipTextActive: {
+    color: '#FFFFFF',
+  },
+  primaryBtn: {
+    marginTop: 28,
+    width: '100%',
+    height: 56,
+    borderRadius: 16,
+    backgroundColor: Brand.green,
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 8,
-    marginBottom: 24,
-    ...Platform.select({
-      ios: {
-        shadowColor: '#3B6FA8',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.3,
-        shadowRadius: 8,
-      },
-      android: {
-        elevation: 4,
-      },
-    }),
   },
-  signupButtonDisabled: {
+  primaryBtnDisabled: {
     opacity: 0.6,
   },
-  signupButtonText: {
+  primaryBtnText: {
     color: '#FFFFFF',
-    fontSize: 18,
-    fontWeight: '600',
+    fontSize: 17,
+    fontWeight: '800',
   },
-  loginContainer: {
+  switchRow: {
+    marginTop: 24,
     alignItems: 'center',
-    marginTop: 8,
   },
-  loginText: {
-    fontSize: 16,
-    opacity: 0.7,
+  switchText: {
+    fontSize: 15,
+    color: Brand.onDarkMuted,
   },
-  loginLink: {
-    color: '#3B6FA8',
-    fontWeight: '600',
-    opacity: 1,
+  switchLink: {
+    color: Brand.greenLink,
+    fontWeight: '700',
   },
 });

@@ -364,6 +364,40 @@ export default function MarketingHome() {
   const signedIn = !loading && !!user;
   const heroRef = useRef(null);
 
+  // Capture the arrival URL at first render, before the Supabase client can
+  // strip the "?code=..." param while auto-processing the OAuth callback.
+  const oauthReturnRef = useRef(null);
+  if (oauthReturnRef.current === null) {
+    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      const search = window.location.search || '';
+      const hash = window.location.hash || '';
+      const isReturn =
+        /[?&](code|error|error_description)=/.test(search) ||
+        /access_token=|refresh_token=/.test(hash);
+      oauthReturnRef.current = isReturn ? { search, hash } : false;
+    } else {
+      oauthReturnRef.current = false;
+    }
+  }
+
+  // Send freshly-authenticated users straight into the app instead of leaving
+  // them on the marketing site. Supabase's OAuth redirect can land on the site
+  // root ("/?code=...") rather than /callback (depending on the project's
+  // redirect allow-list). When we detect an OAuth return we hand off to
+  // /callback (which establishes the session and forwards to /app); once the
+  // session is live we go straight to /app. A normal signed-in visitor who
+  // just opens the site (no OAuth params) is left alone to browse.
+  useEffect(() => {
+    if (Platform.OS !== 'web' || typeof window === 'undefined') return;
+    const ret = oauthReturnRef.current;
+    if (!ret) return;
+    if (signedIn) {
+      window.location.replace('/app');
+    } else {
+      window.location.replace(`/callback${ret.search}${ret.hash}`);
+    }
+  }, [signedIn]);
+
   // Hero load animation: the background spiker jumps in from the bottom of
   // the hero. The static (fully visible) state is never touched until GSAP
   // has actually loaded, so crawlers, no-JS visitors, reduced-motion users,

@@ -1,9 +1,8 @@
 import React, { useEffect } from 'react';
-import { View, StyleSheet, ActivityIndicator, Platform } from 'react-native';
+import { View, StyleSheet, ActivityIndicator, Platform, Text } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
+import { Brand } from '@/constants/brand';
 import { supabase } from '@/lib/supabase';
 import { GOOGLE_SHEETS_FLOW_KEY, GOOGLE_SHEETS_PENDING_TOKEN_KEY } from '@/lib/googleSheets';
 
@@ -56,7 +55,7 @@ export default function CallbackScreen() {
 
             if (session) {
               console.log('✅ Session established for user:', session.user.email);
-              router.replace('/(tabs)/home');
+              router.replace('/(tabs)/app');
               return;
             } else {
               console.error('❌ No session after OAuth callback');
@@ -118,7 +117,7 @@ export default function CallbackScreen() {
           }
 
           console.log('✅ Session established for user:', data?.user?.email);
-          router.replace('/(tabs)/home');
+          router.replace('/(tabs)/app');
         } else {
           console.error('❌ No tokens found in callback');
           router.replace({
@@ -137,10 +136,10 @@ export default function CallbackScreen() {
   };
 
   return (
-    <ThemedView style={styles.container}>
-      <ActivityIndicator size="large" color="#3B6FA8" />
-      <ThemedText style={styles.text}>Completing sign in...</ThemedText>
-    </ThemedView>
+    <View style={styles.container}>
+      <ActivityIndicator size="large" color={Brand.greenLink} />
+      <Text style={styles.text}>Completing sign in…</Text>
+    </View>
   );
 }
 
@@ -150,10 +149,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     padding: 24,
+    backgroundColor: Brand.authBg,
   },
   text: {
     marginTop: 16,
-    fontSize: 16,
-    opacity: 0.7,
+    fontSize: 15,
+    color: Brand.onDarkMuted,
   },
 });

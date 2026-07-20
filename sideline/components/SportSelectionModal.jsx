@@ -1,22 +1,17 @@
-import React, { useState } from 'react';
-import {
-  View,
-  StyleSheet,
-  Modal,
-  TouchableOpacity,
-  Platform,
-} from 'react-native';
-import { ThemedText } from './themed-text';
-import { ThemedView } from './themed-view';
-import { SportButtonSelector } from './SportButtonSelector';
-import { IconSymbol } from './ui/icon-symbol';
+/**
+ * SportSelectionModal — redesign: brand-styled bottom sheet shown after
+ * Google sign-up to pick the coached sport (volleyball for now). Was an
+ * old-theme modal with a blue confirm button; behavior unchanged.
+ */
+import { X } from 'lucide-react-native';
+import { useState } from 'react';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import BottomSheet from '@/components/BottomSheet';
+import { Brand } from '@/constants/brand';
 
-export function SportSelectionModal({
-  visible,
-  onClose,
-  onSelect,
-  initialSport = 'Volleyball',
-}) {
+const SPORTS = ['Volleyball'];
+
+export function SportSelectionModal({ visible, onClose, onSelect, initialSport = 'Volleyball' }) {
   const [selectedSport, setSelectedSport] = useState(initialSport);
 
   const handleConfirm = () => {
@@ -25,111 +20,112 @@ export function SportSelectionModal({
   };
 
   return (
-    <Modal
-      visible={visible}
-      transparent
-      animationType="slide"
-      onRequestClose={onClose}
-    >
-      <View style={styles.modalOverlay}>
-        <ThemedView style={styles.modalContent}>
-          <View style={styles.modalHeader}>
-            <ThemedText type="title" style={styles.modalTitle}>
-              Select Your Sport
-            </ThemedText>
-            <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-              <IconSymbol name="xmark" size={22} color="#3B6FA8" />
-            </TouchableOpacity>
-          </View>
-
-          <ThemedText style={styles.modalDescription}>
-            Please select the sport you coach. This helps us provide better insights for your team.
-          </ThemedText>
-
-          <SportButtonSelector
-            selectedSport={selectedSport}
-            onSportChange={setSelectedSport}
-          />
-
-          <TouchableOpacity
-            style={styles.confirmButton}
-            onPress={handleConfirm}
-            activeOpacity={0.8}
-          >
-            <ThemedText style={styles.confirmButtonText}>Confirm</ThemedText>
-          </TouchableOpacity>
-        </ThemedView>
+    <BottomSheet visible={visible} onClose={onClose} maxHeightPct={0.6}>
+      <View style={styles.headerRow}>
+        <Text style={styles.title}>Select your sport</Text>
+        <TouchableOpacity style={styles.closeBtn} onPress={onClose} activeOpacity={0.7}>
+          <X size={13} color={Brand.chip} strokeWidth={2.6} />
+        </TouchableOpacity>
       </View>
-    </Modal>
+
+      <Text style={styles.description}>
+        Pick the sport you coach — it shapes the vocabulary Sideline listens for.
+      </Text>
+
+      <View style={styles.chipRow}>
+        {SPORTS.map((s) => {
+          const sel = selectedSport === s;
+          return (
+            <TouchableOpacity
+              key={s}
+              style={[styles.chip, sel && styles.chipActive]}
+              onPress={() => setSelectedSport(s)}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.chipEmoji}>🏐</Text>
+              <Text style={[styles.chipText, sel && styles.chipTextActive]}>{s}</Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+
+      <TouchableOpacity style={styles.confirmBtn} onPress={handleConfirm} activeOpacity={0.85}>
+        <Text style={styles.confirmBtnText}>Confirm</Text>
+      </TouchableOpacity>
+    </BottomSheet>
   );
 }
 
 const styles = StyleSheet.create({
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'flex-end',
-  },
-  modalContent: {
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    padding: 24,
-    paddingBottom: 40,
-    maxHeight: '80%',
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: -2 },
-        shadowOpacity: 0.25,
-        shadowRadius: 10,
-      },
-      android: {
-        elevation: 10,
-      },
-    }),
-  },
-  modalHeader: {
+  headerRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 16,
   },
-  modalTitle: {
-    fontSize: 24,
-    fontWeight: '700',
-    flex: 1,
+  title: {
+    fontSize: 20,
+    fontWeight: '800',
+    letterSpacing: -0.3,
+    color: Brand.ink,
   },
-  closeButton: {
-    padding: 4,
-  },
-  modalDescription: {
-    fontSize: 14,
-    opacity: 0.7,
-    marginBottom: 24,
-    lineHeight: 20,
-  },
-  confirmButton: {
-    backgroundColor: '#3B6FA8',
-    paddingVertical: 16,
-    borderRadius: 8,
+  closeBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: Brand.hairline,
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 24,
-    ...Platform.select({
-      ios: {
-        shadowColor: '#3B6FA8',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.3,
-        shadowRadius: 8,
-      },
-      android: {
-        elevation: 4,
-      },
-    }),
   },
-  confirmButtonText: {
-    color: '#FFFFFF',
-    fontSize: 18,
-    fontWeight: '600',
+  description: {
+    fontSize: 13.5,
+    color: Brand.muted,
+    lineHeight: 20,
+    marginTop: 10,
+  },
+  chipRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 18,
+  },
+  chip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    height: 46,
+    paddingHorizontal: 16,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: Brand.border2,
+    backgroundColor: Brand.card,
+  },
+  chipActive: {
+    backgroundColor: Brand.green,
+    borderColor: Brand.green,
+  },
+  chipEmoji: {
+    fontSize: 16,
+  },
+  chipText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: Brand.ink,
+  },
+  chipTextActive: {
+    color: '#fff',
+  },
+  confirmBtn: {
+    marginTop: 22,
+    width: '100%',
+    height: 54,
+    borderRadius: 18,
+    backgroundColor: Brand.green,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  confirmBtnText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '700',
   },
 });

@@ -1,25 +1,39 @@
-import React, { useState, useEffect } from 'react';
+/**
+ * Reset password — redesign: dark auth styling matching login/signup (was an
+ * old-theme screen with a blue button). Reached from the password-reset
+ * email link; updates the password on the recovery session, then sends the
+ * coach back to login. Logic unchanged.
+ */
+import { useRouter } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
+import { useState, useEffect } from 'react';
 import {
-  View,
+  ActivityIndicator,
+  Platform,
+  ScrollView,
   StyleSheet,
+  Text,
   TextInput,
   TouchableOpacity,
-  ActivityIndicator,
-  ScrollView,
-  Platform,
+  View,
 } from 'react-native';
-import { useRouter } from 'expo-router';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
+import { EyeIcon, EyeOffIcon } from '@/components/icons/AuthIcons';
+import { Brand } from '@/constants/brand';
 import { supabase } from '@/lib/supabase';
-import { Ionicons } from '@expo/vector-icons';
-import { useColorScheme } from '@/hooks/use-color-scheme';
-import { Colors } from '@/constants/theme';
+
+// on-dark surfaces for the auth forms (kept in sync with login.jsx)
+const Dark = {
+  inputBg: 'rgba(255,255,255,0.06)',
+  inputBorder: 'rgba(255,255,255,0.16)',
+  placeholder: 'rgba(255,255,255,0.35)',
+  label: 'rgba(255,255,255,0.55)',
+  iconMuted: 'rgba(255,255,255,0.5)',
+  error: '#FF8A7A',
+  errorBorder: '#FF6B5C',
+};
 
 export default function ResetPasswordScreen() {
   const router = useRouter();
-  const colorScheme = useColorScheme();
-  const colors = Colors[colorScheme ?? 'light'];
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -42,16 +56,14 @@ export default function ResetPasswordScreen() {
   };
 
   const validateForm = () => {
-    const newErrors: typeof errors = {};
+    const newErrors = {};
 
-    // Password validation
     if (!password) {
       newErrors.password = 'Password is required';
     } else if (password.length < 6) {
       newErrors.password = 'Password must be at least 6 characters';
     }
 
-    // Confirm password validation
     if (!confirmPassword) {
       newErrors.confirmPassword = 'Please confirm your password';
     } else if (password !== confirmPassword) {
@@ -69,8 +81,6 @@ export default function ResetPasswordScreen() {
 
     setLoading(true);
     try {
-      console.log('🔐 Updating password...');
-      
       const { error } = await supabase.auth.updateUser({
         password: password,
       });
@@ -80,191 +90,175 @@ export default function ResetPasswordScreen() {
         if (Platform.OS === 'web') {
           window.alert(`Error: ${error.message}`);
         } else {
-          // Alert not imported for native, would need to import
           console.error('Password reset failed:', error.message);
         }
         setLoading(false);
         return;
       }
 
-      console.log('✅ Password updated successfully');
-      
       if (Platform.OS === 'web') {
         window.alert('Password updated successfully! You can now log in with your new password.');
       }
-      
-      // Redirect to login
+
       router.replace('/(auth)/login');
     } catch (error) {
       console.error('❌ Password reset exception:', error);
       const errorMsg = error.message || 'Failed to reset password';
-      
       if (Platform.OS === 'web') {
         window.alert(`Error: ${errorMsg}`);
       }
-      
       setLoading(false);
     }
   };
 
   return (
-    <ThemedView style={styles.container}>
+    <View style={styles.container}>
+      <StatusBar style="light" />
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
       >
-        <View style={styles.header}>
-          <ThemedText type="title" style={styles.title}>
-            Reset Password
-          </ThemedText>
-          <ThemedText style={styles.subtitle}>
-            Enter your new password below
-          </ThemedText>
-        </View>
+        <Text style={styles.title}>Reset password</Text>
+        <Text style={styles.subtitle}>Choose a new password for your account.</Text>
 
-        {/* New Password Input */}
-        <View style={styles.inputContainer}>
-          <ThemedText style={styles.label}>New Password</ThemedText>
-          <View style={styles.passwordInputContainer}>
-            <TextInput
-              style={[
-                styles.input,
-                styles.passwordInput,
-                { color: colors.text, backgroundColor: colors.background },
-                errors.password && styles.inputError,
-              ]}
-              placeholder="Enter new password"
-              placeholderTextColor={colors.text + '80'}
-              value={password}
-              onChangeText={(text) => {
-                setPassword(text);
-                if (errors.password) setErrors({ ...errors, password: undefined });
-              }}
-              secureTextEntry={!showPassword}
-              editable={!loading}
-            />
-            <TouchableOpacity
-              style={styles.eyeIcon}
-              onPress={() => setShowPassword(!showPassword)}
-            >
-              <Ionicons
-                name={showPassword ? 'eye-off-outline' : 'eye-outline'}
-                size={24}
-                color={colors.icon}
-              />
-            </TouchableOpacity>
-          </View>
-          {errors.password && (
-            <ThemedText style={styles.errorText}>{errors.password}</ThemedText>
-          )}
+        {/* new password */}
+        <Text style={styles.fieldLabel}>NEW PASSWORD</Text>
+        <View style={styles.passwordWrap}>
+          <TextInput
+            style={[styles.input, styles.passwordInput, errors.password && styles.inputError]}
+            placeholder="At least 6 characters"
+            placeholderTextColor={Dark.placeholder}
+            value={password}
+            onChangeText={(text) => {
+              setPassword(text);
+              if (errors.password) setErrors({ ...errors, password: undefined });
+            }}
+            secureTextEntry={!showPassword}
+            keyboardAppearance="dark"
+            editable={!loading}
+          />
+          <TouchableOpacity
+            style={styles.eyeIcon}
+            onPress={() => setShowPassword(!showPassword)}
+            activeOpacity={0.7}
+          >
+            {showPassword ? (
+              <EyeOffIcon size={22} color={Dark.iconMuted} />
+            ) : (
+              <EyeIcon size={22} color={Dark.iconMuted} />
+            )}
+          </TouchableOpacity>
         </View>
+        {errors.password && <Text style={styles.errorText}>{errors.password}</Text>}
 
-        {/* Confirm Password Input */}
-        <View style={styles.inputContainer}>
-          <ThemedText style={styles.label}>Confirm New Password</ThemedText>
-          <View style={styles.passwordInputContainer}>
-            <TextInput
-              style={[
-                styles.input,
-                styles.passwordInput,
-                { color: colors.text, backgroundColor: colors.background },
-                errors.confirmPassword && styles.inputError,
-              ]}
-              placeholder="Confirm new password"
-              placeholderTextColor={colors.text + '80'}
-              value={confirmPassword}
-              onChangeText={(text) => {
-                setConfirmPassword(text);
-                if (errors.confirmPassword) setErrors({ ...errors, confirmPassword: undefined });
-              }}
-              secureTextEntry={!showConfirmPassword}
-              editable={!loading}
-            />
-            <TouchableOpacity
-              style={styles.eyeIcon}
-              onPress={() => setShowConfirmPassword(!showConfirmPassword)}
-            >
-              <Ionicons
-                name={showConfirmPassword ? 'eye-off-outline' : 'eye-outline'}
-                size={24}
-                color={colors.icon}
-              />
-            </TouchableOpacity>
-          </View>
-          {errors.confirmPassword && (
-            <ThemedText style={styles.errorText}>{errors.confirmPassword}</ThemedText>
-          )}
+        {/* confirm password */}
+        <Text style={styles.fieldLabel}>CONFIRM NEW PASSWORD</Text>
+        <View style={styles.passwordWrap}>
+          <TextInput
+            style={[
+              styles.input,
+              styles.passwordInput,
+              errors.confirmPassword && styles.inputError,
+            ]}
+            placeholder="Type it again"
+            placeholderTextColor={Dark.placeholder}
+            value={confirmPassword}
+            onChangeText={(text) => {
+              setConfirmPassword(text);
+              if (errors.confirmPassword) setErrors({ ...errors, confirmPassword: undefined });
+            }}
+            secureTextEntry={!showConfirmPassword}
+            keyboardAppearance="dark"
+            editable={!loading}
+          />
+          <TouchableOpacity
+            style={styles.eyeIcon}
+            onPress={() => setShowConfirmPassword(!showConfirmPassword)}
+            activeOpacity={0.7}
+          >
+            {showConfirmPassword ? (
+              <EyeOffIcon size={22} color={Dark.iconMuted} />
+            ) : (
+              <EyeIcon size={22} color={Dark.iconMuted} />
+            )}
+          </TouchableOpacity>
         </View>
+        {errors.confirmPassword && (
+          <Text style={styles.errorText}>{errors.confirmPassword}</Text>
+        )}
 
-        {/* Reset Password Button */}
+        {/* reset */}
         <TouchableOpacity
-          style={[styles.resetButton, loading && styles.resetButtonDisabled]}
+          style={[styles.primaryBtn, loading && styles.primaryBtnDisabled]}
           onPress={handleResetPassword}
           disabled={loading}
-          activeOpacity={0.8}
+          activeOpacity={0.85}
         >
           {loading ? (
             <ActivityIndicator color="#FFFFFF" />
           ) : (
-            <ThemedText style={styles.resetButtonText}>Reset Password</ThemedText>
+            <Text style={styles.primaryBtnText}>Reset Password</Text>
           )}
         </TouchableOpacity>
 
-        {/* Back to Login Link */}
-        <View style={styles.loginContainer}>
-          <TouchableOpacity onPress={() => router.push('/(auth)/login')}>
-            <ThemedText style={styles.loginText}>
-              Back to Login
-            </ThemedText>
-          </TouchableOpacity>
-        </View>
+        <TouchableOpacity
+          style={styles.switchRow}
+          onPress={() => router.push('/(auth)/login')}
+          activeOpacity={0.7}
+        >
+          <Text style={styles.switchText}>
+            Back to <Text style={styles.switchLink}>Login</Text>
+          </Text>
+        </TouchableOpacity>
       </ScrollView>
-    </ThemedView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: Brand.authBg,
   },
   scrollContent: {
-    padding: 24,
-    paddingTop: 60,
-    paddingBottom: 60,
-  },
-  header: {
-    marginBottom: 32,
+    flexGrow: 1,
+    paddingHorizontal: 26,
+    paddingTop: 84,
+    paddingBottom: 48,
   },
   title: {
-    fontSize: 32,
-    fontWeight: '700',
-    textAlign: 'center',
-    marginBottom: 8,
+    fontSize: 30,
+    fontWeight: '800',
+    letterSpacing: -0.4,
+    color: '#FFFFFF',
   },
   subtitle: {
-    fontSize: 16,
-    textAlign: 'center',
-    opacity: 0.7,
+    fontSize: 15,
+    color: Brand.onDarkMuted,
+    marginTop: 6,
+    lineHeight: 22,
   },
-  inputContainer: {
-    marginBottom: 20,
-  },
-  label: {
-    fontSize: 16,
-    fontWeight: '600',
+  fieldLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 1.4,
+    color: Dark.label,
+    marginTop: 22,
     marginBottom: 8,
-    opacity: 0.8,
   },
   input: {
+    width: '100%',
+    height: 52,
     borderWidth: 1,
-    borderColor: '#E0E0E0',
-    borderRadius: 8,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    borderColor: Dark.inputBorder,
+    borderRadius: 14,
+    paddingHorizontal: 15,
     fontSize: 16,
-    minHeight: 50,
+    color: '#FFFFFF',
+    backgroundColor: Dark.inputBg,
   },
-  passwordInputContainer: {
+  passwordWrap: {
     position: 'relative',
     width: '100%',
   },
@@ -273,53 +267,44 @@ const styles = StyleSheet.create({
   },
   eyeIcon: {
     position: 'absolute',
-    right: 12,
-    top: 13,
-    padding: 4,
+    right: 14,
+    top: 15,
   },
   inputError: {
-    borderColor: '#FF6B4A',
+    borderColor: Dark.errorBorder,
   },
   errorText: {
-    color: '#FF6B4A',
-    fontSize: 12,
-    marginTop: 4,
+    color: Dark.error,
+    fontSize: 12.5,
+    marginTop: 6,
   },
-  resetButton: {
-    backgroundColor: '#3B6FA8',
-    paddingVertical: 16,
-    borderRadius: 8,
+  primaryBtn: {
+    marginTop: 28,
+    width: '100%',
+    height: 56,
+    borderRadius: 16,
+    backgroundColor: Brand.green,
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 8,
-    marginBottom: 24,
-    ...Platform.select({
-      ios: {
-        shadowColor: '#3B6FA8',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.3,
-        shadowRadius: 8,
-      },
-      android: {
-        elevation: 4,
-      },
-    }),
   },
-  resetButtonDisabled: {
+  primaryBtnDisabled: {
     opacity: 0.6,
   },
-  resetButtonText: {
+  primaryBtnText: {
     color: '#FFFFFF',
-    fontSize: 18,
-    fontWeight: '600',
+    fontSize: 17,
+    fontWeight: '800',
   },
-  loginContainer: {
+  switchRow: {
+    marginTop: 24,
     alignItems: 'center',
-    marginTop: 8,
   },
-  loginText: {
-    color: '#3B6FA8',
-    fontSize: 16,
-    fontWeight: '600',
+  switchText: {
+    fontSize: 15,
+    color: Brand.onDarkMuted,
+  },
+  switchLink: {
+    color: Brand.greenLink,
+    fontWeight: '700',
   },
 });

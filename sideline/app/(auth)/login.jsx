@@ -1,29 +1,46 @@
-import React, { useState, useEffect } from 'react';
+/**
+ * Login — redesign: black auth background matching the welcome screen, white
+ * Google button, on-dark inputs with uppercase eyebrow labels, green Sign In.
+ * Auth logic (Supabase email/password, Google OAuth, password reset) is
+ * unchanged from the previous version.
+ */
+import { useRouter, useLocalSearchParams } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
+import { ChevronLeft } from 'lucide-react-native';
+import { useState, useEffect } from 'react';
 import {
-  View,
+  ActivityIndicator,
+  Platform,
+  ScrollView,
   StyleSheet,
+  Text,
   TextInput,
   TouchableOpacity,
-  ActivityIndicator,
-  ScrollView,
-  Platform,
+  View,
 } from 'react-native';
-import { useRouter, useLocalSearchParams } from 'expo-router';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { supabase } from '@/lib/supabase';
+import { EyeIcon, EyeOffIcon, GoogleLogoIcon } from '@/components/icons/AuthIcons';
+import { Brand } from '@/constants/brand';
 import { showAlert } from '@/lib/alert';
 import { signInWithGoogle } from '@/lib/googleAuth';
-import { IconSymbol } from '@/components/ui/icon-symbol';
-import { useColorScheme } from '@/hooks/use-color-scheme';
-import { Colors } from '@/constants/theme';
-import { EyeIcon, EyeOffIcon, GoogleLogoIcon } from '@/components/icons/AuthIcons';
+import { supabase } from '@/lib/supabase';
+
+// on-dark surfaces for the auth forms (welcome.jsx's black world)
+const Dark = {
+  inputBg: 'rgba(255,255,255,0.06)',
+  inputBorder: 'rgba(255,255,255,0.16)',
+  placeholder: 'rgba(255,255,255,0.35)',
+  label: 'rgba(255,255,255,0.55)',
+  divider: 'rgba(255,255,255,0.14)',
+  dividerText: 'rgba(255,255,255,0.45)',
+  iconMuted: 'rgba(255,255,255,0.5)',
+  backBtnBg: 'rgba(255,255,255,0.09)',
+  error: '#FF8A7A',
+  errorBorder: '#FF6B5C',
+};
 
 export default function LoginScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
-  const colorScheme = useColorScheme();
-  const colors = Colors[colorScheme ?? 'light'];
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -42,24 +59,18 @@ export default function LoginScreen() {
     }
   }, [params.error]);
 
-  // Email validation regex
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
   const validateForm = () => {
-    const newErrors: typeof errors = {};
-
-    // Email validation
+    const newErrors = {};
     if (!email.trim()) {
       newErrors.email = 'Email is required';
     } else if (!emailRegex.test(email)) {
       newErrors.email = 'Please enter a valid email address';
     }
-
-    // Password validation
     if (!password) {
       newErrors.password = 'Password is required';
     }
-
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -71,7 +82,7 @@ export default function LoginScreen() {
 
     setLoading(true);
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({
+      const { error } = await supabase.auth.signInWithPassword({
         email: email.trim(),
         password: password,
       });
@@ -89,11 +100,9 @@ export default function LoginScreen() {
 
       console.log('✅ Login successful!');
       // AuthContext will handle navigation via the RootLayoutNav
-      // No need to manually navigate - the useEffect in _layout.tsx will handle it
     } catch (error) {
       console.error('Login error:', error);
       const errorMsg = error.message || 'An unexpected error occurred during login. Please try again.';
-      
       if (Platform.OS === 'web') {
         window.alert(`Error: ${errorMsg}`);
       } else {
@@ -107,7 +116,7 @@ export default function LoginScreen() {
   const handleGoogleLogin = async () => {
     setLoading(true);
     try {
-      const { data, error } = await signInWithGoogle();
+      const { error } = await signInWithGoogle();
       if (error) {
         if (Platform.OS === 'web') {
           window.alert(`Google Sign-In Error: ${error.message}`);
@@ -117,9 +126,7 @@ export default function LoginScreen() {
         setLoading(false);
         return;
       }
-
       // AuthContext will handle navigation via the RootLayoutNav
-      // No need to manually navigate - the useEffect in _layout.tsx will handle it
       setLoading(false);
     } catch (error) {
       const errorMsg = error.message || 'An error occurred during Google sign-in';
@@ -133,7 +140,6 @@ export default function LoginScreen() {
   };
 
   const handleForgotPassword = async () => {
-    // Validate email first
     if (!email.trim()) {
       if (Platform.OS === 'web') {
         window.alert('Please enter your email address first');
@@ -154,10 +160,8 @@ export default function LoginScreen() {
 
     setResetLoading(true);
     try {
-      console.log('📧 Sending password reset email to:', email);
-      
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: Platform.OS === 'web' 
+        redirectTo: Platform.OS === 'web'
           ? `${window.location.origin}/reset-password`
           : 'sideline://reset-password',
       });
@@ -173,8 +177,6 @@ export default function LoginScreen() {
         return;
       }
 
-      console.log('✅ Password reset email sent');
-      
       if (Platform.OS === 'web') {
         window.alert(`Password reset email sent! Check your email (${email}) for a link to reset your password.`);
       } else {
@@ -184,324 +186,291 @@ export default function LoginScreen() {
           [{ text: 'OK' }]
         );
       }
-      
       setResetLoading(false);
     } catch (error) {
       console.error('❌ Password reset exception:', error);
       const errorMsg = error.message || 'Failed to send password reset email';
-      
       if (Platform.OS === 'web') {
         window.alert(`Error: ${errorMsg}`);
       } else {
         showAlert('Error', errorMsg);
       }
-      
       setResetLoading(false);
     }
   };
 
   return (
-    <ThemedView style={styles.container}>
+    <View style={styles.container}>
+      <StatusBar style="light" />
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
       >
-        <View style={styles.header}>
-          <TouchableOpacity
-            style={styles.backButton}
-            onPress={() => router.back()}
-          >
-            <IconSymbol name="xmark" size={22} color="#3B6FA8" />
-          </TouchableOpacity>
-          <ThemedText type="title" style={styles.title}>
-            Welcome Back
-          </ThemedText>
-        </View>
-
-        {/* Google Sign-In Button */}
+        {/* header */}
         <TouchableOpacity
-          style={styles.googleButton}
+          style={styles.backBtn}
+          onPress={() => router.back()}
+          activeOpacity={0.7}
+          accessibilityLabel="Go back"
+        >
+          <ChevronLeft size={18} color="#fff" strokeWidth={2.4} />
+        </TouchableOpacity>
+        <Text style={styles.title}>Welcome back</Text>
+        <Text style={styles.subtitle}>Sign in to pick up where you left off.</Text>
+
+        {/* Google */}
+        <TouchableOpacity
+          style={styles.googleBtn}
           onPress={handleGoogleLogin}
           disabled={loading}
-          activeOpacity={0.8}
+          activeOpacity={0.85}
         >
           {loading ? (
-            <ActivityIndicator color="#FFFFFF" />
+            <ActivityIndicator color={Brand.ink} />
           ) : (
             <>
-              <GoogleLogoIcon size={20} />
-              <ThemedText style={styles.googleButtonText}>
-                Sign in with Google
-              </ThemedText>
+              <GoogleLogoIcon size={19} color={Brand.ink} />
+              <Text style={styles.googleBtnText}>Continue with Google</Text>
             </>
           )}
         </TouchableOpacity>
 
         <View style={styles.divider}>
           <View style={styles.dividerLine} />
-          <ThemedText style={styles.dividerText}>OR</ThemedText>
+          <Text style={styles.dividerText}>OR</Text>
           <View style={styles.dividerLine} />
         </View>
 
-        {/* Email Input */}
-        <View style={styles.inputContainer}>
-          <ThemedText style={styles.label}>Email</ThemedText>
+        {/* email */}
+        <Text style={styles.fieldLabel}>EMAIL</Text>
+        <TextInput
+          style={[styles.input, errors.email && styles.inputError]}
+          placeholder="coach@school.edu"
+          placeholderTextColor={Dark.placeholder}
+          value={email}
+          onChangeText={(text) => {
+            setEmail(text);
+            if (errors.email) setErrors({ ...errors, email: undefined });
+          }}
+          keyboardType="email-address"
+          autoCapitalize="none"
+          autoCorrect={false}
+          keyboardAppearance="dark"
+          editable={!loading}
+        />
+        {errors.email && <Text style={styles.errorText}>{errors.email}</Text>}
+
+        {/* password */}
+        <Text style={styles.fieldLabel}>PASSWORD</Text>
+        <View style={styles.passwordWrap}>
           <TextInput
-            style={[
-              styles.input,
-              { color: colors.text, backgroundColor: colors.background },
-              errors.email && styles.inputError,
-            ]}
-            placeholder="Enter your email"
-            placeholderTextColor={colors.text + '80'}
-            value={email}
+            style={[styles.input, styles.passwordInput, errors.password && styles.inputError]}
+            placeholder="Your password"
+            placeholderTextColor={Dark.placeholder}
+            value={password}
             onChangeText={(text) => {
-              setEmail(text);
-              if (errors.email) setErrors({ ...errors, email: undefined });
+              setPassword(text);
+              if (errors.password) setErrors({ ...errors, password: undefined });
             }}
-            keyboardType="email-address"
-            autoCapitalize="none"
-            autoCorrect={false}
+            secureTextEntry={!showPassword}
+            keyboardAppearance="dark"
             editable={!loading}
           />
-          {errors.email && (
-            <ThemedText style={styles.errorText}>{errors.email}</ThemedText>
-          )}
-        </View>
-
-        {/* Password Input */}
-        <View style={styles.inputContainer}>
-          <ThemedText style={styles.label}>Password</ThemedText>
-          <View style={styles.passwordInputContainer}>
-            <TextInput
-              style={[
-                styles.input,
-                styles.passwordInput,
-                { color: colors.text, backgroundColor: colors.background },
-                errors.password && styles.inputError,
-              ]}
-              placeholder="Enter your password"
-              placeholderTextColor={colors.text + '80'}
-              value={password}
-              onChangeText={(text) => {
-                setPassword(text);
-                if (errors.password) setErrors({ ...errors, password: undefined });
-              }}
-              secureTextEntry={!showPassword}
-              editable={!loading}
-            />
-            <TouchableOpacity
-              style={styles.eyeIcon}
-              onPress={() => setShowPassword(!showPassword)}
-            >
-              {showPassword ? (
-                <EyeOffIcon size={24} color={colors.icon} />
-              ) : (
-                <EyeIcon size={24} color={colors.icon} />
-              )}
-            </TouchableOpacity>
-          </View>
-          {errors.password && (
-            <ThemedText style={styles.errorText}>{errors.password}</ThemedText>
-          )}
-          
-          {/* Forgot Password Link */}
-          <TouchableOpacity 
-            onPress={handleForgotPassword}
-            disabled={resetLoading}
-            style={styles.forgotPasswordContainer}
+          <TouchableOpacity
+            style={styles.eyeIcon}
+            onPress={() => setShowPassword(!showPassword)}
+            activeOpacity={0.7}
           >
-            <ThemedText style={styles.forgotPasswordText}>
-              {resetLoading ? 'Sending...' : 'Forgot Password?'}
-            </ThemedText>
+            {showPassword ? (
+              <EyeOffIcon size={22} color={Dark.iconMuted} />
+            ) : (
+              <EyeIcon size={22} color={Dark.iconMuted} />
+            )}
           </TouchableOpacity>
         </View>
+        {errors.password && <Text style={styles.errorText}>{errors.password}</Text>}
 
-        {/* Login Button */}
         <TouchableOpacity
-          style={[styles.loginButton, loading && styles.loginButtonDisabled]}
+          onPress={handleForgotPassword}
+          disabled={resetLoading}
+          style={styles.forgotWrap}
+          activeOpacity={0.7}
+        >
+          <Text style={styles.forgotText}>
+            {resetLoading ? 'Sending…' : 'Forgot password?'}
+          </Text>
+        </TouchableOpacity>
+
+        {/* sign in */}
+        <TouchableOpacity
+          style={[styles.primaryBtn, loading && styles.primaryBtnDisabled]}
           onPress={handleLogin}
           disabled={loading}
-          activeOpacity={0.8}
+          activeOpacity={0.85}
         >
           {loading ? (
             <ActivityIndicator color="#FFFFFF" />
           ) : (
-            <ThemedText style={styles.loginButtonText}>Sign In</ThemedText>
+            <Text style={styles.primaryBtnText}>Sign In</Text>
           )}
         </TouchableOpacity>
 
-        {/* Sign Up Link */}
-        <View style={styles.signupContainer}>
-          <ThemedText style={styles.signupText}>
-            Don't have an account?{' '}
-            <ThemedText
-              style={styles.signupLink}
-              onPress={() => router.push('/(auth)/signup')}
-            >
-              Sign Up
-            </ThemedText>
-          </ThemedText>
-        </View>
+        <TouchableOpacity
+          style={styles.switchRow}
+          onPress={() => router.push('/(auth)/signup')}
+          activeOpacity={0.7}
+        >
+          <Text style={styles.switchText}>
+            Don’t have an account? <Text style={styles.switchLink}>Sign up</Text>
+          </Text>
+        </TouchableOpacity>
       </ScrollView>
-    </ThemedView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: Brand.authBg,
   },
   scrollContent: {
-    padding: 24,
-    paddingTop: Platform.OS === 'web' ? 32 : 60,
-    paddingBottom: 60,
+    flexGrow: 1,
+    paddingHorizontal: 26,
+    paddingTop: 56,
+    paddingBottom: 48,
   },
-  header: {
-    marginBottom: 32,
-    position: 'relative',
-  },
-  backButton: {
-    position: 'absolute',
-    left: 0,
-    top: 0,
-    zIndex: 1,
-    padding: 4,
+  backBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: Dark.backBtnBg,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   title: {
-    fontSize: 32,
-    fontWeight: '700',
-    textAlign: 'center',
+    fontSize: 30,
+    fontWeight: '800',
+    letterSpacing: -0.4,
+    color: '#FFFFFF',
+    marginTop: 26,
   },
-  googleButton: {
+  subtitle: {
+    fontSize: 15,
+    color: Brand.onDarkMuted,
+    marginTop: 6,
+    lineHeight: 22,
+  },
+  googleBtn: {
+    marginTop: 28,
+    width: '100%',
+    height: 54,
+    borderRadius: 16,
+    backgroundColor: '#FFFFFF',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#4285F4',
-    paddingVertical: 14,
-    borderRadius: 8,
-    marginBottom: 24,
-    gap: 8,
-    ...Platform.select({
-      ios: {
-        shadowColor: '#4285F4',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.2,
-        shadowRadius: 4,
-      },
-      android: {
-        elevation: 2,
-      },
-    }),
+    gap: 10,
   },
-  googleButtonText: {
-    color: '#FFFFFF',
+  googleBtnText: {
+    color: Brand.ink,
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: '700',
   },
   divider: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 24,
+    marginTop: 22,
+    marginBottom: 4,
   },
   dividerLine: {
     flex: 1,
     height: 1,
-    backgroundColor: '#E0E0E0',
+    backgroundColor: Dark.divider,
   },
   dividerText: {
-    marginHorizontal: 16,
-    fontSize: 14,
-    opacity: 0.6,
+    marginHorizontal: 14,
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 1.2,
+    color: Dark.dividerText,
   },
-  inputContainer: {
-    marginBottom: 20,
-  },
-  label: {
-    fontSize: 16,
-    fontWeight: '600',
+  fieldLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 1.4,
+    color: Dark.label,
+    marginTop: 20,
     marginBottom: 8,
-    opacity: 0.8,
   },
   input: {
+    width: '100%',
+    height: 52,
     borderWidth: 1,
-    borderColor: '#E0E0E0',
-    borderRadius: 8,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    borderColor: Dark.inputBorder,
+    borderRadius: 14,
+    paddingHorizontal: 15,
     fontSize: 16,
-    minHeight: 50,
+    color: '#FFFFFF',
+    backgroundColor: Dark.inputBg,
   },
-  passwordInputContainer: {
+  passwordWrap: {
     position: 'relative',
     width: '100%',
   },
   passwordInput: {
-    paddingRight: 50, // Make room for the eye icon
+    paddingRight: 50,
   },
   eyeIcon: {
     position: 'absolute',
-    right: 12,
-    top: 13,
-    padding: 4,
+    right: 14,
+    top: 15,
   },
   inputError: {
-    borderColor: '#FF6B4A',
+    borderColor: Dark.errorBorder,
   },
   errorText: {
-    color: '#FF6B4A',
-    fontSize: 12,
-    marginTop: 4,
+    color: Dark.error,
+    fontSize: 12.5,
+    marginTop: 6,
   },
-  forgotPasswordContainer: {
+  forgotWrap: {
     alignSelf: 'flex-end',
-    marginTop: 8,
+    marginTop: 12,
   },
-  forgotPasswordText: {
-    color: '#3B6FA8',
+  forgotText: {
+    color: Brand.greenLink,
     fontSize: 14,
-    fontWeight: '600',
-    textDecorationLine: 'underline',
+    fontWeight: '700',
   },
-  loginButton: {
-    backgroundColor: '#3B6FA8',
-    paddingVertical: 16,
-    borderRadius: 8,
+  primaryBtn: {
+    marginTop: 26,
+    width: '100%',
+    height: 56,
+    borderRadius: 16,
+    backgroundColor: Brand.green,
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 16,
-    marginBottom: 24,
-    ...Platform.select({
-      ios: {
-        shadowColor: '#3B6FA8',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.3,
-        shadowRadius: 8,
-      },
-      android: {
-        elevation: 4,
-      },
-    }),
   },
-  loginButtonDisabled: {
+  primaryBtnDisabled: {
     opacity: 0.6,
   },
-  loginButtonText: {
+  primaryBtnText: {
     color: '#FFFFFF',
-    fontSize: 18,
-    fontWeight: '600',
+    fontSize: 17,
+    fontWeight: '800',
   },
-  signupContainer: {
+  switchRow: {
+    marginTop: 24,
     alignItems: 'center',
-    marginTop: 8,
   },
-  signupText: {
-    fontSize: 16,
-    opacity: 0.7,
+  switchText: {
+    fontSize: 15,
+    color: Brand.onDarkMuted,
   },
-  signupLink: {
-    color: '#3B6FA8',
-    fontWeight: '600',
-    opacity: 1,
+  switchLink: {
+    color: Brand.greenLink,
+    fontWeight: '700',
   },
 });
