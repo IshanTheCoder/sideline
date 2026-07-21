@@ -34,9 +34,13 @@ const parseScheduleImage = async (imageAsset) => {
 const isWebPicker = Platform.OS === 'web' && typeof unstable_createElement === 'function';
 
 // Extra CSS the DOM input needs that RN styles don't cover (kept out of
-// StyleSheet.create so native never sees web-only properties).
+// StyleSheet.create so native never sees web-only properties). Form controls
+// don't inherit body typography by default, so `inherit` here would fall
+// back to the browser's UI font — spell out RN Web's own system font stack
+// (see createReactDOMStyle.js) so the native date/time picker matches every
+// other Text element in the app.
 const webPickerCss = {
-  fontFamily: 'inherit',
+  fontFamily: '-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif',
   boxSizing: 'border-box',
   colorScheme: 'light',
 };
