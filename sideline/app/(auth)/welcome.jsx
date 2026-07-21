@@ -38,7 +38,7 @@ export default function WelcomeScreen() {
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         <View style={styles.center}>
           <Image
-            source={require('@/assets/images/whistle.png')}
+            source={require('@/assets/images/app-logo.png')}
             style={styles.whistle}
             resizeMode="contain"
           />
@@ -105,8 +105,8 @@ const styles = StyleSheet.create({
     paddingBottom: 20,
   },
   whistle: {
-    width: 220,
-    height: 220,
+    width: 300,
+    height: 300,
   },
   wordmark: {
     fontSize: 56,
