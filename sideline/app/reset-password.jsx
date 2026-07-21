@@ -9,7 +9,6 @@ import { StatusBar } from 'expo-status-bar';
 import { useState, useEffect } from 'react';
 import {
   ActivityIndicator,
-  Platform,
   ScrollView,
   StyleSheet,
   Text,
@@ -19,6 +18,7 @@ import {
 } from 'react-native';
 import { EyeIcon, EyeOffIcon } from '@/components/icons/AuthIcons';
 import { Brand } from '@/constants/brand';
+import { showAlert } from '@/lib/alert';
 import { supabase } from '@/lib/supabase';
 
 // on-dark surfaces for the auth forms (kept in sync with login.jsx)
@@ -87,26 +87,17 @@ export default function ResetPasswordScreen() {
 
       if (error) {
         console.error('❌ Password update error:', error);
-        if (Platform.OS === 'web') {
-          window.alert(`Error: ${error.message}`);
-        } else {
-          console.error('Password reset failed:', error.message);
-        }
+        showAlert('Error', error.message);
         setLoading(false);
         return;
       }
 
-      if (Platform.OS === 'web') {
-        window.alert('Password updated successfully! You can now log in with your new password.');
-      }
-
-      router.replace('/(auth)/login');
+      showAlert('Password Updated', 'You can now log in with your new password.', [
+        { text: 'OK', onPress: () => router.replace('/(auth)/login') },
+      ]);
     } catch (error) {
       console.error('❌ Password reset exception:', error);
-      const errorMsg = error.message || 'Failed to reset password';
-      if (Platform.OS === 'web') {
-        window.alert(`Error: ${errorMsg}`);
-      }
+      showAlert('Error', error.message || 'Failed to reset password');
       setLoading(false);
     }
   };

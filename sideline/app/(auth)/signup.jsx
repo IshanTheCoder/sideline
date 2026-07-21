@@ -11,7 +11,6 @@ import { ChevronLeft } from 'lucide-react-native';
 import { useState } from 'react';
 import {
   ActivityIndicator,
-  Platform,
   ScrollView,
   StyleSheet,
   Text,
@@ -109,21 +108,13 @@ export default function SignupScreen() {
 
       if (authError) {
         console.error('Signup error:', authError);
-        if (Platform.OS === 'web') {
-          window.alert(`Signup Error: ${authError.message}`);
-        } else {
-          showAlert('Signup Error', authError.message);
-        }
+        showAlert('Signup Error', authError.message);
         setLoading(false);
         return;
       }
 
       if (!authData.user) {
-        if (Platform.OS === 'web') {
-          window.alert('Error: Failed to create account. Please try again.');
-        } else {
-          showAlert('Error', 'Failed to create account. Please try again.');
-        }
+        showAlert('Error', 'Failed to create account. Please try again.');
         setLoading(false);
         return;
       }
@@ -143,30 +134,18 @@ export default function SignupScreen() {
         // Show error to user but don't completely fail the signup
         const errorMsg = 'Your account was created, but there was an issue setting up your profile. You can update your profile later.\n\nError: ' + profileError.message;
 
-        if (Platform.OS === 'web') {
-          window.alert(errorMsg);
-          router.push('/(auth)/login');
-        } else {
-          showAlert('Profile Creation Warning', errorMsg, [
-            { text: 'OK', onPress: () => router.push('/(auth)/login') },
-          ]);
-        }
+        showAlert('Profile Creation Warning', errorMsg, [
+          { text: 'OK', onPress: () => router.push('/(auth)/login') },
+        ]);
         setLoading(false);
         return;
       }
 
       console.log('✅ Account created successfully!');
-      const successMsg = 'Account created successfully! Please check your email to verify your account.';
-
-      if (Platform.OS === 'web') {
-        window.alert(successMsg);
-        setTeamName('');
-        setEmail('');
-        setPassword('');
-        setConfirmPassword('');
-        router.push('/(auth)/login');
-      } else {
-        showAlert('Success', successMsg, [
+      showAlert(
+        'Success',
+        'Account created successfully! Please check your email to verify your account.',
+        [
           {
             text: 'OK',
             onPress: () => {
@@ -177,17 +156,12 @@ export default function SignupScreen() {
               router.push('/(auth)/login');
             },
           },
-        ]);
-      }
+        ]
+      );
       setLoading(false);
     } catch (error) {
       console.error('Signup error:', error);
-      const errorMsg = error.message || 'An unexpected error occurred during signup. Please try again.';
-      if (Platform.OS === 'web') {
-        window.alert(`Error: ${errorMsg}`);
-      } else {
-        showAlert('Error', errorMsg);
-      }
+      showAlert('Error', error.message || 'An unexpected error occurred during signup. Please try again.');
       setLoading(false);
     }
   };

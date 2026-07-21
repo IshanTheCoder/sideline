@@ -13,6 +13,7 @@ import { AuthProvider, useAuth } from '@/contexts/AuthContext';
 import { ActiveSessionProvider } from '@/contexts/ActiveSessionContext';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Colors } from '@/constants/theme';
+import AlertHost from '@/components/AppAlert';
 
 export const unstable_settings = {
   initialRouteName: '(tabs)',
@@ -130,6 +131,7 @@ function ThemedNavigationProvider() {
   return (
     <NavigationThemeProvider value={DarkTheme}>
       <RootLayoutNav />
+      <AlertHost />
       <StatusBar style="light" />
     </NavigationThemeProvider>
   );

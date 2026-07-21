@@ -51,11 +51,7 @@ export default function LoginScreen() {
   // Show error from OAuth callback if present
   useEffect(() => {
     if (params.error) {
-      if (Platform.OS === 'web') {
-        window.alert(`Authentication Error: ${params.error}`);
-      } else {
-        showAlert('Authentication Error', params.error);
-      }
+      showAlert('Authentication Error', params.error);
     }
   }, [params.error]);
 
@@ -89,11 +85,7 @@ export default function LoginScreen() {
 
       if (error) {
         console.error('Login error:', error);
-        if (Platform.OS === 'web') {
-          window.alert(`Login Error: ${error.message}`);
-        } else {
-          showAlert('Login Error', error.message);
-        }
+        showAlert('Login Error', error.message);
         setLoading(false);
         return;
       }
@@ -102,12 +94,7 @@ export default function LoginScreen() {
       // AuthContext will handle navigation via the RootLayoutNav
     } catch (error) {
       console.error('Login error:', error);
-      const errorMsg = error.message || 'An unexpected error occurred during login. Please try again.';
-      if (Platform.OS === 'web') {
-        window.alert(`Error: ${errorMsg}`);
-      } else {
-        showAlert('Error', errorMsg);
-      }
+      showAlert('Error', error.message || 'An unexpected error occurred during login. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -118,43 +105,26 @@ export default function LoginScreen() {
     try {
       const { error } = await signInWithGoogle();
       if (error) {
-        if (Platform.OS === 'web') {
-          window.alert(`Google Sign-In Error: ${error.message}`);
-        } else {
-          showAlert('Google Sign-In Error', error.message);
-        }
+        showAlert('Google Sign-In Error', error.message);
         setLoading(false);
         return;
       }
       // AuthContext will handle navigation via the RootLayoutNav
       setLoading(false);
     } catch (error) {
-      const errorMsg = error.message || 'An error occurred during Google sign-in';
-      if (Platform.OS === 'web') {
-        window.alert(`Error: ${errorMsg}`);
-      } else {
-        showAlert('Error', errorMsg);
-      }
+      showAlert('Error', error.message || 'An error occurred during Google sign-in');
       setLoading(false);
     }
   };
 
   const handleForgotPassword = async () => {
     if (!email.trim()) {
-      if (Platform.OS === 'web') {
-        window.alert('Please enter your email address first');
-      } else {
-        showAlert('Email Required', 'Please enter your email address first');
-      }
+      showAlert('Email Required', 'Please enter your email address first');
       return;
     }
 
     if (!emailRegex.test(email)) {
-      if (Platform.OS === 'web') {
-        window.alert('Please enter a valid email address');
-      } else {
-        showAlert('Invalid Email', 'Please enter a valid email address');
-      }
+      showAlert('Invalid Email', 'Please enter a valid email address');
       return;
     }
 
@@ -168,33 +138,20 @@ export default function LoginScreen() {
 
       if (error) {
         console.error('❌ Password reset error:', error);
-        if (Platform.OS === 'web') {
-          window.alert(`Error: ${error.message}`);
-        } else {
-          showAlert('Error', error.message);
-        }
+        showAlert('Error', error.message);
         setResetLoading(false);
         return;
       }
 
-      if (Platform.OS === 'web') {
-        window.alert(`Password reset email sent! Check your email (${email}) for a link to reset your password.`);
-      } else {
-        showAlert(
-          'Email Sent',
-          `Check your email (${email}) for a link to reset your password.`,
-          [{ text: 'OK' }]
-        );
-      }
+      showAlert(
+        'Email Sent',
+        `Check your email (${email}) for a link to reset your password.`,
+        [{ text: 'OK' }]
+      );
       setResetLoading(false);
     } catch (error) {
       console.error('❌ Password reset exception:', error);
-      const errorMsg = error.message || 'Failed to send password reset email';
-      if (Platform.OS === 'web') {
-        window.alert(`Error: ${errorMsg}`);
-      } else {
-        showAlert('Error', errorMsg);
-      }
+      showAlert('Error', error.message || 'Failed to send password reset email');
       setResetLoading(false);
     }
   };
