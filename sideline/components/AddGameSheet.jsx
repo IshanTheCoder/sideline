@@ -50,7 +50,14 @@ function WebPickerInput({ type, value, onChange }) {
   });
 }
 
-export default function AddGameSheet({ visible, onClose, teamId, onAdded }) {
+export default function AddGameSheet({
+  visible,
+  onClose,
+  teamId,
+  onAdded,
+  quickRecord = false,
+  onRecorded,
+}) {
   const [mode, setMode] = useState('manual'); // 'manual' | 'scan'
   const [opponent, setOpponent] = useState('');
   const [dateText, setDateText] = useState('');
@@ -79,14 +86,22 @@ export default function AddGameSheet({ visible, onClose, teamId, onAdded }) {
   const saveManual = async () => {
     if (!canSave || !teamId) return;
     setSaving(true);
-    // Web pickers emit machine formats (YYYY-MM-DD / HH:MM); native text stays freeform.
-    const { error } = await createScheduledGame({
+    // Quick record: skip the date/time pickers and use right now. Web pickers
+    // otherwise emit machine formats (YYYY-MM-DD / HH:MM); native text stays freeform.
+    const now = new Date();
+    const { game, error } = await createScheduledGame({
       teamId,
       opponentName: opponent.trim(),
-      date: isWebPicker
-        ? (dateText ? new Date(`${dateText}T00:00:00`) : new Date())
-        : (parseFlexibleDate(dateText) ?? new Date()),
-      time: isWebPicker ? format12hTime(timeText) : (timeText.trim() || null),
+      date: quickRecord
+        ? now
+        : isWebPicker
+          ? (dateText ? new Date(`${dateText}T00:00:00`) : new Date())
+          : (parseFlexibleDate(dateText) ?? new Date()),
+      time: quickRecord
+        ? format12hTime(`${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`)
+        : isWebPicker
+          ? format12hTime(timeText)
+          : (timeText.trim() || null),
       venue: venue || null,
     });
     setSaving(false);
@@ -94,7 +109,11 @@ export default function AddGameSheet({ visible, onClose, teamId, onAdded }) {
       showAlert('Could not add game', error.message);
       return;
     }
-    onAdded?.();
+    if (quickRecord) {
+      onRecorded?.(game);
+    } else {
+      onAdded?.();
+    }
     close();
   };
 
@@ -137,30 +156,33 @@ export default function AddGameSheet({ visible, onClose, teamId, onAdded }) {
   return (
     <BottomSheet visible={visible} onClose={close} maxHeightPct={0.88}>
       <View style={styles.headerRow}>
-        <Text style={styles.title}>Add games</Text>
+        <Text style={styles.title}>{quickRecord ? 'Record game' : 'Add games'}</Text>
         <TouchableOpacity style={styles.closeBtn} onPress={close} activeOpacity={0.7}>
           <X size={13} color={Brand.chip} strokeWidth={2.6} />
         </TouchableOpacity>
       </View>
 
-      {/* segmented toggle */}
-      <View style={styles.segment}>
-        {[
-          { key: 'manual', label: 'Enter manually' },
-          { key: 'scan', label: 'Scan schedule' },
-        ].map((m) => (
-          <TouchableOpacity
-            key={m.key}
-            style={[styles.segmentBtn, mode === m.key && styles.segmentBtnActive]}
-            onPress={() => setMode(m.key)}
-            activeOpacity={0.8}
-          >
-            <Text style={[styles.segmentText, mode === m.key && styles.segmentTextActive]}>
-              {m.label}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
+      {/* segmented toggle — quick record always uses manual entry, since it's
+          jumping straight into capture for a game that isn't on the schedule */}
+      {!quickRecord && (
+        <View style={styles.segment}>
+          {[
+            { key: 'manual', label: 'Enter manually' },
+            { key: 'scan', label: 'Scan schedule' },
+          ].map((m) => (
+            <TouchableOpacity
+              key={m.key}
+              style={[styles.segmentBtn, mode === m.key && styles.segmentBtnActive]}
+              onPress={() => setMode(m.key)}
+              activeOpacity={0.8}
+            >
+              <Text style={[styles.segmentText, mode === m.key && styles.segmentTextActive]}>
+                {m.label}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      )}
 
       {mode === 'manual' && (
         <View>
@@ -172,36 +194,40 @@ export default function AddGameSheet({ visible, onClose, teamId, onAdded }) {
             placeholderTextColor={Brand.faint}
             style={styles.input}
           />
-          <View style={styles.row}>
-            <View style={styles.rowItem}>
-              <Text style={styles.fieldLabel}>DATE</Text>
-              {isWebPicker ? (
-                <WebPickerInput type="date" value={dateText} onChange={setDateText} />
-              ) : (
-                <TextInput
-                  value={dateText}
-                  onChangeText={setDateText}
-                  placeholder="Jul 20"
-                  placeholderTextColor={Brand.faint}
-                  style={styles.input}
-                />
-              )}
+          {quickRecord ? (
+            <Text style={styles.autoDateNote}>Date and time are set to right now automatically.</Text>
+          ) : (
+            <View style={styles.row}>
+              <View style={styles.rowItem}>
+                <Text style={styles.fieldLabel}>DATE</Text>
+                {isWebPicker ? (
+                  <WebPickerInput type="date" value={dateText} onChange={setDateText} />
+                ) : (
+                  <TextInput
+                    value={dateText}
+                    onChangeText={setDateText}
+                    placeholder="Jul 20"
+                    placeholderTextColor={Brand.faint}
+                    style={styles.input}
+                  />
+                )}
+              </View>
+              <View style={styles.rowItem}>
+                <Text style={styles.fieldLabel}>TIME</Text>
+                {isWebPicker ? (
+                  <WebPickerInput type="time" value={timeText} onChange={setTimeText} />
+                ) : (
+                  <TextInput
+                    value={timeText}
+                    onChangeText={setTimeText}
+                    placeholder="6:00 PM"
+                    placeholderTextColor={Brand.faint}
+                    style={styles.input}
+                  />
+                )}
+              </View>
             </View>
-            <View style={styles.rowItem}>
-              <Text style={styles.fieldLabel}>TIME</Text>
-              {isWebPicker ? (
-                <WebPickerInput type="time" value={timeText} onChange={setTimeText} />
-              ) : (
-                <TextInput
-                  value={timeText}
-                  onChangeText={setTimeText}
-                  placeholder="6:00 PM"
-                  placeholderTextColor={Brand.faint}
-                  style={styles.input}
-                />
-              )}
-            </View>
-          </View>
+          )}
           <Text style={styles.fieldLabel}>LOCATION</Text>
           <View style={styles.chipRow}>
             {['Home', 'Away'].map((v) => (
@@ -226,7 +252,7 @@ export default function AddGameSheet({ visible, onClose, teamId, onAdded }) {
             {saving ? (
               <ActivityIndicator color="#fff" />
             ) : (
-              <Text style={styles.saveBtnText}>Add Game</Text>
+              <Text style={styles.saveBtnText}>{quickRecord ? 'Record Game' : 'Add Game'}</Text>
             )}
           </TouchableOpacity>
         </View>
@@ -382,6 +408,11 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
     gap: 12,
+  },
+  autoDateNote: {
+    marginTop: 16,
+    fontSize: 13,
+    color: Brand.muted,
   },
   rowItem: {
     flex: 1,

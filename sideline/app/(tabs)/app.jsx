@@ -42,6 +42,7 @@ export default function HomeScreen() {
   const [recentGames, setRecentGames] = useState([]);
   const [loading, setLoading] = useState(true);
   const [addGameOpen, setAddGameOpen] = useState(false);
+  const [addGameMode, setAddGameMode] = useState('schedule'); // 'schedule' | 'record'
 
   const load = useCallback(async () => {
     if (!user?.id) {
@@ -118,6 +119,7 @@ export default function HomeScreen() {
       return;
     }
     if (!nextGame) {
+      setAddGameMode('record');
       setAddGameOpen(true);
       return;
     }
@@ -128,6 +130,21 @@ export default function HomeScreen() {
       date: parseGameDate(nextGame.date) ?? new Date(),
       startedAt: new Date(),
     });
+    router.push('/(tabs)/record');
+  };
+
+  // quick-record flow: the game just got created with date/time defaulted to
+  // right now, so jump straight into capture instead of landing back on Home.
+  const handleRecorded = async (game) => {
+    if (!game) return;
+    await startScheduledGame(game.id);
+    await setActiveSession({
+      id: game.id,
+      opponentName: game.opponent_name,
+      date: parseGameDate(game.date) ?? new Date(),
+      startedAt: new Date(),
+    });
+    load();
     router.push('/(tabs)/record');
   };
 
@@ -192,7 +209,7 @@ export default function HomeScreen() {
           <TouchableOpacity style={styles.heroBtn} onPress={startCapture} activeOpacity={0.85}>
             <Mic size={18} color="#fff" strokeWidth={2.2} />
             <Text style={styles.heroBtnText}>
-              {activeSession ? 'Resume Capture' : nextGame ? 'Start Capture' : 'Add a game'}
+              {activeSession ? 'Resume Capture' : nextGame ? 'Start Capture' : 'Record Game'}
             </Text>
           </TouchableOpacity>
         </View>
@@ -201,7 +218,13 @@ export default function HomeScreen() {
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Schedule</Text>
-            <TouchableOpacity onPress={() => setAddGameOpen(true)} activeOpacity={0.7}>
+            <TouchableOpacity
+              onPress={() => {
+                setAddGameMode('schedule');
+                setAddGameOpen(true);
+              }}
+              activeOpacity={0.7}
+            >
               <Text style={styles.sectionLink}>+ Add game</Text>
             </TouchableOpacity>
           </View>
@@ -312,6 +335,8 @@ export default function HomeScreen() {
         onClose={() => setAddGameOpen(false)}
         teamId={teamId}
         onAdded={load}
+        quickRecord={addGameMode === 'record'}
+        onRecorded={handleRecorded}
       />
     </View>
   );
