@@ -92,19 +92,21 @@ export default function HomeScreen() {
     }, [load])
   );
 
-  // next upcoming game: today or later, soonest first. Deliberately does NOT
-  // fall back to a past scheduled game — starting capture must never flip a
+  // scheduled games today or later, soonest first. Deliberately does NOT
+  // fall back to past scheduled games — starting capture must never flip a
   // stale, months-old scheduled game to "played" just because it's first in
-  // the list.
-  const nextGame = useMemo(() => {
+  // the list, and the Schedule section shouldn't show games that already
+  // happened.
+  const upcomingSchedule = useMemo(() => {
     const now = new Date();
     now.setHours(0, 0, 0, 0);
-    const upcoming = schedule.filter((g) => {
+    return schedule.filter((g) => {
       const d = parseGameDate(g.date);
       return d && d >= now;
     });
-    return upcoming[0] ?? null;
   }, [schedule]);
+
+  const nextGame = upcomingSchedule[0] ?? null;
 
   const heroBadge = activeSession
     ? 'GAME IN PROGRESS'
@@ -228,11 +230,11 @@ export default function HomeScreen() {
               <Text style={styles.sectionLink}>+ Add game</Text>
             </TouchableOpacity>
           </View>
-          {loading && schedule.length === 0 ? (
+          {loading && upcomingSchedule.length === 0 ? (
             <View style={styles.loadingBox}>
               <ActivityIndicator color={Brand.green} />
             </View>
-          ) : schedule.length === 0 ? (
+          ) : upcomingSchedule.length === 0 ? (
             <View style={styles.emptyCard}>
               <Text style={styles.emptyText}>
                 No upcoming games yet. Add your schedule and game day is one tap away.
@@ -240,7 +242,7 @@ export default function HomeScreen() {
             </View>
           ) : (
             <View style={styles.list}>
-              {schedule.slice(0, 4).map((g) => {
+              {upcomingSchedule.slice(0, 4).map((g) => {
                 const parts = gameDateParts(g.date);
                 return (
                   <View key={g.id} style={styles.scheduleRow}>
