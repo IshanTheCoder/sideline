@@ -1,4 +1,4 @@
-import { DarkTheme, DefaultTheme, ThemeProvider as NavigationThemeProvider } from '@react-navigation/native';
+import { DefaultTheme, ThemeProvider as NavigationThemeProvider } from '@react-navigation/native';
 import { Slot, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useFonts } from 'expo-font';
@@ -11,8 +11,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { ThemeProvider, useTheme } from '@/contexts/ThemeContext';
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
 import { ActiveSessionProvider } from '@/contexts/ActiveSessionContext';
-import { useColorScheme } from '@/hooks/use-color-scheme';
-import { Colors } from '@/constants/theme';
+import { Brand } from '@/constants/brand';
 import AlertHost from '@/components/AppAlert';
 
 export const unstable_settings = {
@@ -44,8 +43,7 @@ function RootLayoutNav() {
   const { user, loading } = useAuth();
   const segments = useSegments();
   const router = useRouter();
-  const colorScheme = useColorScheme();
-  const backgroundColor = Colors[colorScheme ?? 'dark']?.background ?? '#000000';
+  const backgroundColor = Brand.bg;
 
   useEffect(() => {
     if (loading) return;
@@ -84,13 +82,13 @@ function RootLayoutNav() {
   // Show loading screen while checking auth state
   if (loading || !fontsLoaded) {
     const loadingView = (
-      <View style={[styles.loadingContainer, { backgroundColor: backgroundColor || '#000000' }]}>
-        <ActivityIndicator size="large" color="#40613A" />
+      <View style={[styles.loadingContainer, { backgroundColor }]}>
+        <ActivityIndicator size="large" color={Brand.green} />
       </View>
     );
     if (Platform.OS === 'web') {
       return (
-        <View style={[styles.webOuter, { backgroundColor: backgroundColor || '#000000' }]}>
+        <View style={[styles.webOuter, { backgroundColor }]}>
           <View style={styles.webInner}>{loadingView}</View>
         </View>
       );
@@ -129,10 +127,10 @@ export default function RootLayout() {
 // Wrapper to use theme context for navigation
 function ThemedNavigationProvider() {
   return (
-    <NavigationThemeProvider value={DarkTheme}>
+    <NavigationThemeProvider value={DefaultTheme}>
       <RootLayoutNav />
       <AlertHost />
-      <StatusBar style="light" />
+      <StatusBar style="dark" />
     </NavigationThemeProvider>
   );
 }
@@ -159,7 +157,7 @@ const styles = StyleSheet.create({
     flex: 1,
     minHeight: '100dvh',
     ...(Platform.OS === 'web' && {
-      boxShadow: '0 0 0 1px rgba(255,255,255,0.06)',
+      boxShadow: '0 0 0 1px rgba(0,0,0,0.06)',
     }),
   },
 });

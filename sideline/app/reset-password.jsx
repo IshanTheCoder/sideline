@@ -1,8 +1,7 @@
 /**
- * Reset password — redesign: dark auth styling matching login/signup (was an
- * old-theme screen with a blue button). Reached from the password-reset
- * email link; updates the password on the recovery session, then sends the
- * coach back to login. Logic unchanged.
+ * Reset password — light cream auth styling matching login/signup and the app.
+ * Reached from the password-reset email link; updates the password on the
+ * recovery session, then sends the coach back to login. Logic unchanged.
  */
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -21,15 +20,15 @@ import { Brand } from '@/constants/brand';
 import { showAlert } from '@/lib/alert';
 import { supabase } from '@/lib/supabase';
 
-// on-dark surfaces for the auth forms (kept in sync with login.jsx)
-const Dark = {
-  inputBg: 'rgba(255,255,255,0.06)',
-  inputBorder: 'rgba(255,255,255,0.16)',
-  placeholder: 'rgba(255,255,255,0.35)',
-  label: 'rgba(255,255,255,0.55)',
-  iconMuted: 'rgba(255,255,255,0.5)',
-  error: '#FF8A7A',
-  errorBorder: '#FF6B5C',
+// on-light form surfaces for the auth forms (kept in sync with login.jsx)
+const Field = {
+  inputBg: Brand.card,
+  inputBorder: Brand.border2,
+  placeholder: Brand.faint,
+  label: Brand.muted,
+  iconMuted: Brand.muted,
+  error: Brand.danger,
+  errorBorder: Brand.danger,
 };
 
 export default function ResetPasswordScreen() {
@@ -104,7 +103,7 @@ export default function ResetPasswordScreen() {
 
   return (
     <View style={styles.container}>
-      <StatusBar style="light" />
+      <StatusBar style="dark" />
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled"
@@ -119,14 +118,14 @@ export default function ResetPasswordScreen() {
           <TextInput
             style={[styles.input, styles.passwordInput, errors.password && styles.inputError]}
             placeholder="At least 6 characters"
-            placeholderTextColor={Dark.placeholder}
+            placeholderTextColor={Field.placeholder}
             value={password}
             onChangeText={(text) => {
               setPassword(text);
               if (errors.password) setErrors({ ...errors, password: undefined });
             }}
             secureTextEntry={!showPassword}
-            keyboardAppearance="dark"
+            keyboardAppearance="light"
             editable={!loading}
           />
           <TouchableOpacity
@@ -135,9 +134,9 @@ export default function ResetPasswordScreen() {
             activeOpacity={0.7}
           >
             {showPassword ? (
-              <EyeOffIcon size={22} color={Dark.iconMuted} />
+              <EyeOffIcon size={22} color={Field.iconMuted} />
             ) : (
-              <EyeIcon size={22} color={Dark.iconMuted} />
+              <EyeIcon size={22} color={Field.iconMuted} />
             )}
           </TouchableOpacity>
         </View>
@@ -153,14 +152,14 @@ export default function ResetPasswordScreen() {
               errors.confirmPassword && styles.inputError,
             ]}
             placeholder="Type it again"
-            placeholderTextColor={Dark.placeholder}
+            placeholderTextColor={Field.placeholder}
             value={confirmPassword}
             onChangeText={(text) => {
               setConfirmPassword(text);
               if (errors.confirmPassword) setErrors({ ...errors, confirmPassword: undefined });
             }}
             secureTextEntry={!showConfirmPassword}
-            keyboardAppearance="dark"
+            keyboardAppearance="light"
             editable={!loading}
           />
           <TouchableOpacity
@@ -169,9 +168,9 @@ export default function ResetPasswordScreen() {
             activeOpacity={0.7}
           >
             {showConfirmPassword ? (
-              <EyeOffIcon size={22} color={Dark.iconMuted} />
+              <EyeOffIcon size={22} color={Field.iconMuted} />
             ) : (
-              <EyeIcon size={22} color={Dark.iconMuted} />
+              <EyeIcon size={22} color={Field.iconMuted} />
             )}
           </TouchableOpacity>
         </View>
@@ -210,7 +209,7 @@ export default function ResetPasswordScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Brand.authBg,
+    backgroundColor: Brand.bg,
   },
   scrollContent: {
     flexGrow: 1,
@@ -222,11 +221,11 @@ const styles = StyleSheet.create({
     fontSize: 30,
     fontWeight: '800',
     letterSpacing: -0.4,
-    color: '#FFFFFF',
+    color: Brand.ink,
   },
   subtitle: {
     fontSize: 15,
-    color: Brand.onDarkMuted,
+    color: Brand.muted,
     marginTop: 6,
     lineHeight: 22,
   },
@@ -234,7 +233,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
     letterSpacing: 1.4,
-    color: Dark.label,
+    color: Field.label,
     marginTop: 22,
     marginBottom: 8,
   },
@@ -242,12 +241,12 @@ const styles = StyleSheet.create({
     width: '100%',
     height: 52,
     borderWidth: 1,
-    borderColor: Dark.inputBorder,
+    borderColor: Field.inputBorder,
     borderRadius: 14,
     paddingHorizontal: 15,
     fontSize: 16,
-    color: '#FFFFFF',
-    backgroundColor: Dark.inputBg,
+    color: Brand.ink,
+    backgroundColor: Field.inputBg,
   },
   passwordWrap: {
     position: 'relative',
@@ -262,10 +261,10 @@ const styles = StyleSheet.create({
     top: 15,
   },
   inputError: {
-    borderColor: Dark.errorBorder,
+    borderColor: Field.errorBorder,
   },
   errorText: {
-    color: Dark.error,
+    color: Field.error,
     fontSize: 12.5,
     marginTop: 6,
   },
@@ -292,7 +291,7 @@ const styles = StyleSheet.create({
   },
   switchText: {
     fontSize: 15,
-    color: Brand.onDarkMuted,
+    color: Brand.muted,
   },
   switchLink: {
     color: Brand.greenLink,

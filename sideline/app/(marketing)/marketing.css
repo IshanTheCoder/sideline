@@ -9,7 +9,7 @@
 html:has(.mk-root) {
   height: auto;
   overflow: auto;
-  background: #f5f3ee;
+  background: #f2f1ec;
 }
 /* body must stay overflow-visible: any overflow value would make it the
    sticky container for .mk-nav while the actual scrolling happens on html,
@@ -17,7 +17,7 @@ html:has(.mk-root) {
 body:has(.mk-root) {
   height: auto;
   overflow: visible;
-  background: #f5f3ee;
+  background: #f2f1ec;
 }
 body:has(.mk-root) #root {
   display: block;
@@ -26,18 +26,19 @@ body:has(.mk-root) #root {
 }
 
 .mk-root {
-  /* palette */
-  --cream: #f5f3ee;
-  --surface: #fefefe;
-  --hairline: #e6e2d8;
-  --ink: #1c1c1a;
-  --ink-2: #565650;
-  --ink-3: #82827a;
-  --sage: #75975e;
-  --sage-deep: #4a6340;
-  --sage-deeper: #3d5335;
-  --sage-wash: #eef1e9;
-  --terracotta: #c4785b;
+  /* palette — mirrors constants/brand.js (the single source of truth).
+     Keep these hex values identical to the matching Brand tokens. */
+  --cream: #f2f1ec;      /* Brand.bg */
+  --surface: #ffffff;    /* Brand.card */
+  --hairline: #e7e5df;   /* Brand.border */
+  --ink: #16181d;        /* Brand.ink */
+  --ink-2: #2b2e33;      /* Brand.inkSoft */
+  --ink-3: #8a8f94;      /* Brand.muted */
+  --sage: #75975e;       /* Brand.sage (accent) */
+  --sage-deep: #40613a;  /* Brand.green (primary) */
+  --sage-deeper: #34502f;/* Brand.greenHover */
+  --sage-wash: #eef1e9;  /* Brand.greenDrillBg family */
+  --terracotta: #c4785b; /* Brand.terracotta */
 
   /* type */
   --serif: 'Source Serif 4', Georgia, 'Times New Roman', serif;

@@ -1,8 +1,8 @@
 /**
- * Login — redesign: black auth background matching the welcome screen, white
- * Google button, on-dark inputs with uppercase eyebrow labels, green Sign In.
- * Auth logic (Supabase email/password, Google OAuth, password reset) is
- * unchanged from the previous version.
+ * Login — light cream auth background matching the welcome screen and app,
+ * outlined Google button, on-light inputs with uppercase eyebrow labels, green
+ * Sign In. Auth logic (Supabase email/password, Google OAuth, password reset)
+ * is unchanged from the previous version.
  */
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -24,18 +24,19 @@ import { showAlert } from '@/lib/alert';
 import { signInWithGoogle } from '@/lib/googleAuth';
 import { supabase } from '@/lib/supabase';
 
-// on-dark surfaces for the auth forms (welcome.jsx's black world)
-const Dark = {
-  inputBg: 'rgba(255,255,255,0.06)',
-  inputBorder: 'rgba(255,255,255,0.16)',
-  placeholder: 'rgba(255,255,255,0.35)',
-  label: 'rgba(255,255,255,0.55)',
-  divider: 'rgba(255,255,255,0.14)',
-  dividerText: 'rgba(255,255,255,0.45)',
-  iconMuted: 'rgba(255,255,255,0.5)',
-  backBtnBg: 'rgba(255,255,255,0.09)',
-  error: '#FF8A7A',
-  errorBorder: '#FF6B5C',
+// on-light form surfaces for the auth forms (matches the app's cream/white
+// forms, e.g. ChangeEmailModal). Kept in sync with signup.jsx / reset-password.jsx.
+const Field = {
+  inputBg: Brand.card,
+  inputBorder: Brand.border2,
+  placeholder: Brand.faint,
+  label: Brand.muted,
+  divider: Brand.border,
+  dividerText: Brand.muted,
+  iconMuted: Brand.muted,
+  backBtnBg: Brand.hairline,
+  error: Brand.danger,
+  errorBorder: Brand.danger,
 };
 
 export default function LoginScreen() {
@@ -158,7 +159,7 @@ export default function LoginScreen() {
 
   return (
     <View style={styles.container}>
-      <StatusBar style="light" />
+      <StatusBar style="dark" />
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled"
@@ -171,7 +172,7 @@ export default function LoginScreen() {
           activeOpacity={0.7}
           accessibilityLabel="Go back"
         >
-          <ChevronLeft size={18} color="#fff" strokeWidth={2.4} />
+          <ChevronLeft size={18} color={Brand.ink} strokeWidth={2.4} />
         </TouchableOpacity>
         <Text style={styles.title}>Welcome back</Text>
         <Text style={styles.subtitle}>Sign in to pick up where you left off.</Text>
@@ -204,7 +205,7 @@ export default function LoginScreen() {
         <TextInput
           style={[styles.input, errors.email && styles.inputError]}
           placeholder="coach@school.edu"
-          placeholderTextColor={Dark.placeholder}
+          placeholderTextColor={Field.placeholder}
           value={email}
           onChangeText={(text) => {
             setEmail(text);
@@ -213,7 +214,7 @@ export default function LoginScreen() {
           keyboardType="email-address"
           autoCapitalize="none"
           autoCorrect={false}
-          keyboardAppearance="dark"
+          keyboardAppearance="light"
           editable={!loading}
         />
         {errors.email && <Text style={styles.errorText}>{errors.email}</Text>}
@@ -224,14 +225,14 @@ export default function LoginScreen() {
           <TextInput
             style={[styles.input, styles.passwordInput, errors.password && styles.inputError]}
             placeholder="Your password"
-            placeholderTextColor={Dark.placeholder}
+            placeholderTextColor={Field.placeholder}
             value={password}
             onChangeText={(text) => {
               setPassword(text);
               if (errors.password) setErrors({ ...errors, password: undefined });
             }}
             secureTextEntry={!showPassword}
-            keyboardAppearance="dark"
+            keyboardAppearance="light"
             editable={!loading}
           />
           <TouchableOpacity
@@ -240,9 +241,9 @@ export default function LoginScreen() {
             activeOpacity={0.7}
           >
             {showPassword ? (
-              <EyeOffIcon size={22} color={Dark.iconMuted} />
+              <EyeOffIcon size={22} color={Field.iconMuted} />
             ) : (
-              <EyeIcon size={22} color={Dark.iconMuted} />
+              <EyeIcon size={22} color={Field.iconMuted} />
             )}
           </TouchableOpacity>
         </View>
@@ -290,7 +291,7 @@ export default function LoginScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Brand.authBg,
+    backgroundColor: Brand.bg,
   },
   scrollContent: {
     flexGrow: 1,
@@ -302,7 +303,7 @@ const styles = StyleSheet.create({
     width: 38,
     height: 38,
     borderRadius: 19,
-    backgroundColor: Dark.backBtnBg,
+    backgroundColor: Field.backBtnBg,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -310,12 +311,12 @@ const styles = StyleSheet.create({
     fontSize: 30,
     fontWeight: '800',
     letterSpacing: -0.4,
-    color: '#FFFFFF',
+    color: Brand.ink,
     marginTop: 26,
   },
   subtitle: {
     fontSize: 15,
-    color: Brand.onDarkMuted,
+    color: Brand.muted,
     marginTop: 6,
     lineHeight: 22,
   },
@@ -324,7 +325,9 @@ const styles = StyleSheet.create({
     width: '100%',
     height: 54,
     borderRadius: 16,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Brand.card,
+    borderWidth: 1,
+    borderColor: Brand.borderBtn,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -344,20 +347,20 @@ const styles = StyleSheet.create({
   dividerLine: {
     flex: 1,
     height: 1,
-    backgroundColor: Dark.divider,
+    backgroundColor: Field.divider,
   },
   dividerText: {
     marginHorizontal: 14,
     fontSize: 12,
     fontWeight: '700',
     letterSpacing: 1.2,
-    color: Dark.dividerText,
+    color: Field.dividerText,
   },
   fieldLabel: {
     fontSize: 12,
     fontWeight: '700',
     letterSpacing: 1.4,
-    color: Dark.label,
+    color: Field.label,
     marginTop: 20,
     marginBottom: 8,
   },
@@ -365,12 +368,12 @@ const styles = StyleSheet.create({
     width: '100%',
     height: 52,
     borderWidth: 1,
-    borderColor: Dark.inputBorder,
+    borderColor: Field.inputBorder,
     borderRadius: 14,
     paddingHorizontal: 15,
     fontSize: 16,
-    color: '#FFFFFF',
-    backgroundColor: Dark.inputBg,
+    color: Brand.ink,
+    backgroundColor: Field.inputBg,
   },
   passwordWrap: {
     position: 'relative',
@@ -385,10 +388,10 @@ const styles = StyleSheet.create({
     top: 15,
   },
   inputError: {
-    borderColor: Dark.errorBorder,
+    borderColor: Field.errorBorder,
   },
   errorText: {
-    color: Dark.error,
+    color: Field.error,
     fontSize: 12.5,
     marginTop: 6,
   },
@@ -424,7 +427,7 @@ const styles = StyleSheet.create({
   },
   switchText: {
     fontSize: 15,
-    color: Brand.onDarkMuted,
+    color: Brand.muted,
   },
   switchLink: {
     color: Brand.greenLink,

@@ -1,6 +1,7 @@
 /**
- * Auth / welcome screen — redesign: black background, whistle logo,
- * SIDELINE wordmark, green Get Started. Entry point for signed-out users.
+ * Auth / welcome screen — light cream background (matches marketing + app),
+ * whistle logo, green SIDELINE wordmark, green Get Started. Entry point for
+ * signed-out users.
  */
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -21,7 +22,7 @@ export default function WelcomeScreen() {
 
   return (
     <View style={styles.container}>
-      <StatusBar style="light" />
+      <StatusBar style="dark" />
       {/* Web only: escape hatch back to the marketing site */}
       {Platform.OS === 'web' && (
         <TouchableOpacity
@@ -74,7 +75,7 @@ export default function WelcomeScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Brand.authBg,
+    backgroundColor: Brand.bg,
   },
   backToSite: {
     position: 'absolute',
@@ -120,14 +121,14 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 30,
     fontWeight: '800',
-    color: '#FFFFFF',
+    color: Brand.ink,
     marginTop: 22,
     letterSpacing: -0.4,
     textAlign: 'center',
   },
   subtitle: {
     fontSize: 16,
-    color: Brand.onDarkMuted,
+    color: Brand.muted,
     textAlign: 'center',
     lineHeight: 24,
     marginTop: 12,
@@ -155,7 +156,7 @@ const styles = StyleSheet.create({
   },
   loginText: {
     fontSize: 16,
-    color: Brand.onDarkMuted,
+    color: Brand.muted,
   },
   loginLink: {
     color: Brand.greenLink,

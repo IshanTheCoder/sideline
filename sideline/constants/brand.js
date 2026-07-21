@@ -2,48 +2,57 @@
  * Sideline brand design tokens — the single-brand forest-green-on-cream palette
  * from the 2026 redesign. Redesigned screens import from here instead of the
  * old light/dark `Colors` map; there is intentionally no dark-mode branching.
+ *
+ * This file is the single source of truth for the product's palette. The
+ * marketing site (app/(marketing)/marketing.css) mirrors these exact hex values
+ * in its `--cream/--ink/--sage/...` CSS variables — keep the two in sync when
+ * changing a shared value (each mirrored token is marked "· mirrored in
+ * marketing.css" below).
  */
 
 export const Brand = {
   // greens
-  green: '#40613A', // primary buttons, active states, accents, avatars
-  greenHover: '#34502F', // button hover / pressed
+  green: '#40613A', // primary buttons, CTAs, active states, avatars · mirrored (--sage-deep)
+  greenHover: '#34502F', // button hover / pressed · mirrored (--sage-deeper)
+  sage: '#75975E', // accent green: eyebrows / small marks · mirrored (--sage)
   greenTint: '#EAEFE4', // avatar/chip backgrounds, date chips
   greenTintToday: '#D8E6CC', // "Today" date chip
   greenLightInk: '#8CA97D', // secondary green accents
-  greenPale: '#A9C39B', // on-dark labels (hero eyebrows)
+  greenPale: '#A9C39B', // on-dark labels (dark hero-card eyebrows)
   greenPaleSub: '#C8D8BC', // on-green secondary text (selected month pill sub)
-  greenLink: '#6FA76A', // links on dark (auth screen)
-  greenWordmark: '#5C8A57', // SIDELINE wordmark on black
+  greenLink: '#4A6340', // links on light (auth screens)
+  greenWordmark: '#40613A', // SIDELINE wordmark (= green)
   greenDrillBg: '#F0F5EC', // drill suggestion pill background
 
   // inks
-  ink: '#16181D', // primary text, dark hero cards
-  inkSoft: '#2B2E33', // long-form body text (transcripts, insights)
+  ink: '#16181D', // primary text, dark hero cards · mirrored (--ink)
+  inkSoft: '#2B2E33', // long-form body text (transcripts, insights) · mirrored (--ink-2)
   inkHover: '#23262D', // dark button hover
-  muted: '#8A8F94', // secondary text
+  muted: '#8A8F94', // secondary text · mirrored (--ink-3)
   faint: '#B0B4B8', // tertiary text
   chip: '#6B7075', // neutral chip ink
   chevron: '#C4C7CB', // chevrons, disabled buttons
 
   // surfaces
-  bg: '#F2F1EC', // screen background (cream)
-  card: '#FFFFFF',
+  bg: '#F2F1EC', // screen background (cream) · mirrored (--cream)
+  card: '#FFFFFF', // · mirrored (--surface)
   cardHover: '#FBFAF7',
   hairline: '#F0EFEA', // row dividers, neutral chips
-  border: '#E7E5DF', // card borders
+  border: '#E7E5DF', // card borders · mirrored (--hairline)
   border2: '#E3E1DB', // input borders, sheet handles
   borderBtn: '#D8D6D0', // outline button borders
   dashed: '#C9C6BE', // dashed drop-zone borders
   transcriptBg: '#F9F8F5',
 
+  // accents
+  terracotta: '#C4785B', // editorial underline accent · mirrored (--terracotta)
+
   // status
   recordRed: '#FF453A', // active recording state
-  danger: '#C24545', // sign out
+  danger: '#C24545', // sign out, on-light form errors
   successCheck: '#34C77B', // toast checkmark
-  authBg: '#000000', // auth screen only
 
-  // on-dark neutrals (auth + hero cards)
+  // on-dark neutrals (dark hero cards)
   onDarkMuted: '#A3A8AE',
 };
 

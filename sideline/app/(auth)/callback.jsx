@@ -137,7 +137,7 @@ export default function CallbackScreen() {
 
   return (
     <View style={styles.container}>
-      <ActivityIndicator size="large" color={Brand.greenLink} />
+      <ActivityIndicator size="large" color={Brand.green} />
       <Text style={styles.text}>Completing sign in…</Text>
     </View>
   );
@@ -149,11 +149,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     padding: 24,
-    backgroundColor: Brand.authBg,
+    backgroundColor: Brand.bg,
   },
   text: {
     marginTop: 16,
     fontSize: 15,
-    color: Brand.onDarkMuted,
+    color: Brand.muted,
   },
 });
