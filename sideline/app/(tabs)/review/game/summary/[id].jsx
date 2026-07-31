@@ -18,7 +18,8 @@ import {
   TouchableOpacity,
 } from 'react-native';
 import Svg, { Circle, Text as SvgText } from 'react-native-svg';
-import { Brand, ChartAccents, Shape, playerAccent } from '@/constants/brand';
+import { Brand, ChartAccents, Shape, Spacing, playerAccent } from '@/constants/brand';
+import { Fonts } from '@/constants/theme';
 import { useAuth } from '@/contexts/AuthContext';
 import { fetchRecordingsForGame, parseRecordingNotes } from '@/lib/recording';
 import { fetchRosterForUser } from '@/lib/roster';
@@ -29,6 +30,7 @@ import {
 import {
   FEEDBACK_TYPE_LABELS,
   SKILL_CATEGORY_LABELS,
+  formatCategoryLabel,
   parseAiLabels,
 } from '@/lib/volleyballVocabulary';
 
@@ -68,10 +70,10 @@ function Donut({ segments, total }) {
           />
         );
       })}
-      <SvgText x={60} y={57} textAnchor="middle" fontSize={28} fontWeight="800" fill={Brand.ink}>
+      <SvgText x={60} y={57} textAnchor="middle" fontFamily={Fonts.sans} fontSize={28} fontWeight="800" fill={Brand.ink}>
         {total}
       </SvgText>
-      <SvgText x={60} y={73} textAnchor="middle" fontSize={10} fontWeight="600" letterSpacing={0.5} fill={Brand.muted}>
+      <SvgText x={60} y={73} textAnchor="middle" fontFamily={Fonts.sans} fontSize={10} fontWeight="600" letterSpacing={0.5} fill={Brand.muted}>
         NOTES
       </SvgText>
     </Svg>
@@ -175,7 +177,7 @@ export default function GameAnalysisScreen() {
       .sort((a, b) => b[1] - a[1])
       .slice(0, 3)
       .map(([key, count], i) => ({
-        name: key === 'other' ? 'Other' : FEEDBACK_TYPE_LABELS[key] ?? key,
+        name: key === 'other' ? 'Other' : formatCategoryLabel(FEEDBACK_TYPE_LABELS, key),
         count,
         color: ChartAccents.donut[i],
       }));
@@ -204,7 +206,7 @@ export default function GameAnalysisScreen() {
     const entries = [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 4);
     const max = Math.max(1, ...entries.map(([, c]) => c));
     return entries.map(([skill, count], i) => ({
-      name: SKILL_CATEGORY_LABELS[skill] ?? skill,
+      name: formatCategoryLabel(SKILL_CATEGORY_LABELS, skill),
       count,
       pct: count / max,
       color: ChartAccents.focus[i % ChartAccents.focus.length],
@@ -522,7 +524,7 @@ const styles = StyleSheet.create({
   },
   hero: {
     backgroundColor: Brand.ink,
-    borderRadius: 22,
+    borderRadius: Shape.heroRadius,
     paddingVertical: 18,
     paddingHorizontal: 20,
     marginTop: 18,
@@ -584,7 +586,7 @@ const styles = StyleSheet.create({
   legendRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 7,
+    gap: Spacing.xs,
   },
   legendSwatch: {
     width: 9,
@@ -703,8 +705,8 @@ const styles = StyleSheet.create({
     gap: 8,
     backgroundColor: Brand.greenDrillBg,
     borderRadius: 12,
-    paddingVertical: 9,
-    paddingHorizontal: 12,
+    paddingVertical: Spacing.xs,
+    paddingHorizontal: Spacing.sm,
     marginTop: 10,
   },
   drillText: {
@@ -748,9 +750,9 @@ const styles = StyleSheet.create({
   planRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 13,
+    gap: Spacing.sm,
     backgroundColor: Brand.card,
-    borderRadius: 18,
+    borderRadius: Shape.buttonRadius,
     paddingVertical: 14,
     paddingHorizontal: 16,
     ...Shape.cardShadow,
@@ -779,7 +781,7 @@ const styles = StyleSheet.create({
   planWhy: {
     fontSize: 12.5,
     color: Brand.muted,
-    marginTop: 1,
+    marginTop: Spacing.xxs,
   },
   planMins: {
     fontSize: 12,
@@ -795,7 +797,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: 10,
-    paddingVertical: 13,
+    paddingVertical: Spacing.sm,
     paddingHorizontal: 16,
   },
   scoutRowBorder: {

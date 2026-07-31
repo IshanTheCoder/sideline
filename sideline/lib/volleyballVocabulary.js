@@ -84,6 +84,27 @@ export const FEEDBACK_TYPE_LABELS = {
   [FEEDBACK_TYPES.EFFORT]: 'Effort',
 };
 
+/**
+ * Looks up a display label for a category key (skill/position/feedback), tolerant
+ * of casing drift from the AI. Falls back to a title-cased version of the raw key
+ * instead of leaking it verbatim, so an unmapped value still matches the look of
+ * its mapped siblings (e.g. no more lowercase "strategy" next to "Effort").
+ * @param {Record<string, string>} labelMap - one of the *_LABELS maps above
+ * @param {string} rawKey - whatever came back from the AI/DB
+ * @returns {string}
+ */
+export function formatCategoryLabel(labelMap, rawKey) {
+  if (!rawKey) return '';
+  const normalized = String(rawKey).trim().toLowerCase();
+  if (labelMap[normalized]) return labelMap[normalized];
+  return normalized
+    .replace(/[_-]+/g, ' ')
+    .split(' ')
+    .filter(Boolean)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ');
+}
+
 /** keyword → skill category lookup — so the AI knows "ace" means serving, not poker */
 export const SKILL_TERMS = {
   [SKILL_CATEGORIES.SERVING]: [

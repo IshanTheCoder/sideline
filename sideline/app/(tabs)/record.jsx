@@ -33,7 +33,7 @@ import {
   uploadRecording,
 } from '@/lib/recording';
 import { processRecording } from '@/lib/recordingProcessing';
-import { SKILL_CATEGORY_LABELS, parseAiLabels } from '@/lib/volleyballVocabulary';
+import { SKILL_CATEGORY_LABELS, formatCategoryLabel, parseAiLabels } from '@/lib/volleyballVocabulary';
 
 // Speech-tuned recording profile: mono + 128kbps AAC. Whisper downmixes to mono
 // anyway, so stereo just doubles the upload on gym wifi for zero accuracy gain.
@@ -300,7 +300,7 @@ export default function RecordScreen() {
           if (result.success) {
             const parsed = parseAiLabels(result.label ?? null);
             const player = parsed.taggedPlayers?.[0];
-            const tag = parsed.skillCategory ? SKILL_CATEGORY_LABELS[parsed.skillCategory] : null;
+            const tag = parsed.skillCategory ? formatCategoryLabel(SKILL_CATEGORY_LABELS, parsed.skillCategory) : null;
             showToast({
               num: noteNum,
               title: parsed.displayLabel || 'Note captured',

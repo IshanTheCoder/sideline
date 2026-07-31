@@ -45,6 +45,21 @@ function escapeRegex(s) {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
+/**
+ * Matches an AI-returned enum value against the known-valid list case-insensitively,
+ * returning the list's canonical casing (or null if it's not a recognized value).
+ * Groq occasionally drifts on casing (e.g. "Strategy" vs "strategy"), which otherwise
+ * causes the same category to render inconsistently next to correctly-cased siblings.
+ * @param {unknown} value
+ * @param {string[]} validValues
+ * @returns {string|null}
+ */
+function normalizeEnumValue(value, validValues) {
+  if (typeof value !== 'string' || !value.trim()) return null;
+  const trimmed = value.trim();
+  return validValues.find((v) => v.toLowerCase() === trimmed.toLowerCase()) ?? null;
+}
+
 function toTitleCase(str) {
   if (!str) return str;
   return str.replace(/\b[a-zA-Z][a-zA-Z'-]*\b/g, (word) => {
@@ -329,13 +344,28 @@ async function generateLabelWithDeps(transcriptionText, options = {}, deps = {})
         label: structured.label,
         transcription: transcriptionText,
       });
-      console.log('✅ Label generated (volleyball):', finalLabel, structured.skillCategory ?? '', structured.position ?? '', isOpponentNote ? '[opponent]' : '');
+      // normalize casing against the known enum/custom-bucket lists so the same
+      // category never ends up stored with two different castings (e.g. "Strategy"
+      // vs "strategy"), which otherwise shows up as inconsistent capitalization in the UI
+      const skillCategory = normalizeEnumValue(structured.skillCategory, [
+        ...getSkillCategoryList(),
+        ...(customBuckets.skill ?? []),
+      ]);
+      const position = normalizeEnumValue(structured.position, [
+        ...getPositionList(),
+        ...(customBuckets.position ?? []),
+      ]);
+      const feedbackType = normalizeEnumValue(structured.feedbackType, [
+        ...getFeedbackTypeList(),
+        ...(customBuckets.feedback ?? []),
+      ]);
+      console.log('✅ Label generated (volleyball):', finalLabel, skillCategory ?? '', position ?? '', isOpponentNote ? '[opponent]' : '');
       return {
         label: finalLabel,
-        skillCategory: structured.skillCategory ?? null,
-        position: structured.position ?? null,
+        skillCategory,
+        position,
         playPattern: structured.playPattern ?? null,
-        feedbackType: structured.feedbackType ?? null,
+        feedbackType,
         ruleNote: structured.ruleNote ?? null,
         isOpponentNote,
         error: null,

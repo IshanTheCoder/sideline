@@ -40,6 +40,7 @@ import {
   FEEDBACK_TYPE_LABELS,
   POSITION_LABELS,
   SKILL_CATEGORY_LABELS,
+  formatCategoryLabel,
   parseAiLabels,
   serializeAiLabels,
 } from '@/lib/volleyballVocabulary';
@@ -315,9 +316,9 @@ export default function GameDetailScreen() {
                     const player = parsed.taggedPlayers?.[0];
                     const accent = playerAccent(roster, player);
                     const tag = parsed.skillCategory
-                      ? SKILL_CATEGORY_LABELS[parsed.skillCategory] ?? parsed.skillCategory
+                      ? formatCategoryLabel(SKILL_CATEGORY_LABELS, parsed.skillCategory)
                       : parsed.feedbackType
-                        ? FEEDBACK_TYPE_LABELS[parsed.feedbackType] ?? parsed.feedbackType
+                        ? formatCategoryLabel(FEEDBACK_TYPE_LABELS, parsed.feedbackType)
                         : null;
                     return (
                       <TouchableOpacity
@@ -392,7 +393,7 @@ export default function GameDetailScreen() {
               {!!activeParsed?.skillCategory && (
                 <View style={styles.tagChip}>
                   <Text style={styles.tagChipText}>
-                    {SKILL_CATEGORY_LABELS[activeParsed.skillCategory] ?? activeParsed.skillCategory}
+                    {formatCategoryLabel(SKILL_CATEGORY_LABELS, activeParsed.skillCategory)}
                   </Text>
                 </View>
               )}

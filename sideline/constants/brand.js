@@ -86,6 +86,17 @@ export function playerAccent(roster, playerName) {
   return { bg, ink };
 }
 
+// Shared spacing scale — use instead of ad-hoc padding/margin/gap numbers so
+// spacing stays consistent across screens.
+export const Spacing = {
+  xxs: 4,
+  xs: 8,
+  sm: 12,
+  md: 16,
+  lg: 20,
+  xl: 24,
+};
+
 // Shared shape tokens
 export const Shape = {
   cardRadius: 20,
