@@ -22,6 +22,7 @@ import {
 import BottomSheet from '@/components/BottomSheet';
 import { Brand, Shape, playerAccent } from '@/constants/brand';
 import { useAuth } from '@/contexts/AuthContext';
+import { useAppBack } from '@/hooks/use-app-back';
 import { showAlert } from '@/lib/alert';
 import { getCustomBuckets } from '@/lib/customBuckets';
 import {
@@ -55,6 +56,7 @@ const setNumberFor = (rec) => {
 export default function GameDetailScreen() {
   const { id } = useLocalSearchParams();
   const router = useRouter();
+  const goBack = useAppBack();
   const { user } = useAuth();
 
   const [recordings, setRecordings] = useState([]);
@@ -271,8 +273,9 @@ export default function GameDetailScreen() {
         <View style={styles.headerRow}>
           <TouchableOpacity
             style={styles.backBtn}
-            onPress={() => (router.canGoBack() ? router.back() : router.replace('/(tabs)/app'))}
+            onPress={goBack}
             activeOpacity={0.7}
+            accessibilityLabel="Go back"
           >
             <ChevronLeft size={18} color={Brand.ink} strokeWidth={2.4} />
           </TouchableOpacity>

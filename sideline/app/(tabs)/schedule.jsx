@@ -5,7 +5,6 @@
  * (manual + scan). Long-press a game to remove it from the schedule.
  */
 import { useFocusEffect } from '@react-navigation/native';
-import { useRouter } from 'expo-router';
 import { Calendar, ChevronLeft, ChevronRight, Plus } from 'lucide-react-native';
 import { useCallback, useMemo, useState } from 'react';
 import {
@@ -19,6 +18,7 @@ import {
 import AddGameSheet from '@/components/AddGameSheet';
 import { Brand, Shape } from '@/constants/brand';
 import { useAuth } from '@/contexts/AuthContext';
+import { useAppBack } from '@/hooks/use-app-back';
 import { showAlert } from '@/lib/alert';
 import { deleteScheduledGame, fetchAllGames } from '@/lib/gameSessions';
 import {
@@ -33,7 +33,7 @@ import { getActiveTeam } from '@/lib/teams';
 
 export default function ScheduleScreen() {
   const { user } = useAuth();
-  const router = useRouter();
+  const goBack = useAppBack();
 
   const [teamId, setTeamId] = useState(null);
   const [games, setGames] = useState([]);
@@ -105,8 +105,9 @@ export default function ScheduleScreen() {
         <View style={styles.headerRow}>
           <TouchableOpacity
             style={styles.backBtn}
-            onPress={() => (router.canGoBack() ? router.back() : router.replace('/(tabs)/app'))}
+            onPress={goBack}
             activeOpacity={0.7}
+            accessibilityLabel="Go back"
           >
             <ChevronLeft size={18} color={Brand.ink} strokeWidth={2.4} />
           </TouchableOpacity>

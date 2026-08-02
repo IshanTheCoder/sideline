@@ -5,7 +5,6 @@
  * Groq vision importer with an include/exclude review list. Tap a player to
  * edit, long-press to remove.
  */
-import { useRouter } from 'expo-router';
 import { Camera, Check, ChevronLeft, X } from 'lucide-react-native';
 import { useCallback, useState } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
@@ -21,6 +20,7 @@ import {
 import BottomSheet from '@/components/BottomSheet';
 import { Brand, Shape } from '@/constants/brand';
 import { useAuth } from '@/contexts/AuthContext';
+import { useAppBack } from '@/hooks/use-app-back';
 import { useScreenshotScan } from '@/hooks/use-screenshot-scan';
 import { showAlert } from '@/lib/alert';
 import {
@@ -73,7 +73,7 @@ const displayClassYear = (grade) => {
 };
 
 export default function RosterScreen() {
-  const router = useRouter();
+  const goBack = useAppBack();
   const { user } = useAuth();
 
   const [players, setPlayers] = useState([]);
@@ -223,8 +223,9 @@ export default function RosterScreen() {
         <View style={styles.headerRow}>
           <TouchableOpacity
             style={styles.backBtn}
-            onPress={() => (router.canGoBack() ? router.back() : router.replace('/(tabs)/app'))}
+            onPress={goBack}
             activeOpacity={0.7}
+            accessibilityLabel="Go back"
           >
             <ChevronLeft size={18} color={Brand.ink} strokeWidth={2.4} />
           </TouchableOpacity>

@@ -18,6 +18,7 @@ import {
 } from 'react-native';
 import { Brand, Shape } from '@/constants/brand';
 import { useAuth } from '@/contexts/AuthContext';
+import { useAppBack } from '@/hooks/use-app-back';
 import { showAlert } from '@/lib/alert';
 import { deleteGameForUser, fetchRecordingsForTeam } from '@/lib/recording';
 import { gameDateParts, initialsFor } from '@/lib/scheduleFormat';
@@ -25,6 +26,7 @@ import { getActiveTeam } from '@/lib/teams';
 
 export default function GamesListScreen() {
   const router = useRouter();
+  const goBack = useAppBack();
   const { user } = useAuth();
   const [games, setGames] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -110,8 +112,9 @@ export default function GamesListScreen() {
         <View style={styles.headerRow}>
           <TouchableOpacity
             style={styles.backBtn}
-            onPress={() => (router.canGoBack() ? router.back() : router.replace('/(tabs)/app'))}
+            onPress={goBack}
             activeOpacity={0.7}
+            accessibilityLabel="Go back"
           >
             <ChevronLeft size={18} color={Brand.ink} strokeWidth={2.4} />
           </TouchableOpacity>

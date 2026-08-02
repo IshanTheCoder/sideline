@@ -26,6 +26,7 @@ import { useActiveSession } from '@/contexts/ActiveSessionContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { useAudioPermissions } from '@/hooks/use-audio-permissions';
 import { showAlert } from '@/lib/alert';
+import { dropCurrentVisit } from '@/lib/navHistory';
 import {
   createRecordingRecord,
   formatDuration,
@@ -370,6 +371,10 @@ export default function RecordScreen() {
           if (recordingRef.current) await stopRecording();
           const sessionId = activeSession?.id;
           clearActiveSession();
+          // The game page the coach lands on next is the end of the capture,
+          // not a step forward from Record — back from it should skip Record
+          // and return to wherever the capture was started from.
+          dropCurrentVisit();
           if (sessionId) {
             router.replace(`/(tabs)/review/game/${sessionId}`);
           } else {

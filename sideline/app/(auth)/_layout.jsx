@@ -1,5 +1,11 @@
 import { Stack } from 'expo-router';
 
+export const unstable_settings = {
+  // Landing straight on /login or /signup (bookmark, emailed link, OAuth
+  // bounce) puts Welcome underneath, so the back arrow is never a dead end.
+  initialRouteName: 'welcome',
+};
+
 export default function AuthLayout() {
   return (
     <Stack

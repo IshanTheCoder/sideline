@@ -1,5 +1,5 @@
 import { DefaultTheme, ThemeProvider as NavigationThemeProvider } from '@react-navigation/native';
-import { Slot, useRouter, useSegments } from 'expo-router';
+import { Slot, usePathname, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useFonts } from 'expo-font';
 import { useEffect } from 'react';
@@ -13,6 +13,7 @@ import { AuthProvider, useAuth } from '@/contexts/AuthContext';
 import { ActiveSessionProvider } from '@/contexts/ActiveSessionContext';
 import { Brand } from '@/constants/brand';
 import AlertHost from '@/components/AppAlert';
+import { recordVisit, resetHistory } from '@/lib/navHistory';
 
 export const unstable_settings = {
   initialRouteName: '(tabs)',
@@ -42,8 +43,24 @@ function RootLayoutNav() {
   });
   const { user, loading } = useAuth();
   const segments = useSegments();
+  const pathname = usePathname();
   const router = useRouter();
   const backgroundColor = Brand.bg;
+
+  // Keep the trail the back arrow reads from. Recorded here — one place, once
+  // per navigation — so no screen has to remember where the user came from.
+  // Marketing pages are skipped: they carry their own nav, and an in-app back
+  // arrow should never drop the coach out onto the public site.
+  const inMarketing = segments[0] === '(marketing)';
+  useEffect(() => {
+    if (loading || inMarketing) return;
+    recordVisit(pathname);
+  }, [pathname, loading, inMarketing]);
+
+  // A new sign-in must not inherit the previous coach's trail.
+  useEffect(() => {
+    if (!loading && !user) resetHistory();
+  }, [user, loading]);
 
   useEffect(() => {
     if (loading) return;

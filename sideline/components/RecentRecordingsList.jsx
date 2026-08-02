@@ -143,7 +143,7 @@ export default function RecentRecordingsList({
         </Animated.View>
         <ThemedText style={styles.emptyTitle}>No recordings yet</ThemedText>
         <ThemedText style={styles.emptySubtitle}>
-          Tap "Start Recording" to create your first recording
+          Tap &quot;Start Recording&quot; to create your first recording
         </ThemedText>
       </ThemedView>
     );

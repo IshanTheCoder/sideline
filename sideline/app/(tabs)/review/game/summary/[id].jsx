@@ -6,7 +6,7 @@
  * notes via Groq, with data-only fallbacks when AI is unavailable.
  */
 import { useFocusEffect } from '@react-navigation/native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
 import { CheckCircle2, ChevronLeft, Eye } from 'lucide-react-native';
 import { useCallback, useMemo, useState } from 'react';
 import {
@@ -21,6 +21,7 @@ import Svg, { Circle, Text as SvgText } from 'react-native-svg';
 import { Brand, ChartAccents, Shape, Spacing, playerAccent } from '@/constants/brand';
 import { Fonts } from '@/constants/theme';
 import { useAuth } from '@/contexts/AuthContext';
+import { useAppBack } from '@/hooks/use-app-back';
 import { fetchRecordingsForGame, parseRecordingNotes } from '@/lib/recording';
 import { fetchRosterForUser } from '@/lib/roster';
 import {
@@ -82,7 +83,7 @@ function Donut({ segments, total }) {
 
 export default function GameAnalysisScreen() {
   const { id } = useLocalSearchParams();
-  const router = useRouter();
+  const goBack = useAppBack();
   const { user } = useAuth();
 
   const [recordings, setRecordings] = useState([]);
@@ -257,8 +258,9 @@ export default function GameAnalysisScreen() {
         <View style={styles.headerRow}>
           <TouchableOpacity
             style={styles.backBtn}
-            onPress={() => router.back()}
+            onPress={goBack}
             activeOpacity={0.7}
+            accessibilityLabel="Go back"
           >
             <ChevronLeft size={18} color={Brand.ink} strokeWidth={2.4} />
           </TouchableOpacity>

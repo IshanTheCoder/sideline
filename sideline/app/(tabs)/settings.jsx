@@ -24,6 +24,7 @@ import ChangePasswordModal from '@/components/ChangePasswordModal';
 import ProfileEditModal from '@/components/ProfileEditModal';
 import { Brand, Shape } from '@/constants/brand';
 import { useAuth } from '@/contexts/AuthContext';
+import { useAppBack } from '@/hooks/use-app-back';
 import { showAlert } from '@/lib/alert';
 import { fetchPlayersForTeam } from '@/lib/roster';
 import { initialsFor } from '@/lib/scheduleFormat';
@@ -34,6 +35,7 @@ const SPORTS = ['Volleyball'];
 export default function SettingsScreen() {
   const { user, profile, signOut, refreshProfile } = useAuth();
   const router = useRouter();
+  const goBack = useAppBack();
 
   const [teams, setTeams] = useState([]);
   const [activeTeam, setActiveTeam] = useState(null);
@@ -167,8 +169,9 @@ export default function SettingsScreen() {
         <View style={styles.headerRow}>
           <TouchableOpacity
             style={styles.backBtn}
-            onPress={() => (router.canGoBack() ? router.back() : router.replace('/(tabs)/app'))}
+            onPress={goBack}
             activeOpacity={0.7}
+            accessibilityLabel="Go back"
           >
             <ChevronLeft size={18} color={Brand.ink} strokeWidth={2.4} />
           </TouchableOpacity>

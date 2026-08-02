@@ -20,6 +20,7 @@ import {
 } from 'react-native';
 import { EyeIcon, EyeOffIcon, GoogleLogoIcon } from '@/components/icons/AuthIcons';
 import { Brand } from '@/constants/brand';
+import { useAppBack } from '@/hooks/use-app-back';
 import { showAlert } from '@/lib/alert';
 import { signInWithGoogle } from '@/lib/googleAuth';
 import { supabase } from '@/lib/supabase';
@@ -41,6 +42,7 @@ const Field = {
 
 export default function LoginScreen() {
   const router = useRouter();
+  const goBack = useAppBack('/welcome');
   const params = useLocalSearchParams();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -168,7 +170,7 @@ export default function LoginScreen() {
         {/* header */}
         <TouchableOpacity
           style={styles.backBtn}
-          onPress={() => router.back()}
+          onPress={goBack}
           activeOpacity={0.7}
           accessibilityLabel="Go back"
         >

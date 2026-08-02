@@ -21,6 +21,7 @@ import {
 import { EyeIcon, EyeOffIcon, GoogleLogoIcon } from '@/components/icons/AuthIcons';
 import { SportSelectionModal } from '@/components/SportSelectionModal';
 import { Brand } from '@/constants/brand';
+import { useAppBack } from '@/hooks/use-app-back';
 import { showAlert } from '@/lib/alert';
 import { signInWithGoogle } from '@/lib/googleAuth';
 import { supabase } from '@/lib/supabase';
@@ -43,6 +44,7 @@ const SPORTS = ['Volleyball'];
 
 export default function SignupScreen() {
   const router = useRouter();
+  const goBack = useAppBack('/welcome');
   const [teamName, setTeamName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -266,7 +268,7 @@ export default function SignupScreen() {
         {/* header */}
         <TouchableOpacity
           style={styles.backBtn}
-          onPress={() => router.back()}
+          onPress={goBack}
           activeOpacity={0.7}
           accessibilityLabel="Go back"
         >
