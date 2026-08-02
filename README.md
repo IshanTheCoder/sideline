@@ -42,7 +42,6 @@ Sideline converts this into structured post-game notes.
 - 📋 Roster management — manual entry, CSV import, Google Sheets import, or AI-powered import from a roster screenshot
 - 🏷️ Custom coach-defined categories ("buckets") for skills, positions, and feedback types, with AI-generated descriptions
 - 🔐 Email/password auth and Google OAuth sign-in (Supabase Auth)
-- 🌓 Light/dark theme support
 
 ### Planned Features
 - Multi-game trends and analytics
