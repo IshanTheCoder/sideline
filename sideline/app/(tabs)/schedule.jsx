@@ -7,15 +7,9 @@
 import { useFocusEffect } from '@react-navigation/native';
 import { Calendar, ChevronLeft, ChevronRight, Plus } from 'lucide-react-native';
 import { useCallback, useMemo, useState } from 'react';
-import {
-  ActivityIndicator,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import AddGameSheet from '@/components/AddGameSheet';
+import ScheduleSkeleton from '@/components/ScheduleSkeleton';
 import { Brand, Shape } from '@/constants/brand';
 import { useAuth } from '@/contexts/AuthContext';
 import { useAppBack } from '@/hooks/use-app-back';
@@ -147,9 +141,7 @@ export default function ScheduleScreen() {
 
         {/* month games */}
         {loading && games.length === 0 ? (
-          <View style={styles.loadingBox}>
-            <ActivityIndicator color={Brand.green} />
-          </View>
+          <ScheduleSkeleton />
         ) : monthGames.length === 0 ? (
           <View style={styles.emptyCard}>
             <View style={styles.emptyIconCircle}>
@@ -299,10 +291,6 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '600',
     color: Brand.greenPaleSub,
-  },
-  loadingBox: {
-    paddingVertical: 40,
-    alignItems: 'center',
   },
   list: {
     gap: 10,

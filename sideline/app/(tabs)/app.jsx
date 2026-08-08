@@ -8,15 +8,9 @@ import { useFocusEffect } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
 import { Calendar, ChevronRight, Mic, Settings, Users } from 'lucide-react-native';
 import { useCallback, useMemo, useState } from 'react';
-import {
-  ActivityIndicator,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import AddGameSheet from '@/components/AddGameSheet';
+import { GameRowSkeleton, ScheduleRowSkeleton } from '@/components/HomeSkeleton';
 import { Brand, Shape } from '@/constants/brand';
 import { useActiveSession } from '@/contexts/ActiveSessionContext';
 import { useAuth } from '@/contexts/AuthContext';
@@ -231,9 +225,7 @@ export default function HomeScreen() {
             </TouchableOpacity>
           </View>
           {loading && upcomingSchedule.length === 0 ? (
-            <View style={styles.loadingBox}>
-              <ActivityIndicator color={Brand.green} />
-            </View>
+            <ScheduleRowSkeleton />
           ) : upcomingSchedule.length === 0 ? (
             <View style={styles.emptyCard}>
               <Text style={styles.emptyText}>
@@ -294,9 +286,7 @@ export default function HomeScreen() {
             )}
           </View>
           {loading && recentGames.length === 0 ? (
-            <View style={styles.loadingBox}>
-              <ActivityIndicator color={Brand.green} />
-            </View>
+            <GameRowSkeleton />
           ) : recentGames.length === 0 ? (
             <View style={styles.emptyCard}>
               <Text style={styles.emptyText}>
@@ -469,10 +459,6 @@ const styles = StyleSheet.create({
   },
   list: {
     gap: 10,
-  },
-  loadingBox: {
-    paddingVertical: 24,
-    alignItems: 'center',
   },
   emptyCard: {
     backgroundColor: Brand.card,

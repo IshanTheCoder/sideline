@@ -18,6 +18,7 @@ import {
   TouchableOpacity,
 } from 'react-native';
 import Svg, { Circle, Text as SvgText } from 'react-native-svg';
+import GameAnalysisSkeleton from '@/components/GameAnalysisSkeleton';
 import { Brand, ChartAccents, Shape, Spacing, playerAccent } from '@/constants/brand';
 import { Fonts } from '@/constants/theme';
 import { useAuth } from '@/contexts/AuthContext';
@@ -276,9 +277,7 @@ export default function GameAnalysisScreen() {
         </View>
 
         {loading ? (
-          <View style={styles.loadingBox}>
-            <ActivityIndicator color={Brand.green} />
-          </View>
+          <GameAnalysisSkeleton />
         ) : totalNotes === 0 ? (
           <View style={styles.emptyCard}>
             <Text style={styles.emptyText}>No notes to analyze for this game yet.</Text>
@@ -508,10 +507,6 @@ const styles = StyleSheet.create({
   subtitle: {
     fontSize: 13,
     color: Brand.muted,
-  },
-  loadingBox: {
-    paddingVertical: 40,
-    alignItems: 'center',
   },
   emptyCard: {
     backgroundColor: Brand.card,

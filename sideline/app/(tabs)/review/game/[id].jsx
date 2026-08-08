@@ -20,6 +20,7 @@ import {
   View,
 } from 'react-native';
 import BottomSheet from '@/components/BottomSheet';
+import GameDetailSkeleton from '@/components/GameDetailSkeleton';
 import { Brand, Shape, playerAccent } from '@/constants/brand';
 import { useAuth } from '@/contexts/AuthContext';
 import { useAppBack } from '@/hooks/use-app-back';
@@ -301,9 +302,7 @@ export default function GameDetailScreen() {
 
         {/* notes grouped by set */}
         {loading ? (
-          <View style={styles.loadingBox}>
-            <ActivityIndicator color={Brand.green} />
-          </View>
+          <GameDetailSkeleton />
         ) : sets.length === 0 ? (
           <View style={styles.emptyCard}>
             <Text style={styles.emptyText}>No notes for this game yet.</Text>
@@ -612,10 +611,6 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: '700',
-  },
-  loadingBox: {
-    paddingVertical: 40,
-    alignItems: 'center',
   },
   emptyCard: {
     backgroundColor: Brand.card,

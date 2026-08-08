@@ -22,6 +22,7 @@ import BottomSheet from '@/components/BottomSheet';
 import ChangeEmailModal from '@/components/ChangeEmailModal';
 import ChangePasswordModal from '@/components/ChangePasswordModal';
 import ProfileEditModal from '@/components/ProfileEditModal';
+import SettingsSkeleton from '@/components/SettingsSkeleton';
 import { Brand, Shape } from '@/constants/brand';
 import { useAuth } from '@/contexts/AuthContext';
 import { useAppBack } from '@/hooks/use-app-back';
@@ -40,6 +41,7 @@ export default function SettingsScreen() {
   const [teams, setTeams] = useState([]);
   const [activeTeam, setActiveTeam] = useState(null);
   const [rosterCount, setRosterCount] = useState(null);
+  const [loading, setLoading] = useState(true);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showChangeEmailModal, setShowChangeEmailModal] = useState(false);
   const [showChangePasswordModal, setShowChangePasswordModal] = useState(false);
@@ -54,12 +56,16 @@ export default function SettingsScreen() {
 
   const load = useCallback(async () => {
     if (!user?.id) return;
-    const { team, teams: all } = await getActiveTeam(user.id);
-    setTeams(all);
-    setActiveTeam(team);
-    if (team?.id) {
-      const { data } = await fetchPlayersForTeam(team.id);
-      setRosterCount((data ?? []).length);
+    try {
+      const { team, teams: all } = await getActiveTeam(user.id);
+      setTeams(all);
+      setActiveTeam(team);
+      if (team?.id) {
+        const { data } = await fetchPlayersForTeam(team.id);
+        setRosterCount((data ?? []).length);
+      }
+    } finally {
+      setLoading(false);
     }
   }, [user?.id]);
 
@@ -197,82 +203,88 @@ export default function SettingsScreen() {
           </View>
         </TouchableOpacity>
 
-        {/* my teams */}
-        <Text style={styles.eyebrow}>MY TEAMS</Text>
-        <View style={styles.card}>
-          {teams.map((t) => {
-            const sel = t.id === activeTeam?.id;
-            return (
-              <TouchableOpacity
-                key={t.id}
-                style={[styles.teamRow, styles.rowBorder]}
-                onPress={() => pickTeam(t)}
-                activeOpacity={0.75}
-              >
-                <View style={[styles.teamBadge, sel && styles.teamBadgeActive]}>
-                  <Text style={[styles.teamBadgeText, sel && styles.teamBadgeTextActive]}>
-                    {initialsFor(t.name)}
-                  </Text>
-                </View>
-                <View style={styles.teamInfo}>
-                  <Text style={styles.teamName} numberOfLines={1}>{t.name}</Text>
-                  <Text style={styles.teamMeta}>{teamSeason(t)}</Text>
-                </View>
-                <TouchableOpacity
-                  style={styles.teamEditBtn}
-                  onPress={() => openEditTeam(t)}
-                  activeOpacity={0.7}
-                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                >
-                  <Pencil size={15} color={Brand.muted} strokeWidth={2} />
-                </TouchableOpacity>
-                {sel ? (
-                  <View style={styles.teamCheck}>
-                    <Check size={12} color="#fff" strokeWidth={3} />
-                  </View>
-                ) : (
-                  <View style={styles.teamRing} />
-                )}
-              </TouchableOpacity>
-            );
-          })}
-          <TouchableOpacity
-            style={styles.teamRow}
-            onPress={() => setAddTeamOpen(true)}
-            activeOpacity={0.75}
-          >
-            <View style={styles.addTeamBadge}>
-              <Plus size={18} color={Brand.green} strokeWidth={2.4} />
-            </View>
-            <Text style={styles.addTeamText}>Add a team</Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* active team */}
-        {activeTeam && (
+        {loading ? (
+          <SettingsSkeleton />
+        ) : (
           <>
-            <Text style={styles.eyebrow}>{activeTeam.name.toUpperCase()}</Text>
+            {/* my teams */}
+            <Text style={styles.eyebrow}>MY TEAMS</Text>
             <View style={styles.card}>
-              <View style={[styles.settingRow, styles.rowBorder]}>
-                <Text style={styles.settingLabel}>Sport</Text>
-                <Text style={styles.settingValue}>
-                  {activeTeam.sport
-                    ? activeTeam.sport.charAt(0).toUpperCase() + activeTeam.sport.slice(1)
-                    : 'Volleyball'}
-                </Text>
-              </View>
+              {teams.map((t) => {
+                const sel = t.id === activeTeam?.id;
+                return (
+                  <TouchableOpacity
+                    key={t.id}
+                    style={[styles.teamRow, styles.rowBorder]}
+                    onPress={() => pickTeam(t)}
+                    activeOpacity={0.75}
+                  >
+                    <View style={[styles.teamBadge, sel && styles.teamBadgeActive]}>
+                      <Text style={[styles.teamBadgeText, sel && styles.teamBadgeTextActive]}>
+                        {initialsFor(t.name)}
+                      </Text>
+                    </View>
+                    <View style={styles.teamInfo}>
+                      <Text style={styles.teamName} numberOfLines={1}>{t.name}</Text>
+                      <Text style={styles.teamMeta}>{teamSeason(t)}</Text>
+                    </View>
+                    <TouchableOpacity
+                      style={styles.teamEditBtn}
+                      onPress={() => openEditTeam(t)}
+                      activeOpacity={0.7}
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    >
+                      <Pencil size={15} color={Brand.muted} strokeWidth={2} />
+                    </TouchableOpacity>
+                    {sel ? (
+                      <View style={styles.teamCheck}>
+                        <Check size={12} color="#fff" strokeWidth={3} />
+                      </View>
+                    ) : (
+                      <View style={styles.teamRing} />
+                    )}
+                  </TouchableOpacity>
+                );
+              })}
               <TouchableOpacity
-                style={styles.settingRow}
-                onPress={() => router.push('/(tabs)/roster')}
+                style={styles.teamRow}
+                onPress={() => setAddTeamOpen(true)}
                 activeOpacity={0.75}
               >
-                <Text style={styles.settingLabel}>Roster</Text>
-                <Text style={styles.settingValue}>
-                  {rosterCount == null ? '—' : `${rosterCount} player${rosterCount === 1 ? '' : 's'}`}
-                </Text>
-                <ChevronRight size={14} color={Brand.chevron} strokeWidth={2.4} />
+                <View style={styles.addTeamBadge}>
+                  <Plus size={18} color={Brand.green} strokeWidth={2.4} />
+                </View>
+                <Text style={styles.addTeamText}>Add a team</Text>
               </TouchableOpacity>
             </View>
+
+            {/* active team */}
+            {activeTeam && (
+              <>
+                <Text style={styles.eyebrow}>{activeTeam.name.toUpperCase()}</Text>
+                <View style={styles.card}>
+                  <View style={[styles.settingRow, styles.rowBorder]}>
+                    <Text style={styles.settingLabel}>Sport</Text>
+                    <Text style={styles.settingValue}>
+                      {activeTeam.sport
+                        ? activeTeam.sport.charAt(0).toUpperCase() + activeTeam.sport.slice(1)
+                        : 'Volleyball'}
+                    </Text>
+                  </View>
+                  <TouchableOpacity
+                    style={styles.settingRow}
+                    onPress={() => router.push('/(tabs)/roster')}
+                    activeOpacity={0.75}
+                  >
+                    <Text style={styles.settingLabel}>Roster</Text>
+                    <Text style={styles.settingValue}>
+                      {rosterCount == null ? '—' : `${rosterCount} player${rosterCount === 1 ? '' : 's'}`}
+                    </Text>
+                    <ChevronRight size={14} color={Brand.chevron} strokeWidth={2.4} />
+                  </TouchableOpacity>
+                </View>
+              </>
+            )}
           </>
         )}
 

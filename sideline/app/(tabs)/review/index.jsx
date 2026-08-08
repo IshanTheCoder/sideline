@@ -8,7 +8,6 @@ import { useRouter } from 'expo-router';
 import { ChevronLeft, ChevronRight, Trash2 } from 'lucide-react-native';
 import { useCallback, useState } from 'react';
 import {
-  ActivityIndicator,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -16,6 +15,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import GamesListSkeleton from '@/components/GamesListSkeleton';
 import { Brand, Shape } from '@/constants/brand';
 import { useAuth } from '@/contexts/AuthContext';
 import { useAppBack } from '@/hooks/use-app-back';
@@ -127,9 +127,7 @@ export default function GamesListScreen() {
         </View>
 
         {loading ? (
-          <View style={styles.loadingBox}>
-            <ActivityIndicator color={Brand.green} />
-          </View>
+          <GamesListSkeleton />
         ) : games.length === 0 ? (
           <View style={styles.emptyCard}>
             <Text style={styles.emptyText}>
@@ -215,10 +213,6 @@ const styles = StyleSheet.create({
   subtitle: {
     fontSize: 13,
     color: Brand.muted,
-  },
-  loadingBox: {
-    paddingVertical: 40,
-    alignItems: 'center',
   },
   emptyCard: {
     backgroundColor: Brand.card,

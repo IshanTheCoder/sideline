@@ -18,6 +18,7 @@ import {
   View,
 } from 'react-native';
 import BottomSheet from '@/components/BottomSheet';
+import RosterSkeleton from '@/components/RosterSkeleton';
 import { Brand, Shape } from '@/constants/brand';
 import { useAuth } from '@/contexts/AuthContext';
 import { useAppBack } from '@/hooks/use-app-back';
@@ -247,9 +248,7 @@ export default function RosterScreen() {
 
         {/* player rows */}
         {loading ? (
-          <View style={styles.loadingBox}>
-            <ActivityIndicator color={Brand.green} />
-          </View>
+          <RosterSkeleton />
         ) : players.length === 0 ? (
           <View style={styles.emptyCard}>
             <Text style={styles.emptyText}>
@@ -541,10 +540,6 @@ const styles = StyleSheet.create({
     color: Brand.ink,
     fontSize: 15,
     fontWeight: '700',
-  },
-  loadingBox: {
-    paddingVertical: 40,
-    alignItems: 'center',
   },
   emptyCard: {
     backgroundColor: Brand.card,
