@@ -50,8 +50,17 @@ export function AuthProvider({ children }) {
         .single();
 
       if (insertError) {
-        console.log('❌ Failed to create fallback profile:', insertError);
-        setProfile(null);
+        // Right after signup, the signup screen inserts the profile (with the
+        // coach's team name) at the same moment this safety net does — one of
+        // the two loses on the primary key. A conflict means the row exists
+        // now, so re-read it instead of leaving the app profile-less.
+        console.log('⚠️ Fallback profile insert failed, re-reading:', insertError.message);
+        const { data: existing } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', userId)
+          .maybeSingle();
+        setProfile(existing ?? null);
         return;
       }
 
