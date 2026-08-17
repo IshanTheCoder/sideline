@@ -335,11 +335,15 @@ export default function RecordScreen() {
               meta: [player, tag, `Set ${capturedSet}`].filter(Boolean).join(' · '),
             });
           } else {
+            console.error('Processing failed:', result.error);
+            // surface the real failure reason instead of a generic message — the
+            // coach reading this off their phone is often our only diagnostic signal
+            const reason = result.error?.message ? String(result.error.message).slice(0, 120) : 'unknown error';
             showToast({
               num: noteNum,
               title: 'Note saved',
-              meta: `Set ${capturedSet} · transcription failed — audio is safe`,
-            });
+              meta: `Set ${capturedSet} · transcription failed: ${reason}`,
+            }, 8000);
           }
         } catch (err) {
           console.error('Background processing error:', err);
