@@ -36,6 +36,28 @@ import {
 import { processRecording } from '@/lib/recordingProcessing';
 import { SKILL_CATEGORY_LABELS, formatCategoryLabel, parseAiLabels } from '@/lib/volleyballVocabulary';
 
+// Safari (iOS + macOS) never supported the webm container/codec that
+// MediaRecorder defaults to — new MediaRecorder(stream, { mimeType: 'audio/webm' })
+// throws synchronously there, so Audio.Recording.createAsync() rejects before
+// recording ever starts. Feature-detect a mimeType the current browser actually
+// supports instead of hardcoding webm.
+function pickWebMimeType() {
+  if (typeof window === 'undefined' || typeof window.MediaRecorder === 'undefined') {
+    return undefined;
+  }
+  const candidates = ['audio/webm', 'audio/mp4', 'audio/aac', 'audio/ogg'];
+  const supported = candidates.find((type) => {
+    try {
+      return window.MediaRecorder.isTypeSupported?.(type);
+    } catch {
+      return false;
+    }
+  });
+  // undefined lets the browser fall back to its own default encoder instead
+  // of us guessing wrong and blowing up the recorder constructor
+  return supported;
+}
+
 // Speech-tuned recording profile: mono + 128kbps AAC. Whisper downmixes to mono
 // anyway, so stereo just doubles the upload on gym wifi for zero accuracy gain.
 // 44.1kHz keeps full voice detail for noisy-environment transcription.
@@ -61,7 +83,7 @@ const SPEECH_RECORDING_OPTIONS = {
     linearPCMIsFloat: false,
   },
   web: {
-    mimeType: 'audio/webm',
+    mimeType: pickWebMimeType(),
     bitsPerSecond: 128000,
   },
 };
@@ -201,7 +223,12 @@ export default function RecordScreen() {
         ({ recording } = await Audio.Recording.createAsync(SPEECH_RECORDING_OPTIONS));
       } catch (presetError) {
         console.warn('Speech recording profile failed, falling back to HIGH_QUALITY:', presetError);
-        ({ recording } = await Audio.Recording.createAsync(Audio.RecordingOptionsPresets.HIGH_QUALITY));
+        // expo-av's HIGH_QUALITY preset also hardcodes web mimeType: 'audio/webm',
+        // which throws the same way on Safari — override it with our feature-detected one
+        ({ recording } = await Audio.Recording.createAsync({
+          ...Audio.RecordingOptionsPresets.HIGH_QUALITY,
+          web: SPEECH_RECORDING_OPTIONS.web,
+        }));
       }
       hapticStart();
       if (activeSession?.startedAt) {

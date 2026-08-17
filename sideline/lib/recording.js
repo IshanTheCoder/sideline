@@ -68,13 +68,20 @@ const isMissingColumnError = (error, column) => {
  */
 export const uploadRecording = async (userId, recordingId, audioUri) => {
   try {
-    // web = webm, native = m4a — gotta match the audio format to the platform
     const isWeb = Platform.OS === 'web';
-    const ext = isWeb ? 'webm' : 'm4a';
-    const contentType = isWeb ? 'audio/webm' : 'audio/mp4';
-    const fileName = `${userId}/${recordingId}.${ext}`;
+    // web format varies by browser: MediaRecorder produces webm on Chrome/Firefox
+    // but mp4 on Safari (it never supported webm) — read the real type off the
+    // recorded blob rather than assuming webm for every web recording
+    const WEB_MIME_TO_EXT = {
+      'audio/webm': { ext: 'webm', contentType: 'audio/webm' },
+      'audio/mp4': { ext: 'm4a', contentType: 'audio/mp4' },
+      'audio/aac': { ext: 'aac', contentType: 'audio/aac' },
+      'audio/ogg': { ext: 'ogg', contentType: 'audio/ogg' },
+    };
+    let ext = isWeb ? 'webm' : 'm4a';
+    let contentType = isWeb ? 'audio/webm' : 'audio/mp4';
 
-    console.log('Preparing audio file for upload. URI:', audioUri, 'format:', ext);
+    console.log('Preparing audio file for upload. URI:', audioUri);
 
     let fileToUpload;
 
@@ -83,8 +90,13 @@ export const uploadRecording = async (userId, recordingId, audioUri) => {
       console.log('Web detected - fetching blob and converting to ArrayBuffer');
       const response = await fetch(audioUri);
       const blob = await response.blob();
+      const detected = WEB_MIME_TO_EXT[(blob.type || '').split(';')[0].trim().toLowerCase()];
+      if (detected) {
+        ext = detected.ext;
+        contentType = detected.contentType;
+      }
       fileToUpload = await blob.arrayBuffer();
-      console.log('ArrayBuffer created. Size:', fileToUpload.byteLength);
+      console.log('ArrayBuffer created. Size:', fileToUpload.byteLength, 'blob.type:', blob.type, '-> ext:', ext);
     } else {
       // native path: file → base64 string → raw bytes (the scenic route)
       console.log('Native detected - reading audio file as base64');
@@ -128,6 +140,7 @@ export const uploadRecording = async (userId, recordingId, audioUri) => {
       }
     }
 
+    const fileName = `${userId}/${recordingId}.${ext}`;
     console.log('Uploading to Supabase Storage. FileName:', fileName, 'ContentType:', contentType);
 
     // fire the audio up to Supabase cloud storage — fingers crossed
