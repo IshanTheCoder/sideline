@@ -1,6 +1,6 @@
 /**
  * Live Capture — redesign: the whole screen is the tap target (tap to start,
- * tap again to stop; holding works walkie-talkie style), with a set switcher,
+ * tap again to stop), with a set switcher,
  * a big purely-visual record circle, a live clock, and a confirmation toast
  * showing the transcribed note's AI label once processing lands. All real:
  * expo-av recording → Supabase upload → background transcription + labeling.
@@ -92,6 +92,11 @@ const SPEECH_RECORDING_OPTIONS = {
 const hapticStart = () => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
 const hapticStop = () => Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
 
+// Anything shorter than this never contains a usable note. Phones can take a
+// while to hand over the mic, so a press that ends before the mic is live would
+// otherwise save a silent clip that "fails transcription" for no clear reason.
+const MIN_RECORDING_MS = 700;
+
 const WAVE_BARS = [0, 1, 2, 3, 4, 5, 6, 7, 8];
 
 function WaveBar({ index }) {
@@ -154,10 +159,10 @@ export default function RecordScreen() {
   const [noteCount, setNoteCount] = useState(0);
 
   const recordingRef = useRef(null);
-  const pressAtRef = useRef(0);
-  const armedRef = useRef(false);
-  const pendingReleaseRef = useRef(false);
-  const decideStopRef = useRef(() => {});
+  const recordStartedAtRef = useRef(0);
+  const startingRef = useRef(false);
+  const pendingStopRef = useRef(false);
+  const stopRef = useRef(() => {});
   const toastTimer = useRef(null);
   const noteCountRef = useRef(0);
   const isProcessing = processingCount > 0;
@@ -204,6 +209,7 @@ export default function RecordScreen() {
 
   const startRecording = useCallback(async () => {
     if (recordingRef.current || isBusy) return;
+    startingRef.current = true;
     setIsBusy(true);
     try {
       if (status !== 'granted') {
@@ -237,18 +243,20 @@ export default function RecordScreen() {
         );
       }
       recordingRef.current = recording;
+      recordStartedAtRef.current = Date.now();
       setToast(null);
       setIsRecording(true);
-      // the coach may have already released (fast tap, or a hold shorter than
-      // mic init time) before createAsync resolved — apply that release now
-      if (pendingReleaseRef.current) {
-        pendingReleaseRef.current = false;
-        decideStopRef.current();
+      // the coach may have already tapped again to stop while the mic was still
+      // opening — apply that stop now that there is something to stop
+      if (pendingStopRef.current) {
+        pendingStopRef.current = false;
+        stopRef.current();
       }
     } catch (error) {
       console.error('Failed to start recording:', error);
       showToast({ error: 'Could not start recording — try again.' }, 5000);
     } finally {
+      startingRef.current = false;
       setIsBusy(false);
     }
   }, [activeSession?.startedAt, isBusy, requestPermission, showToast, status]);
@@ -280,6 +288,15 @@ export default function RecordScreen() {
         return;
       }
 
+      // Drop clips that ended before the mic had time to capture anything —
+      // saving them produced a phantom "note" the coach never spoke into.
+      const elapsedMs = recordStartedAtRef.current ? Date.now() - recordStartedAtRef.current : 0;
+      recordStartedAtRef.current = 0;
+      if (elapsedMs < MIN_RECORDING_MS) {
+        showToast({ error: 'Too quick to capture — tap once, speak, then tap to stop.' }, 4000);
+        return;
+      }
+
       let recordingId;
       try {
         recordingId = Crypto.randomUUID();
@@ -287,7 +304,7 @@ export default function RecordScreen() {
         recordingId = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
       }
 
-      const capturedDuration = recordingDuration;
+      const capturedDuration = Math.max(1, Math.round(elapsedMs / 1000));
       const capturedSet = selectedSet;
       const capturedOffset = setOffsetSeconds ?? 0;
       const capturedSessionId = activeSession?.id ?? null;
@@ -351,41 +368,28 @@ export default function RecordScreen() {
     } finally {
       setIsBusy(false);
     }
-  }, [activeSession?.id, recordingDuration, selectedSet, setOffsetSeconds, showToast, user?.id]);
+  }, [activeSession?.id, selectedSet, setOffsetSeconds, showToast, user?.id]);
 
-  // whole-screen tap target: tap starts, tap again stops; a genuine hold
-  // records walkie-talkie style and stops on release. Only blocks on an
-  // in-flight start/stop or an already-running recording — a prior note
-  // still uploading/transcribing in the background must never block the
-  // next capture, or back-to-back plays get silently dropped.
-  const onSurfaceDown = () => {
-    if (isBusy || recordingRef.current) {
-      pressAtRef.current = 0;
+  // whole-screen tap target: one tap starts, the next tap stops. How long the
+  // finger stays down is irrelevant — a note is never cut short by the coach
+  // lifting their thumb. A prior note still uploading/transcribing in the
+  // background must never block the next capture, or back-to-back plays get
+  // silently dropped.
+  stopRef.current = stopRecording;
+  const onSurfaceTap = () => {
+    if (recordingRef.current) {
+      stopRecording();
       return;
     }
-    pressAtRef.current = Date.now();
-    armedRef.current = false;
-    pendingReleaseRef.current = false;
+    if (startingRef.current) {
+      // mic is still opening (Audio.Recording.createAsync hasn't resolved yet)
+      // — remember this stop and apply it the moment recording is live
+      pendingStopRef.current = true;
+      return;
+    }
+    if (isBusy) return; // a previous stop is still wrapping up
+    pendingStopRef.current = false;
     startRecording();
-  };
-  const decideStop = () => {
-    if (pressAtRef.current && Date.now() - pressAtRef.current < 350 && !armedRef.current) {
-      armedRef.current = true; // it was a tap — keep recording until the next tap
-      return;
-    }
-    armedRef.current = false;
-    stopRecording();
-  };
-  decideStopRef.current = decideStop;
-  const onSurfaceUp = () => {
-    if (!recordingRef.current) {
-      // mic is still initializing (Audio.Recording.createAsync hasn't
-      // resolved yet) — apply this release once it has, so a fast
-      // press-and-release before the mic is ready still stops correctly
-      pendingReleaseRef.current = true;
-      return;
-    }
-    decideStop();
   };
 
   const endGame = () => {
@@ -426,7 +430,7 @@ export default function RecordScreen() {
         : 'Ready for the next one.';
 
   return (
-    <Pressable style={styles.container} onPressIn={onSurfaceDown} onPressOut={onSurfaceUp}>
+    <Pressable style={styles.container} onPressIn={onSurfaceTap}>
       {/* top row */}
       <View style={styles.topRow}>
         <TouchableOpacity
