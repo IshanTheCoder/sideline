@@ -144,22 +144,24 @@ export default function SignupScreen() {
       }
 
       console.log('✅ Account created successfully!');
-      showAlert(
-        'Success',
-        'Account created successfully! Please check your email to verify your account.',
-        [
-          {
-            text: 'OK',
-            onPress: () => {
-              setTeamName('');
-              setEmail('');
-              setPassword('');
-              setConfirmPassword('');
-              router.push('/(auth)/login');
-            },
-          },
-        ]
-      );
+      setTeamName('');
+      setEmail('');
+      setPassword('');
+      setConfirmPassword('');
+
+      // Supabase only withholds a session when the project requires email
+      // confirmation. When it doesn't (the current setting), the coach is
+      // already signed in — promising a verification link that will never
+      // arrive just strands them on the login screen.
+      if (authData.session) {
+        router.replace('/(tabs)/app');
+      } else {
+        showAlert(
+          'Verify your email',
+          'Account created. Click the link we just sent to finish signing in.',
+          [{ text: 'OK', onPress: () => router.push('/(auth)/login') }]
+        );
+      }
       setLoading(false);
     } catch (error) {
       console.error('Signup error:', error);

@@ -7,14 +7,22 @@
 import { useFocusEffect } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
 import { Calendar, ChevronRight, Mic, Settings, Users } from 'lucide-react-native';
-import { useCallback, useMemo, useState } from 'react';
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import AddGameSheet from '@/components/AddGameSheet';
 import { GameRowSkeleton, ScheduleRowSkeleton } from '@/components/HomeSkeleton';
+import TutorialOverlay from '@/components/TutorialOverlay';
 import { Brand, Shape } from '@/constants/brand';
 import { useActiveSession } from '@/contexts/ActiveSessionContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { fetchScheduledGames, startScheduledGame } from '@/lib/gameSessions';
+import { markTutorialSeen, shouldShowTutorial } from '@/lib/onboarding';
 import { fetchRecordingsForTeam } from '@/lib/recording';
 import {
   gameDateParts,
@@ -37,6 +45,15 @@ export default function HomeScreen() {
   const [loading, setLoading] = useState(true);
   const [addGameOpen, setAddGameOpen] = useState(false);
   const [addGameMode, setAddGameMode] = useState('schedule'); // 'schedule' | 'record'
+  const [tutorialOpen, setTutorialOpen] = useState(false);
+
+  // Tutorial targets — the overlay measures these live elements so the
+  // spotlight lands on the real control, not a hardcoded position.
+  const rosterBtn = useRef(null);
+  const settingsBtn = useRef(null);
+  const scheduleBtn = useRef(null);
+  const startGameBtn = useRef(null);
+  const tutorialChecked = useRef(false);
 
   const load = useCallback(async () => {
     if (!user?.id) {
@@ -84,6 +101,64 @@ export default function HomeScreen() {
     useCallback(() => {
       load();
     }, [load])
+  );
+
+  // First-run tour, for brand-new accounts only. Held until the first load
+  // finishes so the hero shows its final label before the spotlight measures it,
+  // and checked once per mount so returning to Home can never replay it.
+  // Deliberately independent of `profile`: it can be null through a coach's
+  // first session, which is precisely when the tour should run.
+  useEffect(() => {
+    if (loading || tutorialChecked.current || !user?.id) return;
+    tutorialChecked.current = true;
+    let cancelled = false;
+    shouldShowTutorial(user.id).then((show) => {
+      console.log(show ? '🎓 First-run tutorial: showing' : '🎓 First-run tutorial: already seen');
+      if (!cancelled && show) setTutorialOpen(true);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [loading, user?.id]);
+
+  // Finishing and skipping both count — the tour must never nag.
+  const finishTutorial = useCallback(() => {
+    setTutorialOpen(false);
+    markTutorialSeen(user?.id);
+  }, [user?.id]);
+
+  const tutorialSteps = useMemo(
+    () => [
+      {
+        key: 'roster',
+        ref: rosterBtn,
+        shape: 'circle',
+        title: 'Start with your roster',
+        body: 'Add your players here first. Names, numbers, and positions let Sideline tag every note to the right player.',
+      },
+      {
+        key: 'settings',
+        ref: settingsBtn,
+        shape: 'circle',
+        title: 'Settings',
+        body: 'Your team, sport, and account live here. Switch teams or update your profile any time.',
+      },
+      {
+        key: 'schedule',
+        ref: scheduleBtn,
+        shape: 'circle',
+        title: 'Add your schedule',
+        body: 'Put your games on the schedule and your next one shows up right here on game day.',
+      },
+      {
+        key: 'start-game',
+        ref: startGameBtn,
+        radius: 18,
+        title: 'Start the game here',
+        body: 'One tap on game day, then record three-second voice notes without looking away from the court.',
+      },
+    ],
+    []
   );
 
   // scheduled games today or later, soonest first. Deliberately does NOT
@@ -163,6 +238,7 @@ export default function HomeScreen() {
           </View>
           <View style={styles.headerIcons}>
             <TouchableOpacity
+              ref={scheduleBtn}
               style={styles.iconBtn}
               onPress={() => router.push('/(tabs)/schedule')}
               activeOpacity={0.7}
@@ -170,6 +246,7 @@ export default function HomeScreen() {
               <Calendar size={20} color={Brand.ink} strokeWidth={1.8} />
             </TouchableOpacity>
             <TouchableOpacity
+              ref={rosterBtn}
               style={styles.iconBtn}
               onPress={() => router.push('/(tabs)/roster')}
               activeOpacity={0.7}
@@ -177,6 +254,7 @@ export default function HomeScreen() {
               <Users size={20} color={Brand.ink} strokeWidth={1.8} />
             </TouchableOpacity>
             <TouchableOpacity
+              ref={settingsBtn}
               style={styles.iconBtn}
               onPress={() => router.push('/(tabs)/settings')}
               activeOpacity={0.7}
@@ -202,7 +280,12 @@ export default function HomeScreen() {
                 ? gameWhenLabel(nextGame)
                 : 'Add your schedule to get started'}
           </Text>
-          <TouchableOpacity style={styles.heroBtn} onPress={startCapture} activeOpacity={0.85}>
+          <TouchableOpacity
+            ref={startGameBtn}
+            style={styles.heroBtn}
+            onPress={startCapture}
+            activeOpacity={0.85}
+          >
             <Mic size={18} color="#fff" strokeWidth={2.2} />
             <Text style={styles.heroBtnText}>
               {activeSession ? 'Resume Capture' : nextGame ? 'Start Capture' : 'Record Game'}
@@ -330,6 +413,8 @@ export default function HomeScreen() {
         quickRecord={addGameMode === 'record'}
         onRecorded={handleRecorded}
       />
+
+      <TutorialOverlay visible={tutorialOpen} steps={tutorialSteps} onFinish={finishTutorial} />
     </View>
   );
 }
