@@ -360,7 +360,10 @@ export default function RecordScreen() {
           }
         } catch (err) {
           console.error('Background processing error:', err);
-          showToast({ error: 'Upload failed — the note will sync when connection returns.' }, 6000);
+          // No offline queue exists: the audio only lived in this closure, so a
+          // failed upload means the note is gone. Say so — a coach who is told
+          // it will sync won't re-record, and the observation is lost for good.
+          showToast({ error: "Upload failed — that note wasn't saved. Record it again." }, 6000);
         } finally {
           setProcessingCount((c) => Math.max(0, c - 1));
         }
