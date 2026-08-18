@@ -9,7 +9,7 @@ import { Audio } from 'expo-av';
 import * as Crypto from 'expo-crypto';
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
-import { Check, Mic, Square } from 'lucide-react-native';
+import { Check, ClipboardList, Mic, Square } from 'lucide-react-native';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -453,6 +453,25 @@ export default function RecordScreen() {
 
       <Text style={styles.opponent}>vs. {activeSession?.opponentName ?? 'Current Game'}</Text>
 
+      {/* jump to this game's notes mid-game (e.g. during a timeout) — disabled
+          while recording since leaving the screen would drop the in-progress
+          clip instead of saving it */}
+      {!!activeSession?.id && (
+        <TouchableOpacity
+          style={[styles.notesBtn, isRecording && styles.notesBtnDisabled]}
+          onPress={() => router.push(`/(tabs)/review/game/${activeSession.id}`)}
+          onPressIn={swallow}
+          onPressOut={swallow}
+          disabled={isRecording}
+          activeOpacity={0.7}
+        >
+          <ClipboardList size={14} color={Brand.muted} strokeWidth={2} />
+          <Text style={styles.notesBtnText}>
+            {noteCount === 0 ? 'View notes' : `${noteCount} note${noteCount === 1 ? '' : 's'}`}
+          </Text>
+        </TouchableOpacity>
+      )}
+
       {/* set switcher */}
       <View style={styles.setRow}>
         {[1, 2, 3, 4, 5].map((n) => (
@@ -584,6 +603,27 @@ const styles = StyleSheet.create({
     color: Brand.ink,
     textAlign: 'center',
     marginTop: 10,
+  },
+  notesBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'center',
+    gap: 6,
+    marginTop: 10,
+    height: 32,
+    paddingHorizontal: 12,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: Brand.border,
+    backgroundColor: Brand.card,
+  },
+  notesBtnDisabled: {
+    opacity: 0.4,
+  },
+  notesBtnText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: Brand.muted,
   },
   setRow: {
     flexDirection: 'row',
