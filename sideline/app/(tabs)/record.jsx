@@ -29,6 +29,7 @@ import { showAlert } from '@/lib/alert';
 import { dropCurrentVisit } from '@/lib/navHistory';
 import {
   createRecordingRecord,
+  fetchRecordingsForGame,
   formatDuration,
   serializeRecordingNotes,
   uploadRecording,
@@ -185,6 +186,23 @@ export default function RecordScreen() {
     const interval = setInterval(() => setRecordingDuration((p) => p + 1), 1000);
     return () => clearInterval(interval);
   }, [isRecording]);
+
+  // Seed the pill with this game's real note count. Recordings persist in the
+  // DB, but `noteCount` itself is local state — without this it always starts
+  // back at 0 on remount (e.g. after "View past notes" and back), even though
+  // the game already has notes.
+  useEffect(() => {
+    if (!user?.id || !activeSession?.id) return;
+    let cancelled = false;
+    fetchRecordingsForGame(user.id, activeSession.id).then(({ data }) => {
+      if (cancelled || !data) return;
+      noteCountRef.current = data.length;
+      setNoteCount(data.length);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id, activeSession?.id]);
 
   // configure the mic as soon as this screen loads; kill any live recording on leave
   useEffect(() => {
@@ -467,7 +485,7 @@ export default function RecordScreen() {
         >
           <ClipboardList size={14} color={Brand.muted} strokeWidth={2} />
           <Text style={styles.notesBtnText}>
-            {noteCount === 0 ? 'View notes' : `${noteCount} note${noteCount === 1 ? '' : 's'}`}
+            {noteCount === 0 ? 'View past notes' : `View past notes (${noteCount})`}
           </Text>
         </TouchableOpacity>
       )}
