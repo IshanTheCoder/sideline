@@ -52,10 +52,11 @@ function RootLayoutNav() {
   // Marketing pages are skipped: they carry their own nav, and an in-app back
   // arrow should never drop the coach out onto the public site.
   const inMarketing = segments[0] === '(marketing)';
+  const isNotFound = segments[0] === '+not-found';
   useEffect(() => {
-    if (loading || inMarketing) return;
+    if (loading || inMarketing || isNotFound) return;
     recordVisit(pathname);
-  }, [pathname, loading, inMarketing]);
+  }, [pathname, loading, inMarketing, isNotFound]);
 
   // A new sign-in must not inherit the previous coach's trail.
   useEffect(() => {
@@ -68,8 +69,10 @@ function RootLayoutNav() {
     const inAuthGroup = segments[0] === '(auth)';
     const inMarketingGroup = segments[0] === '(marketing)';
 
-    // Marketing pages are public — never redirect visitors reading the site
-    if (inMarketingGroup) return;
+    // Marketing pages are public — never redirect visitors reading the site.
+    // The 404 fallback is public too — it must be reachable regardless of
+    // auth state, or a signed-out visitor on a dead link never sees it.
+    if (inMarketingGroup || isNotFound) return;
 
     console.log('🔍 Root Layout Navigation Check:', {
       hasUser: !!user,
