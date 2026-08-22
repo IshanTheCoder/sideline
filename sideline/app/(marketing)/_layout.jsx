@@ -57,6 +57,7 @@ export default function MarketingLayout() {
             <ul className="mk-footer-links">
               <li><a href="/app">Open the app</a></li>
               <li><a href="/about">About</a></li>
+              <li><a href="/privacy">Privacy</a></li>
               <li><a href={`mailto:${CONTACT_EMAIL}`}>Contact</a></li>
             </ul>
           </div>

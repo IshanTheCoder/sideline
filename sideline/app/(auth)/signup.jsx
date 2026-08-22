@@ -7,7 +7,7 @@
  */
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { ChevronLeft } from 'lucide-react-native';
+import { Check, ChevronLeft } from 'lucide-react-native';
 import { useState } from 'react';
 import {
   ActivityIndicator,
@@ -55,6 +55,7 @@ export default function SignupScreen() {
   const [googleUserData, setGoogleUserData] = useState(null);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [agreedToPrivacy, setAgreedToPrivacy] = useState(false);
   const [errors, setErrors] = useState({});
 
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -84,6 +85,10 @@ export default function SignupScreen() {
       newErrors.confirmPassword = 'Please confirm your password';
     } else if (password !== confirmPassword) {
       newErrors.confirmPassword = 'Passwords do not match';
+    }
+
+    if (!agreedToPrivacy) {
+      newErrors.privacy = 'Please agree to the Privacy Policy to continue';
     }
 
     setErrors(newErrors);
@@ -171,6 +176,12 @@ export default function SignupScreen() {
   };
 
   const handleGoogleSignup = async () => {
+    if (!agreedToPrivacy) {
+      setErrors((prev) => ({ ...prev, privacy: 'Please agree to the Privacy Policy to continue' }));
+      showAlert('Privacy Policy', 'Please agree to the Privacy Policy to continue.');
+      return;
+    }
+
     setLoading(true);
     try {
       const { data, error } = await signInWithGoogle();
@@ -425,6 +436,46 @@ export default function SignupScreen() {
           })}
         </View>
 
+        {/* privacy agreement */}
+        <View style={styles.privacyRow}>
+          <TouchableOpacity
+            style={styles.privacyCheckHit}
+            onPress={() => {
+              setAgreedToPrivacy((v) => !v);
+              if (errors.privacy) setErrors({ ...errors, privacy: undefined });
+            }}
+            activeOpacity={0.7}
+            disabled={loading}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            accessibilityRole="checkbox"
+            accessibilityState={{ checked: agreedToPrivacy }}
+          >
+            {agreedToPrivacy ? (
+              <View style={styles.privacyCheck}>
+                <Check size={12} color="#fff" strokeWidth={3} />
+              </View>
+            ) : (
+              <View style={styles.privacyRing} />
+            )}
+          </TouchableOpacity>
+          <Text
+            style={styles.privacyText}
+            onPress={() => {
+              setAgreedToPrivacy((v) => !v);
+              if (errors.privacy) setErrors({ ...errors, privacy: undefined });
+            }}
+          >
+            I have read and agree to the{' '}
+            <Text
+              style={styles.privacyLink}
+              onPress={() => !loading && router.push('/privacy')}
+            >
+              Privacy Policy
+            </Text>
+          </Text>
+        </View>
+        {errors.privacy && <Text style={styles.errorText}>{errors.privacy}</Text>}
+
         {/* sign up */}
         <TouchableOpacity
           style={[styles.primaryBtn, loading && styles.primaryBtnDisabled]}
@@ -600,6 +651,40 @@ const styles = StyleSheet.create({
   },
   sportChipTextActive: {
     color: '#FFFFFF',
+  },
+  privacyRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+    marginTop: 22,
+  },
+  privacyCheckHit: {
+    paddingTop: 2,
+  },
+  privacyCheck: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: Brand.green,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  privacyRing: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    borderWidth: 1.8,
+    borderColor: Field.inputBorder,
+  },
+  privacyText: {
+    flex: 1,
+    fontSize: 14,
+    color: Brand.muted,
+    lineHeight: 20,
+  },
+  privacyLink: {
+    color: Brand.greenLink,
+    fontWeight: '700',
   },
   primaryBtn: {
     marginTop: 28,

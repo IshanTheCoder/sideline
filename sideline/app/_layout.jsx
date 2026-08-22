@@ -68,11 +68,14 @@ function RootLayoutNav() {
 
     const inAuthGroup = segments[0] === '(auth)';
     const inMarketingGroup = segments[0] === '(marketing)';
+    const isPrivacy = segments[0] === 'privacy';
 
     // Marketing pages are public — never redirect visitors reading the site.
     // The 404 fallback is public too — it must be reachable regardless of
-    // auth state, or a signed-out visitor on a dead link never sees it.
-    if (inMarketingGroup || isNotFound) return;
+    // auth state, or a signed-out visitor on a dead link never sees it. The
+    // Privacy Policy must also be public — a signed-out coach evaluating the
+    // app, or a school admin, needs to read it without being sent to /welcome.
+    if (inMarketingGroup || isNotFound || isPrivacy) return;
 
     console.log('🔍 Root Layout Navigation Check:', {
       hasUser: !!user,
