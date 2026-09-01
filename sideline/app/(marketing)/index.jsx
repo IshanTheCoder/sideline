@@ -13,19 +13,65 @@ const TITLE = 'Sideline: Voice-first coaching notes for volleyball coaches';
 const DESCRIPTION =
   'Sideline turns a coach’s five-second voice notes into structured, searchable feedback, organized by player, skill, and game. Record during the game, review before practice.';
 
+// @id-linked graph (Organization + WebSite + SoftwareApplication) instead of
+// one flat block: this is how Google/LLMs learn "Sideline" is a single
+// consistent entity across pages rather than re-guessing it from prose on
+// every crawl. Keep the Organization node's fields identical to about.jsx's
+// so the two pages don't describe the brand two different ways.
+const ORGANIZATION_ID = `${SITE_URL}/#organization`;
+const WEBSITE_ID = `${SITE_URL}/#website`;
+
 const JSON_LD = {
   '@context': 'https://schema.org',
-  '@type': 'SoftwareApplication',
-  name: 'Sideline',
-  applicationCategory: 'SportsApplication',
-  operatingSystem: 'iOS, Android, Web',
-  url: SITE_URL,
-  description: DESCRIPTION,
-  creator: {
-    '@type': 'Organization',
-    name: 'Sideline',
-    email: CONTACT_EMAIL,
-  },
+  '@graph': [
+    {
+      '@type': 'Organization',
+      '@id': ORGANIZATION_ID,
+      name: 'Sideline',
+      url: SITE_URL,
+      email: CONTACT_EMAIL,
+      logo: `${SITE_URL}/sideline-whistle.png`,
+      foundingLocation: 'New Jersey, United States',
+      founder: [
+        { '@type': 'Person', name: 'Ishan Sarda' },
+        { '@type': 'Person', name: 'Sidhant Damarapati' },
+      ],
+    },
+    {
+      '@type': 'WebSite',
+      '@id': WEBSITE_ID,
+      name: 'Sideline',
+      url: SITE_URL,
+      inLanguage: 'en-US',
+      publisher: { '@id': ORGANIZATION_ID },
+    },
+    {
+      '@type': 'SoftwareApplication',
+      name: 'Sideline',
+      applicationCategory: 'SportsApplication',
+      applicationSubCategory: 'Coaching software',
+      operatingSystem: 'iOS, Android, Web',
+      url: SITE_URL,
+      description: DESCRIPTION,
+      inLanguage: 'en-US',
+      isPartOf: { '@id': WEBSITE_ID },
+      creator: { '@id': ORGANIZATION_ID },
+      publisher: { '@id': ORGANIZATION_ID },
+      audience: {
+        '@type': 'Audience',
+        audienceType: 'Volleyball coaches',
+      },
+      keywords:
+        'volleyball coaching app, AI coaching assistant, voice notes for coaches, volleyball scouting app, sports coaching software',
+      featureList: [
+        'Voice-to-text recording during live games',
+        'AI-generated skill and player labels',
+        'Notes searchable by player, skill, and game',
+        'AI-written post-game summaries',
+        'Opponent scouting notes',
+      ],
+    },
+  ],
 };
 
 // The rotating demo: real observations a coach would actually say
@@ -433,9 +479,11 @@ export default function MarketingHome() {
       <Head>
         <title>{TITLE}</title>
         <meta name="description" content={DESCRIPTION} />
+        <meta name="robots" content="index, follow, max-image-preview:large" />
         <link rel="canonical" href={`${SITE_URL}/`} />
         <meta property="og:type" content="website" />
         <meta property="og:site_name" content="Sideline" />
+        <meta property="og:locale" content="en_US" />
         <meta property="og:title" content={TITLE} />
         <meta property="og:description" content={DESCRIPTION} />
         <meta property="og:url" content={`${SITE_URL}/`} />
