@@ -626,14 +626,10 @@ body:has(.mk-root) #root {
   color: var(--ink-2);
   font-size: 0.95rem;
 }
-/* The libero breaks out of the founders band: she's bottom-anchored and
-   oversized so she rises past the section's top edge, like she's coming out
-   of the screen. multiply-blend erases any white left in the source art
-   against the band's solid background; the drop-shadow sells the depth. */
-.mk-section-founders { overflow: visible; }
 /* figure.mk-dig (not .mk-dig): must outrank the `.mk-root figure` margin
-   reset at the top of this file, which otherwise zeroes the negative
-   margins that let her overhang the band */
+   reset at the top of this file. Centered both axes so she lines up with
+   the vertical middle of the text column beside her (.mk-founders-grid's
+   align-items: center) at every width instead of drifting to the bottom. */
 figure.mk-dig {
   width: 100%;
   max-width: 400px;
@@ -648,11 +644,7 @@ figure.mk-dig img {
 }
 @media (min-width: 880px) {
   figure.mk-dig {
-    max-width: 520px;
-    /* bottom-anchored via align-self; the negative bottom margin pushes her
-       past the band's bottom border so she visibly breaks the frame */
-    margin: 0 0 -96px;
-    align-self: end;
+    max-width: 460px;
   }
 }
 
