@@ -9,6 +9,9 @@ const TITLE = 'About Sideline. Helping coaches stay focused when it matters.';
 const DESCRIPTION =
   'Sideline is a voice-first note-taking tool for volleyball coaches, built by two students from New Jersey. It captures in-game observations in the moment so nothing gets lost before practice.';
 
+// '@id': `${SITE_URL}/#organization` ties this back to the same Organization
+// node defined on the homepage (index.jsx) — keep the two in sync rather than
+// letting the brand's identity drift across pages.
 const JSON_LD = {
   '@context': 'https://schema.org',
   '@type': 'AboutPage',
@@ -17,9 +20,11 @@ const JSON_LD = {
   description: DESCRIPTION,
   mainEntity: {
     '@type': 'Organization',
+    '@id': `${SITE_URL}/#organization`,
     name: 'Sideline',
     url: SITE_URL,
     email: CONTACT_EMAIL,
+    logo: `${SITE_URL}/sideline-whistle.png`,
     foundingLocation: 'New Jersey, United States',
     founder: [
       { '@type': 'Person', name: 'Ishan Sarda' },
@@ -36,9 +41,11 @@ export default function AboutPage() {
       <Head>
         <title>{TITLE}</title>
         <meta name="description" content={DESCRIPTION} />
+        <meta name="robots" content="index, follow, max-image-preview:large" />
         <link rel="canonical" href={`${SITE_URL}/about`} />
         <meta property="og:type" content="website" />
         <meta property="og:site_name" content="Sideline" />
+        <meta property="og:locale" content="en_US" />
         <meta property="og:title" content={TITLE} />
         <meta property="og:description" content={DESCRIPTION} />
         <meta property="og:url" content={`${SITE_URL}/about`} />
