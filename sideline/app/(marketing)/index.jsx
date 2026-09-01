@@ -288,7 +288,7 @@ function NoteCardDemo() {
   );
 }
 
-// The note a coach's voice becomes in the voice-to-note moment below.
+// The note a coach's voice becomes in the voice-to-note morph below.
 const WAVE_NOTE = {
   quote: 'Maya’s toss is drifting left on her jump serve.',
   player: '#12 (Maya R.)',
@@ -296,19 +296,65 @@ const WAVE_NOTE = {
   game: 'Tuesday vs. Ridge',
 };
 
-// The waveform's resting shape: bar heights (px) roughly tracing the
-// cadence of a short spoken sentence — two bursts with a breath between.
-const WAVE_BARS = [
-  16, 26, 38, 50, 42, 32, 24, 20, 28, 36, 26, 18,
-  22, 44, 56, 46, 34, 26, 30, 22, 16, 24, 18, 12,
-];
+// Builds the voice-to-note timeline: the six bars oscillate like a live
+// waveform for ~1s, then the outer four reshape into the card's frame (the
+// two at the edges stretch into the side borders; two rotate 90° into the
+// top and bottom) while the middle pair fades. The real card crossfades in
+// underneath. Transforms and opacity only; no layout, no canvas.
+function buildWaveTimeline(gsap, card, bars) {
+  const cardRect = card.getBoundingClientRect();
+  const rects = bars.map((b) => b.getBoundingClientRect());
+  const barW = rects[0].width;
+  const barH = rects[0].height;
+  // GSAP x/y are deltas from each bar's resting center to a border midpoint.
+  const moveTo = (i, targetX, targetY) => ({
+    x: targetX - (rects[i].left + rects[i].right) / 2,
+    y: targetY - (rects[i].top + rects[i].bottom) / 2,
+  });
+  const midX = cardRect.left + cardRect.width / 2;
+  const midY = cardRect.top + cardRect.height / 2;
+  const frame = {
+    left: { ...moveTo(0, cardRect.left + barW / 2, midY), rotation: 0, scaleY: cardRect.height / barH },
+    top: { ...moveTo(1, midX, cardRect.top + barW / 2), rotation: 90, scaleY: cardRect.width / barH },
+    bottom: { ...moveTo(4, midX, cardRect.bottom - barW / 2), rotation: 90, scaleY: cardRect.width / barH },
+    right: { ...moveTo(5, cardRect.right - barW / 2, midY), rotation: 0, scaleY: cardRect.height / barH },
+  };
 
-// The "how it works" moment, read top to bottom like the product itself:
-// a voice waveform, an arrow, and the structured note it becomes. On
-// scroll (GSAP ScrollTrigger, once) the bars flutter like live audio,
-// then the arrow and card follow, as if the note files itself. Everything
-// is statically rendered fully visible, so crawlers, no-JS visitors, and
-// reduced-motion users always see the complete moment.
+  const tl = gsap.timeline({ defaults: { transformOrigin: '50% 50%' } });
+  // ~1s of "listening": each bar re-rolls a random height every beat
+  tl.to(bars, {
+    scaleY: 'random(0.3, 2.3)',
+    duration: 0.14,
+    ease: 'sine.inOut',
+    repeat: 6,
+    repeatRefresh: true,
+    stagger: { each: 0.02, from: 'random' },
+  });
+  tl.to(bars, { scaleY: 1, duration: 0.16, ease: 'sine.out' });
+  // the waveform becomes the card frame
+  tl.add('morph');
+  tl.to(bars[0], { ...frame.left, duration: 0.6, ease: 'power3.inOut' }, 'morph');
+  tl.to(bars[1], { ...frame.top, duration: 0.6, ease: 'power3.inOut' }, 'morph');
+  tl.to(bars[4], { ...frame.bottom, duration: 0.6, ease: 'power3.inOut' }, 'morph');
+  tl.to(bars[5], { ...frame.right, duration: 0.6, ease: 'power3.inOut' }, 'morph');
+  tl.to([bars[2], bars[3]], { scaleY: 0.2, opacity: 0, duration: 0.3, ease: 'power2.in' }, 'morph');
+  // the frame hands off to the real card
+  tl.to(card, { opacity: 1, duration: 0.45, ease: 'power1.out' }, 'morph+=0.45');
+  tl.fromTo(
+    card.querySelectorAll('.mk-wavecard-quote, .mk-notecard-row'),
+    { opacity: 0, y: 6 },
+    { opacity: 1, y: 0, duration: 0.35, ease: 'power2.out', stagger: 0.06 },
+    'morph+=0.5'
+  );
+  tl.to(bars, { opacity: 0, duration: 0.3, ease: 'power1.out' }, 'morph+=0.6');
+  return tl;
+}
+
+// The "how it works" moment: a sound waveform that collapses into the
+// structured note card when scrolled into view (GSAP ScrollTrigger, once).
+// Statically rendered as the finished card; the bars only appear after JS
+// arms the animation, so crawlers, no-JS visitors, and reduced-motion users
+// always see the complete card.
 function WaveToNote() {
   const rootRef = useRef(null);
 
@@ -316,90 +362,74 @@ function WaveToNote() {
     if (Platform.OS !== 'web' || prefersReducedMotion()) return undefined;
     const root = rootRef.current;
     if (!root) return undefined;
-    const bars = Array.from(root.querySelectorAll('.mk-wavecard-bar'));
-    const flow = root.querySelector('.mk-wavecard-flow');
     const card = root.querySelector('.mk-wavecard-card');
-    if (bars.length === 0 || !card) return undefined;
+    const bars = Array.from(root.querySelectorAll('.mk-wavecard-bar'));
+    if (!card || bars.length === 0) return undefined;
 
     let trigger;
     let tl;
     let cancelled = false;
+    let gaveUp = false;
+    root.classList.add('is-armed');
+    // Arming hides the card (the morph is what fades it back in), so a CDN
+    // that hangs rather than erroring — captive wifi, a blocking proxy — would
+    // otherwise leave an empty gap where the card should be, forever. Give the
+    // script a budget; past it, drop the animation and show the finished card.
+    const giveUp = setTimeout(() => {
+      gaveUp = true;
+      root.classList.remove('is-armed');
+    }, 3000);
     loadMarketingGsap().then((gsap) => {
-      if (cancelled || !gsap) return;
+      if (cancelled || gaveUp) return; // too late to hide the card again
+      clearTimeout(giveUp);
+      if (!gsap) {
+        root.classList.remove('is-armed'); // CDN failed; show the static card
+        return;
+      }
       trigger = window.ScrollTrigger.create({
         trigger: root,
         start: 'top 75%',
         once: true,
         onEnter: () => {
-          tl = gsap.timeline();
-          // the voice: bars sweep up left-to-right, then jitter like live audio
-          tl.fromTo(
-            bars,
-            { scaleY: 0.15, opacity: 0.4, transformOrigin: '50% 50%' },
-            { scaleY: 1, opacity: 1, duration: 0.45, ease: 'power2.out', stagger: { each: 0.02 } }
-          );
-          tl.to(bars, {
-            scaleY: 'random(0.45, 1.5)',
-            duration: 0.14,
-            ease: 'sine.inOut',
-            repeat: 5,
-            repeatRefresh: true,
-            stagger: { each: 0.012, from: 'random' },
-          });
-          tl.to(bars, { scaleY: 1, duration: 0.2, ease: 'sine.out' });
-          // ...becomes the note: arrow, then the card rises in
-          tl.fromTo(flow, { opacity: 0 }, { opacity: 1, duration: 0.3 }, '-=0.25');
-          tl.fromTo(
-            card,
-            { opacity: 0, y: 16 },
-            { opacity: 1, y: 0, duration: 0.55, ease: 'power2.out' },
-            '-=0.05'
-          );
-          tl.fromTo(
-            card.querySelectorAll('.mk-notecard-row'),
-            { opacity: 0, y: 6 },
-            { opacity: 1, y: 0, duration: 0.3, ease: 'power2.out', stagger: 0.07 },
-            '-=0.25'
-          );
+          tl = buildWaveTimeline(gsap, card, bars);
         },
       });
     });
     return () => {
       cancelled = true;
+      clearTimeout(giveUp);
       if (trigger) trigger.kill();
       if (tl) tl.kill();
+      root.classList.remove('is-armed');
     };
   }, []);
 
   return (
     <div className="mk-wavecard" ref={rootRef}>
-      <div className="mk-wavecard-bars" aria-hidden="true">
-        {WAVE_BARS.map((height, i) => (
-          <span key={i} className="mk-wavecard-bar" style={{ height }} />
-        ))}
-      </div>
-      <div className="mk-wavecard-flow" aria-hidden="true">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M12 4v16" /><path d="M6 14l6 6 6-6" />
-        </svg>
-      </div>
-      <figure className="mk-wavecard-card" aria-label="A five-second voice note shown as the structured note it becomes">
-        <p className="mk-wavecard-quote">&ldquo;{WAVE_NOTE.quote}&rdquo;</p>
-        <div className="mk-wavecard-rows">
-          <div className="mk-notecard-row">
-            <span className="mk-notecard-label">Player</span>
-            <span className="mk-notecard-value">{WAVE_NOTE.player}</span>
-          </div>
-          <div className="mk-notecard-row">
-            <span className="mk-notecard-label">Skill</span>
-            <span className="mk-notecard-value">{WAVE_NOTE.skill}</span>
-          </div>
-          <div className="mk-notecard-row">
-            <span className="mk-notecard-label">Game</span>
-            <span className="mk-notecard-value">{WAVE_NOTE.game}</span>
-          </div>
+      <div className="mk-wavecard-stage">
+        <div className="mk-wavecard-bars" aria-hidden="true">
+          {[0, 1, 2, 3, 4, 5].map((i) => (
+            <span key={i} className="mk-wavecard-bar" />
+          ))}
         </div>
-      </figure>
+        <figure className="mk-wavecard-card" aria-label="A five-second voice note shown as the structured note it becomes">
+          <p className="mk-wavecard-quote">&ldquo;{WAVE_NOTE.quote}&rdquo;</p>
+          <div className="mk-wavecard-rows">
+            <div className="mk-notecard-row">
+              <span className="mk-notecard-label">Player</span>
+              <span className="mk-notecard-value">{WAVE_NOTE.player}</span>
+            </div>
+            <div className="mk-notecard-row">
+              <span className="mk-notecard-label">Skill</span>
+              <span className="mk-notecard-value">{WAVE_NOTE.skill}</span>
+            </div>
+            <div className="mk-notecard-row">
+              <span className="mk-notecard-label">Game</span>
+              <span className="mk-notecard-value">{WAVE_NOTE.game}</span>
+            </div>
+          </div>
+        </figure>
+      </div>
       <p className="mk-wavecard-caption">Said out loud during a rally. Filed before the next one.</p>
     </div>
   );

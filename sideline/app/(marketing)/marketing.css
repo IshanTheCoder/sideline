@@ -492,43 +492,37 @@ body:has(.mk-root) #root {
   color: var(--sage-deep);
 }
 
-/* ---------- voice-to-note moment (how it works) ----------
-   Read top to bottom like the product: a live waveform, an arrow, and the
-   structured note it becomes. Statically rendered fully visible; GSAP only
-   adds the flutter-and-file entrance on scroll. */
+/* ---------- voice-to-note morph (how it works) ----------
+   Statically rendered as the finished card. When JS arms the animation
+   (.is-armed), the card hides and the waveform bars take its place; GSAP
+   then morphs the bars out into the card frame and crossfades the card back
+   in. Reduced-motion and no-JS visitors only ever see the finished card. */
 
 .mk-wavecard {
   max-width: 560px;
   margin: 72px auto 0;
 }
+/* the bars sit on top of where the card will be, so they can stretch
+   outward into its four borders rather than animating beside it */
+.mk-wavecard-stage { position: relative; }
 .mk-wavecard-bars {
-  display: flex;
+  position: absolute;
+  inset: 0;
+  display: none;
   align-items: center;
   justify-content: center;
-  gap: 7px;
-  height: 64px;
+  gap: 12px;
+  pointer-events: none;
 }
+.mk-wavecard.is-armed .mk-wavecard-bars { display: flex; }
+.mk-wavecard.is-armed .mk-wavecard-card { opacity: 0; }
 .mk-wavecard-bar {
-  width: 6px;
-  border-radius: 4px;
+  width: 5px;
+  height: 44px;
+  border-radius: 3px;
   background: var(--sage);
   will-change: transform;
 }
-/* the same hairline-and-arrow divider the hero card uses */
-.mk-wavecard-flow {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin: 18px 0;
-  color: var(--ink-3);
-}
-.mk-wavecard-flow::before,
-.mk-wavecard-flow::after {
-  content: '';
-  flex: 1;
-  border-top: 1px solid var(--hairline);
-}
-.mk-wavecard-flow svg { flex-shrink: 0; }
 .mk-wavecard-card {
   background: var(--surface);
   border: 1px solid var(--hairline);
@@ -551,6 +545,12 @@ body:has(.mk-root) #root {
   font-style: italic;
   color: var(--ink-2);
   margin-top: 18px;
+}
+/* the bars are decoration for a motion the reduced-motion user never sees;
+   the finished card is the whole message, so show only that */
+@media (prefers-reduced-motion: reduce) {
+  .mk-wavecard .mk-wavecard-bars { display: none !important; }
+  .mk-wavecard .mk-wavecard-card { opacity: 1 !important; }
 }
 
 /* ---------- features (what you get back) ---------- */
