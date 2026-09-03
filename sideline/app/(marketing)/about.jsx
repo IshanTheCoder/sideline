@@ -66,8 +66,7 @@ export default function AboutPage() {
           <h1>We&rsquo;re helping coaches stay focused when it matters.</h1>
 
           <p>
-            We&rsquo;re Ishan and Sid, students at West Windsor-Plainsboro High School
-            South in New Jersey. We love sports, we love AI, and we love using technology
+            We&rsquo;re Ishan and Sid, high school students in New Jersey. We love sports, we love AI, and we love using technology
             to solve real problems.
           </p>
 
@@ -108,8 +107,7 @@ export default function AboutPage() {
 
           <h2>Get in touch</h2>
           <p>
-            Sideline has already run games with our school&rsquo;s team at WW-P South, a
-            top-five program in the state. Now we&rsquo;re looking for our first ten
+            Sideline has already run games with local high school teams. Now we&rsquo;re looking for our first ten
             volleyball coaches to run it for a season, boys&rsquo; and girls&rsquo; programs
             alike. If that&rsquo;s you, email{' '}
             <a className="mk-link-underline" href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a>.
