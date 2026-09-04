@@ -5,6 +5,7 @@
  * and the opponent scouting report. All synthesized from the game's real
  * notes via Groq, with data-only fallbacks when AI is unavailable.
  */
+import Head from 'expo-router/head';
 import { useFocusEffect } from '@react-navigation/native';
 import { useLocalSearchParams } from 'expo-router';
 import { CheckCircle2, ChevronLeft, Eye } from 'lucide-react-native';
@@ -250,6 +251,9 @@ export default function GameAnalysisScreen() {
 
   return (
     <View style={styles.container}>
+      <Head>
+        <title>Sideline - Game Summary</title>
+      </Head>
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={styles.scrollContent}

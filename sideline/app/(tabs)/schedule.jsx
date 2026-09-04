@@ -4,6 +4,7 @@
  * (MON / day / weekday), an empty state per month, and the Add Game sheet
  * (manual + scan). Long-press a game to remove it from the schedule.
  */
+import Head from 'expo-router/head';
 import { useFocusEffect } from '@react-navigation/native';
 import { Calendar, ChevronLeft, ChevronRight, Plus } from 'lucide-react-native';
 import { useCallback, useMemo, useState } from 'react';
@@ -90,6 +91,9 @@ export default function ScheduleScreen() {
 
   return (
     <View style={styles.container}>
+      <Head>
+        <title>Sideline - Schedule</title>
+      </Head>
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={styles.scrollContent}

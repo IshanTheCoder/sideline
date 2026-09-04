@@ -4,6 +4,7 @@
  * scheduled game (Start Capture jumps straight into live capture), the
  * upcoming schedule, and recent games with note counts.
  */
+import Head from 'expo-router/head';
 import { useFocusEffect } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
 import { Calendar, ChevronRight, Mic, Settings, Users } from 'lucide-react-native';
@@ -223,6 +224,9 @@ export default function HomeScreen() {
 
   return (
     <View style={styles.container}>
+      <Head>
+        <title>Sideline</title>
+      </Head>
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={styles.scrollContent}

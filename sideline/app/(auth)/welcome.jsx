@@ -3,6 +3,7 @@
  * whistle logo, green SIDELINE wordmark, green Get Started. Entry point for
  * signed-out users.
  */
+import Head from 'expo-router/head';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { ChevronLeft } from 'lucide-react-native';
@@ -22,6 +23,9 @@ export default function WelcomeScreen() {
 
   return (
     <View style={styles.container}>
+      <Head>
+        <title>Sideline - Welcome</title>
+      </Head>
       <StatusBar style="dark" />
       {/* Web only: escape hatch back to the marketing site */}
       {Platform.OS === 'web' && (

@@ -4,6 +4,7 @@
  * screen's required checkbox, without duplicating the copy into two pages.
  * Exempted from the root layout's signed-out redirect in app/_layout.jsx.
  */
+import Head from 'expo-router/head';
 import { StatusBar } from 'expo-status-bar';
 import { ChevronLeft } from 'lucide-react-native';
 import { Linking, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
@@ -26,6 +27,9 @@ export default function PrivacyPolicyScreen() {
 
   return (
     <View style={styles.container}>
+      <Head>
+        <title>Sideline - Privacy Policy</title>
+      </Head>
       <StatusBar style="dark" />
       <ScrollView
         contentContainerStyle={styles.scrollContent}

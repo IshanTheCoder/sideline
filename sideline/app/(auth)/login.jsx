@@ -4,6 +4,7 @@
  * Sign In. Auth logic (Supabase email/password, Google OAuth, password reset)
  * is unchanged from the previous version.
  */
+import Head from 'expo-router/head';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { ChevronLeft } from 'lucide-react-native';
@@ -161,6 +162,9 @@ export default function LoginScreen() {
 
   return (
     <View style={styles.container}>
+      <Head>
+        <title>Sideline - Log In</title>
+      </Head>
       <StatusBar style="dark" />
       <ScrollView
         contentContainerStyle={styles.scrollContent}

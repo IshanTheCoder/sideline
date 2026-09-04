@@ -1,3 +1,4 @@
+import Head from 'expo-router/head';
 import React, { useEffect } from 'react';
 import { View, StyleSheet, ActivityIndicator, Platform, Text } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
@@ -137,6 +138,9 @@ export default function CallbackScreen() {
 
   return (
     <View style={styles.container}>
+      <Head>
+        <title>Sideline - Signing In</title>
+      </Head>
       <ActivityIndicator size="large" color={Brand.green} />
       <Text style={styles.text}>Completing sign in…</Text>
     </View>

@@ -4,6 +4,7 @@
  * through this single file, on web and native). See _layout.jsx: this route
  * is exempted from the auth-redirect effect so it's actually reachable.
  */
+import Head from 'expo-router/head';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
@@ -20,6 +21,9 @@ export default function NotFoundScreen() {
 
   return (
     <View style={styles.container}>
+      <Head>
+        <title>Sideline - Page Not Found</title>
+      </Head>
       <StatusBar style="dark" />
       <View style={styles.center}>
         <Text style={styles.eyebrow}>404</Text>

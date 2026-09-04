@@ -4,6 +4,7 @@
  * small sheet), an active-team section (Sport + Roster), ACCOUNT rows using
  * the existing email/password modals, and Sign out.
  */
+import Head from 'expo-router/head';
 import { useFocusEffect } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
 import { Check, ChevronLeft, ChevronRight, Pencil, Plus, X } from 'lucide-react-native';
@@ -166,6 +167,9 @@ export default function SettingsScreen() {
 
   return (
     <View style={styles.container}>
+      <Head>
+        <title>Sideline - Settings</title>
+      </Head>
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={styles.scrollContent}

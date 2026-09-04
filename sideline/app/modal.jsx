@@ -1,3 +1,4 @@
+import Head from 'expo-router/head';
 import { Link } from 'expo-router';
 import { StyleSheet } from 'react-native';
 
@@ -6,6 +7,7 @@ import { ThemedView } from '@/components/themed-view';
 
 export default function ModalScreen() {
   return (
+    <Head><title>Sideline - Modal</title></Head>
     <ThemedView style={styles.container}>
       <ThemedText type="title">This is a modal</ThemedText>
       <Link href="/" dismissTo style={styles.link}>
