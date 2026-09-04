@@ -455,6 +455,7 @@ export default function RecordScreen() {
     <Pressable style={styles.container} onPressIn={onSurfaceTap}>
       <Head>
         <title>Sideline - Record</title>
+        <meta name="description" content="Record voice notes during games. AI transcribes and organizes them instantly." />
       </Head>
       {/* top row */}
       <View style={styles.topRow}>

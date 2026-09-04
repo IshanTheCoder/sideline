@@ -93,6 +93,7 @@ export default function ScheduleScreen() {
     <View style={styles.container}>
       <Head>
         <title>Sideline - Schedule</title>
+        <meta name="description" content="Plan your season with game scheduling and management." />
       </Head>
       <ScrollView
         style={styles.scroll}

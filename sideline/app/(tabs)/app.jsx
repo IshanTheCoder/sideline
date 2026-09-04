@@ -226,6 +226,7 @@ export default function HomeScreen() {
     <View style={styles.container}>
       <Head>
         <title>Sideline</title>
+        <meta name="description" content="Dashboard for your volleyball coaching notes and upcoming games." />
       </Head>
       <ScrollView
         style={styles.scroll}

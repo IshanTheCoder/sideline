@@ -268,6 +268,7 @@ export default function GameDetailScreen() {
     <View style={styles.container}>
       <Head>
         <title>Sideline - Game Recordings</title>
+        <meta name="description" content="View all notes from a specific game, organized by set and player." />
       </Head>
       <ScrollView
         style={styles.scroll}

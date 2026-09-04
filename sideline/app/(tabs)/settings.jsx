@@ -169,6 +169,7 @@ export default function SettingsScreen() {
     <View style={styles.container}>
       <Head>
         <title>Sideline - Settings</title>
+        <meta name="description" content="Customize your Sideline account and team settings." />
       </Head>
       <ScrollView
         style={styles.scroll}

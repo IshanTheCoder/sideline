@@ -25,6 +25,7 @@ export default function WelcomeScreen() {
     <View style={styles.container}>
       <Head>
         <title>Sideline - Welcome</title>
+        <meta name="description" content="Sideline - AI-powered coaching notes for volleyball. Get started." />
       </Head>
       <StatusBar style="dark" />
       {/* Web only: escape hatch back to the marketing site */}

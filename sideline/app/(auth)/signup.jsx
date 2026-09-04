@@ -275,6 +275,7 @@ export default function SignupScreen() {
     <View style={styles.container}>
       <Head>
         <title>Sideline - Sign Up</title>
+        <meta name="description" content="Create a Sideline account to start recording game observations with AI." />
       </Head>
       <StatusBar style="dark" />
       <ScrollView

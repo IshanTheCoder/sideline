@@ -29,6 +29,7 @@ export default function PrivacyPolicyScreen() {
     <View style={styles.container}>
       <Head>
         <title>Sideline - Privacy Policy</title>
+        <meta name="description" content="Sideline Privacy Policy - how we protect your coaching data." />
       </Head>
       <StatusBar style="dark" />
       <ScrollView

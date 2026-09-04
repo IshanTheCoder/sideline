@@ -253,6 +253,7 @@ export default function GameAnalysisScreen() {
     <View style={styles.container}>
       <Head>
         <title>Sideline - Game Summary</title>
+        <meta name="description" content="AI-generated game analysis with practice plans and opponent scouting." />
       </Head>
       <ScrollView
         style={styles.scroll}
