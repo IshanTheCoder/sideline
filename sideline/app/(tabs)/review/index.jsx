@@ -3,6 +3,7 @@
  * Initials-tile rows with date + note count, pull-to-refresh, and
  * long-press to delete a game (recordings included).
  */
+import Head from 'expo-router/head';
 import { useFocusEffect } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
 import { ChevronLeft, ChevronRight, Trash2 } from 'lucide-react-native';
@@ -94,6 +95,9 @@ export default function GamesListScreen() {
 
   return (
     <View style={styles.container}>
+      <Head>
+        <title>Sideline - Games</title>
+      </Head>
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={styles.scrollContent}

@@ -5,6 +5,7 @@
  * profile insert, Google OAuth + sport modal) is unchanged from the previous
  * version.
  */
+import Head from 'expo-router/head';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { Check, ChevronLeft } from 'lucide-react-native';
@@ -272,6 +273,9 @@ export default function SignupScreen() {
 
   return (
     <View style={styles.container}>
+      <Head>
+        <title>Sideline - Sign Up</title>
+      </Head>
       <StatusBar style="dark" />
       <ScrollView
         contentContainerStyle={styles.scrollContent}

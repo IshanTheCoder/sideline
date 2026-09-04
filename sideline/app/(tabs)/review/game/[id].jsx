@@ -6,6 +6,7 @@
  */
 import { useFocusEffect } from '@react-navigation/native';
 import { Audio } from 'expo-av';
+import Head from 'expo-router/head';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { BarChart3, ChevronLeft, ChevronRight, Pause, Play, X } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -265,6 +266,9 @@ export default function GameDetailScreen() {
 
   return (
     <View style={styles.container}>
+      <Head>
+        <title>Sideline - Game Recordings</title>
+      </Head>
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={styles.scrollContent}

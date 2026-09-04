@@ -5,6 +5,7 @@
  * showing the transcribed note's AI label once processing lands. All real:
  * expo-av recording → Supabase upload → background transcription + labeling.
  */
+import Head from 'expo-router/head';
 import { Audio } from 'expo-av';
 import * as Crypto from 'expo-crypto';
 import * as Haptics from 'expo-haptics';
@@ -452,6 +453,9 @@ export default function RecordScreen() {
 
   return (
     <Pressable style={styles.container} onPressIn={onSurfaceTap}>
+      <Head>
+        <title>Sideline - Record</title>
+      </Head>
       {/* top row */}
       <View style={styles.topRow}>
         <TouchableOpacity

@@ -5,6 +5,7 @@
  * Groq vision importer with an include/exclude review list. Tap a player to
  * edit, long-press to remove.
  */
+import Head from 'expo-router/head';
 import { Camera, Check, ChevronLeft, X } from 'lucide-react-native';
 import { useCallback, useState } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
@@ -215,6 +216,9 @@ export default function RosterScreen() {
 
   return (
     <View style={styles.container}>
+      <Head>
+        <title>Sideline - Roster</title>
+      </Head>
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={styles.scrollContent}

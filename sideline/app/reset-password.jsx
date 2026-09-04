@@ -3,6 +3,7 @@
  * Reached from the password-reset email link; updates the password on the
  * recovery session, then sends the coach back to login. Logic unchanged.
  */
+import Head from 'expo-router/head';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useState, useEffect } from 'react';
@@ -103,6 +104,9 @@ export default function ResetPasswordScreen() {
 
   return (
     <View style={styles.container}>
+      <Head>
+        <title>Sideline - Reset Password</title>
+      </Head>
       <StatusBar style="dark" />
       <ScrollView
         contentContainerStyle={styles.scrollContent}
