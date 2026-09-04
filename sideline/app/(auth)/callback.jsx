@@ -140,6 +140,7 @@ export default function CallbackScreen() {
     <View style={styles.container}>
       <Head>
         <title>Sideline - Signing In</title>
+        <meta name="description" content="Completing your sign in to Sideline..." />
       </Head>
       <ActivityIndicator size="large" color={Brand.green} />
       <Text style={styles.text}>Completing sign in…</Text>

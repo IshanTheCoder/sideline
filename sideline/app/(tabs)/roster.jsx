@@ -218,6 +218,7 @@ export default function RosterScreen() {
     <View style={styles.container}>
       <Head>
         <title>Sideline - Roster</title>
+        <meta name="description" content="Manage your team roster with positions and jersey numbers." />
       </Head>
       <ScrollView
         style={styles.scroll}

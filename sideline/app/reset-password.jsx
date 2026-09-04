@@ -106,6 +106,7 @@ export default function ResetPasswordScreen() {
     <View style={styles.container}>
       <Head>
         <title>Sideline - Reset Password</title>
+        <meta name="description" content="Reset your Sideline password." />
       </Head>
       <StatusBar style="dark" />
       <ScrollView

@@ -97,6 +97,7 @@ export default function GamesListScreen() {
     <View style={styles.container}>
       <Head>
         <title>Sideline - Games</title>
+        <meta name="description" content="Review all your recorded games and coaching observations." />
       </Head>
       <ScrollView
         style={styles.scroll}

@@ -23,6 +23,7 @@ export default function NotFoundScreen() {
     <View style={styles.container}>
       <Head>
         <title>Sideline - Page Not Found</title>
+        <meta name="description" content="Page not found on Sideline." />
       </Head>
       <StatusBar style="dark" />
       <View style={styles.center}>

@@ -164,6 +164,7 @@ export default function LoginScreen() {
     <View style={styles.container}>
       <Head>
         <title>Sideline - Log In</title>
+        <meta name="description" content="Sign in to Sideline and access your game notes and analysis." />
       </Head>
       <StatusBar style="dark" />
       <ScrollView
